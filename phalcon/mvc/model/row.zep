@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -30,7 +30,7 @@ use Phalcon\Mvc\Model\ResultInterface;
  * This component allows Phalcon\Mvc\Model to return rows without an associated entity.
  * This objects implements the ArrayAccess interface to allow access the object as object->x or array[x].
  */
-class Row implements EntityInterface, ResultInterface, \ArrayAccess
+class Row implements EntityInterface, ResultInterface, \ArrayAccess, \JsonSerializable
 {
 
 	/**
@@ -92,7 +92,7 @@ class Row implements EntityInterface, ResultInterface, \ArrayAccess
 	 * Reads an attribute value by its name
 	 *
 	 *<code>
-	 *  echo $robot->readAttribute('name');
+	 * echo $robot->readAttribute("name");
 	 *</code>
 	 *
 	 * @param string attribute
@@ -111,7 +111,7 @@ class Row implements EntityInterface, ResultInterface, \ArrayAccess
 	 * Writes an attribute value by its name
 	 *
 	 *<code>
-	 *  $robot->writeAttribute('name', 'Rosey');
+	 * $robot->writeAttribute("name", "Rosey");
 	 *</code>
 	 *
 	 * @param string attribute
@@ -130,5 +130,15 @@ class Row implements EntityInterface, ResultInterface, \ArrayAccess
 	public function toArray() -> array
 	{
 		return get_object_vars(this);
+	}
+
+    /**
+    * Serializes the object for json_encode
+    *
+    * @return array
+    */
+	public function jsonSerialize() -> array
+	{
+	    return this->toArray();
 	}
 }

@@ -34,6 +34,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_Row) {
 	zend_class_implements(phalcon_mvc_model_row_ce TSRMLS_CC, 1, phalcon_mvc_entityinterface_ce);
 	zend_class_implements(phalcon_mvc_model_row_ce TSRMLS_CC, 1, phalcon_mvc_model_resultinterface_ce);
 	zend_class_implements(phalcon_mvc_model_row_ce TSRMLS_CC, 1, zend_ce_arrayaccess);
+	zend_class_implements(phalcon_mvc_model_row_ce TSRMLS_CC, 1, zephir_get_internal_ce(SS("jsonserializable") TSRMLS_CC));
 	return SUCCESS;
 
 }
@@ -44,7 +45,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_Row) {
 PHP_METHOD(Phalcon_Mvc_Model_Row, setDirtyState) {
 
 	zval *dirtyState_param = NULL;
-	int dirtyState;
+	zend_long dirtyState;
 
 	zephir_fetch_params(0, 1, 0, &dirtyState_param);
 
@@ -124,7 +125,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Row, offsetSet) {
 PHP_METHOD(Phalcon_Mvc_Model_Row, offsetUnset) {
 
 	zval *offset_param = NULL;
-	int offset;
+	zend_long offset;
 
 	zephir_fetch_params(0, 1, 0, &offset_param);
 
@@ -140,7 +141,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Row, offsetUnset) {
  * Reads an attribute value by its name
  *
  *<code>
- *  echo $robot->readAttribute('name');
+ * echo $robot->readAttribute("name");
  *</code>
  *
  * @param string attribute
@@ -167,7 +168,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Row, readAttribute) {
  * Writes an attribute value by its name
  *
  *<code>
- *  $robot->writeAttribute('name', 'Rosey');
+ * $robot->writeAttribute("name", "Rosey");
  *</code>
  *
  * @param string attribute
@@ -181,11 +182,11 @@ PHP_METHOD(Phalcon_Mvc_Model_Row, writeAttribute) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 2, 0, &attribute_param, &value);
 
-	if (unlikely(Z_TYPE_P(attribute_param) != IS_STRING && Z_TYPE_P(attribute_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(attribute_param) != IS_STRING && Z_TYPE_P(attribute_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'attribute' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(attribute_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(attribute_param) == IS_STRING)) {
 		zephir_get_strval(attribute, attribute_param);
 	} else {
 		ZEPHIR_INIT_VAR(attribute);
@@ -193,7 +194,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Row, writeAttribute) {
 	}
 
 
-	zephir_update_property_zval_zval(this_ptr, attribute, value TSRMLS_CC);
+	zephir_update_property_zval_zval(getThis(), attribute, value TSRMLS_CC);
 	ZEPHIR_MM_RESTORE();
 
 }
@@ -205,11 +206,28 @@ PHP_METHOD(Phalcon_Mvc_Model_Row, writeAttribute) {
  */
 PHP_METHOD(Phalcon_Mvc_Model_Row, toArray) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
-	ZEPHIR_RETURN_CALL_FUNCTION("get_object_vars", NULL, 24, this_ptr);
+	ZEPHIR_RETURN_CALL_FUNCTION("get_object_vars", NULL, 22, this_ptr);
+	zephir_check_call_status();
+	RETURN_MM();
+
+}
+
+/**
+ * Serializes the object for json_encode
+ *
+ * @return array
+ */
+PHP_METHOD(Phalcon_Mvc_Model_Row, jsonSerialize) {
+
+	zend_long ZEPHIR_LAST_CALL_STATUS;
+
+	ZEPHIR_MM_GROW();
+
+	ZEPHIR_RETURN_CALL_METHOD(this_ptr, "toarray", NULL, 0);
 	zephir_check_call_status();
 	RETURN_MM();
 

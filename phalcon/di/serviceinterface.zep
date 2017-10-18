@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -26,16 +26,6 @@ namespace Phalcon\Di;
  */
 interface ServiceInterface
 {
-
-	/**
-	 * Phalcon\Di\ServiceInterface
-	 *
-	 * @param string name
-	 * @param mixed definition
-	 * @param boolean shared
-	 */
-	public function __construct(string name, definition, boolean shared = false);
-
 	/**
 	 * Returns the service's name
 	 *
@@ -82,7 +72,7 @@ interface ServiceInterface
 	public function setParameter(int position, array! parameter) -> <ServiceInterface>;
 
 	/**
-	 * Restore the interal state of a service
+	 * Restore the internal state of a service
 	 */
 	public static function __set_state(array! attributes) -> <ServiceInterface>;
 

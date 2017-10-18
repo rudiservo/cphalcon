@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -24,7 +24,7 @@ namespace Phalcon\Session;
  *
  * Base class for Phalcon\Session adapters
  */
-abstract class Adapter
+abstract class Adapter implements AdapterInterface
 {
 	const SESSION_ACTIVE = 2;
 
@@ -69,7 +69,11 @@ abstract class Adapter
 	 * Sets session's options
 	 *
 	 *<code>
-	 *	$session->setOptions(['uniqueId' => 'my-private-app']);
+	 * $session->setOptions(
+	 *     [
+	 *         "uniqueId" => "my-private-app",
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function setOptions(array! options)
@@ -119,9 +123,9 @@ abstract class Adapter
 	/**
 	 * Gets a session variable from an application context
 	 *
-	 *<code>
-	 *	$session->get('auth', 'yes');
-	 *</code>
+	 * <code>
+	 * $session->get("auth", "yes");
+	 * </code>
 	 */
 	public function get(string index, var defaultValue = null, boolean remove = false) -> var
 	{
@@ -148,7 +152,7 @@ abstract class Adapter
 	 * Sets a session variable in an application context
 	 *
 	 *<code>
-	 *	$session->set('auth', 'yes');
+	 * $session->set("auth", "yes");
 	 *</code>
 	 */
 	public function set(string index, var value)
@@ -168,7 +172,9 @@ abstract class Adapter
 	 * Check whether a session variable is set in an application context
 	 *
 	 *<code>
-	 *	var_dump($session->has('auth'));
+	 * var_dump(
+	 *     $session->has("auth")
+	 * );
 	 *</code>
 	 */
 	public function has(string index) -> boolean
@@ -186,11 +192,11 @@ abstract class Adapter
 	/**
 	 * Removes a session variable from an application context
 	 *
-	 *<code>
-	 *	$session->remove('auth');
-	 *</code>
+	 * <code>
+	 * $session->remove("auth");
+	 * </code>
 	 */
-	public function remove(string index)
+	public function remove(string index) -> void
 	{
 		var uniqueId;
 
@@ -207,7 +213,7 @@ abstract class Adapter
 	 * Returns active session id
 	 *
 	 *<code>
-	 *	echo $session->getId();
+	 * echo $session->getId();
 	 *</code>
 	 */
 	public function getId() -> string
@@ -219,7 +225,7 @@ abstract class Adapter
 	 * Set the current session id
 	 *
 	 *<code>
-	 *	$session->setId($id);
+	 * $session->setId($id);
 	 *</code>
 	 */
 	public function setId(string id)
@@ -231,7 +237,9 @@ abstract class Adapter
 	 * Check whether the session has been started
 	 *
 	 *<code>
-	 *	var_dump($session->isStarted());
+	 * var_dump(
+	 *     $session->isStarted()
+	 * );
 	 *</code>
 	 */
 	public function isStarted() -> boolean
@@ -243,25 +251,19 @@ abstract class Adapter
 	 * Destroys the active session
 	 *
 	 *<code>
-	 *	var_dump($session->destroy());
-	 *	var_dump($session->destroy(true));
+	 * var_dump(
+	 *     $session->destroy()
+	 * );
+	 *
+	 * var_dump(
+	 *     $session->destroy(true)
+	 * );
 	 *</code>
 	 */
 	public function destroy(boolean removeData = false) -> boolean
 	{
-		var uniqueId, key;
-
 		if removeData {
-			let uniqueId = this->_uniqueId;
-			if !empty uniqueId {
-				for key, _ in _SESSION {
-					if starts_with(key, uniqueId . "#") {
-						unset _SESSION[key];
-					}
-				}
-			} else {
-				let _SESSION = [];
-			}
+			this->removeSessionData();
 		}
 
 		let this->_started = false;
@@ -269,31 +271,30 @@ abstract class Adapter
 	}
 
 	/**
-	 * Returns the status of the current session. For PHP 5.3 this function will always return SESSION_NONE
+	 * Returns the status of the current session.
 	 *
 	 *<code>
-	 *	var_dump($session->status());
+	 * var_dump(
+	 *     $session->status()
+	 * );
 	 *
-	 *  // PHP 5.4 and above will give meaningful messages, 5.3 gets SESSION_NONE always
-	 *  if ($session->status() !== $session::SESSION_ACTIVE) {
-	 *      $session->start();
-	 *  }
+	 * if ($session->status() !== $session::SESSION_ACTIVE) {
+	 *     $session->start();
+	 * }
 	 *</code>
 	 */
 	public function status() -> int
 	{
 		var status;
 
-		if !is_php_version("5.3") {
-			let status = session_status();
+		let status = session_status();
 
-			switch status {
-				case PHP_SESSION_DISABLED:
-					return self::SESSION_DISABLED;
+		switch status {
+			case PHP_SESSION_DISABLED:
+				return self::SESSION_DISABLED;
 
-				case PHP_SESSION_ACTIVE:
-					return self::SESSION_ACTIVE;
-			}
+			case PHP_SESSION_ACTIVE:
+				return self::SESSION_ACTIVE;
 		}
 
 		return self::SESSION_NONE;
@@ -325,10 +326,14 @@ abstract class Adapter
 
 	/**
 	 * Alias: Removes a session variable from an application context
+	 *
+	 * <code>
+	 * unset($session->auth);
+	 * </code>
 	 */
 	public function __unset(string index)
 	{
-		return this->remove(index);
+		this->remove(index);
 	}
 
 	public function __destruct()
@@ -336,6 +341,27 @@ abstract class Adapter
 		if this->_started {
 			session_write_close();
 			let this->_started = false;
+		}
+	}
+
+	protected function removeSessionData() -> void
+	{
+		var uniqueId, key;
+
+		let uniqueId = this->_uniqueId;
+
+		if empty _SESSION {
+			return;
+		}
+
+		if !empty uniqueId {
+			for key, _ in _SESSION {
+				if starts_with(key, uniqueId . "#") {
+					unset _SESSION[key];
+				}
+			}
+		} else {
+			let _SESSION = [];
 		}
 	}
 }

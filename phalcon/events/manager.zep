@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,7 +20,7 @@
 namespace Phalcon\Events;
 
 use Phalcon\Events\Event;
-use SplPriorityQueue as PriorityQueue;
+use SplPriorityQueue;
 
 /**
  * Phalcon\Events\Manager
@@ -61,10 +61,10 @@ class Manager implements ManagerInterface
 			if this->_enablePriorities {
 
 				// Create a SplPriorityQueue to store the events with priorities
-				let priorityQueue = new PriorityQueue();
+				let priorityQueue = new SplPriorityQueue();
 
 				// Extract only the Data // Set extraction flags
-				priorityQueue->setExtractFlags(PriorityQueue::EXTR_DATA);
+				priorityQueue->setExtractFlags(SplPriorityQueue::EXTR_DATA);
 
 				// Append the events to the queue
 				let this->_events[eventType] = priorityQueue;
@@ -79,8 +79,8 @@ class Manager implements ManagerInterface
 			priorityQueue->insert(handler, priority);
 		} else {
 			// Append the events to the queue
-			let priorityQueue[] = handler;
-			let this->_events[eventType] = priorityQueue;
+			let priorityQueue[] = handler,
+				this->_events[eventType] = priorityQueue;
 		}
 
 	}
@@ -104,10 +104,10 @@ class Manager implements ManagerInterface
 			if typeof priorityQueue == "object" {
 
 				// SplPriorityQueue hasn't method for element deletion, so we need to rebuild queue
-				let newPriorityQueue = new PriorityQueue();
-				newPriorityQueue->setExtractFlags(\SplPriorityQueue::EXTR_DATA);
+				let newPriorityQueue = new SplPriorityQueue();
+				newPriorityQueue->setExtractFlags(SplPriorityQueue::EXTR_DATA);
 
-				priorityQueue->setExtractFlags(PriorityQueue::EXTR_BOTH);
+				priorityQueue->setExtractFlags(SplPriorityQueue::EXTR_BOTH);
 				priorityQueue->top();
 
 				while priorityQueue->valid() {
@@ -188,29 +188,26 @@ class Manager implements ManagerInterface
 	}
 
 	/**
-	 * Alias of detachAll
-	 */
-	public function dettachAll(string! type = null)
-	{
-		this->detachAll(type);
-	}
-
-	/**
 	 * Internal handler to call a queue of events
 	 *
 	 * @param \SplPriorityQueue|array queue
 	 * @param \Phalcon\Events\Event event
 	 * @return mixed
 	 */
-	public final function fireQueue(var queue, <Event> event)
+	public final function fireQueue(var queue, <EventInterface> event)
 	{
 		var status, arguments, eventName, data, iterator, source, handler;
 		boolean collect, cancelable;
 
 		if typeof queue != "array" {
 			if typeof queue == "object" {
-				if !(queue instanceof \SplPriorityQueue) {
-					throw new Exception(sprintf("Unexpected value type: expected object of type SplPriorityQueue, %s given", get_class(queue)));
+				if !(queue instanceof SplPriorityQueue) {
+					throw new Exception(
+						sprintf(
+							"Unexpected value type: expected object of type SplPriorityQueue, %s given",
+							get_class(queue)
+						)
+					);
 				}
 			} else {
 				throw new Exception("The queue is not valid");
@@ -232,7 +229,7 @@ class Manager implements ManagerInterface
 		let data = event->getData();
 
 		// Tell if the event is cancelable
-		let cancelable = (boolean) event->getCancelable();
+		let cancelable = (boolean) event->isCancelable();
 
 		// Responses need to be traced?
 		let collect = (boolean) this->_collect;
@@ -301,7 +298,6 @@ class Manager implements ManagerInterface
 						}
 					}
 				}
-
 			}
 
 		} else {
@@ -355,9 +351,7 @@ class Manager implements ManagerInterface
 									break;
 								}
 							}
-
 						}
-
 					}
 				}
 			}
@@ -370,7 +364,7 @@ class Manager implements ManagerInterface
 	 * Fires an event in the events manager causing the active listeners to be notified about it
 	 *
 	 *<code>
-	 *	$eventsManager->fire('db', $connection);
+	 *	$eventsManager->fire("db", $connection);
 	 *</code>
 	 *
 	 * @param string eventType
@@ -416,7 +410,6 @@ class Manager implements ManagerInterface
 
 				// Call the events queue
 				let status = this->fireQueue(fireEvents, event);
-
 			}
 		}
 
@@ -433,7 +426,6 @@ class Manager implements ManagerInterface
 				// Call the events queue
 				let status = this->fireQueue(fireEvents, event);
 			}
-
 		}
 
 		return status;

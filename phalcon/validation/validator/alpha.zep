@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,44 +28,64 @@ use Phalcon\Validation\Validator;
  *
  * Check for alphabetic character(s)
  *
- *<code>
- *use Phalcon\Validation\Validator\Alpha as AlphaValidator;
+ * <code>
+ * use Phalcon\Validation;
+ * use Phalcon\Validation\Validator\Alpha as AlphaValidator;
  *
- *$validator->add('username', new AlphaValidator(array(
- *   'message' => ':field must contain only letters'
- *)));
- *</code>
+ * $validator = new Validation();
+ *
+ * $validator->add(
+ *     "username",
+ *     new AlphaValidator(
+ *         [
+ *             "message" => ":field must contain only letters",
+ *         ]
+ *     )
+ * );
+ *
+ * $validator->add(
+ *     [
+ *         "username",
+ *         "name",
+ *     ],
+ *     new AlphaValidator(
+ *         [
+ *             "message" => [
+ *                 "username" => "username must contain only letters",
+ *                 "name"     => "name must contain only letters",
+ *             ],
+ *         ]
+ *     )
+ * );
+ * </code>
  */
 class Alpha extends Validator
 {
-
 	/**
 	 * Executes the validation
 	 */
 	public function validate(<Validation> validation, string! field) -> boolean
 	{
-		var value, message, label, replacePairs;
+		var value, message, label, replacePairs, code;
 
 		let value = validation->getValue(field);
 
-		if this->isSetOption("allowEmpty") && empty value {
-			return true;
-		}
+		if preg_match("/[^[:alpha:]]/imu", value) {
+			let label = this->prepareLabel(validation, field),
+				message = this->prepareMessage(validation, field, "Alpha"),
+				code = this->prepareCode(field);
 
-		if !ctype_alpha(value) {
-
-			let label = this->getOption("label");
-			if empty label {
-				let label = validation->getLabel(field);
-			}
-
-			let message = this->getOption("message");
 			let replacePairs = [":field": label];
-			if empty message {
-				let message = validation->getDefaultMessage("Alpha");
-			}
 
-			validation->appendMessage(new Message(strtr(message, replacePairs), field, "Alpha"));
+			validation->appendMessage(
+				new Message(
+					strtr(message, replacePairs),
+					field,
+					"Alpha",
+					code
+				)
+			);
+
 			return false;
 		}
 

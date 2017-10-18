@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -36,6 +36,8 @@ class Multiple
 
 	protected _formatter { get };
 
+	protected _logLevel { get };
+
 	/**
 	 * Pushes a logger to the logger tail
 	 */
@@ -58,6 +60,22 @@ class Multiple
 			}
 		}
 		let this->_formatter = formatter;
+	}
+
+	/**
+	 * Sets a global level
+	 */
+	public function setLogLevel(int level)
+	{
+		var loggers, logger;
+
+		let loggers = this->_loggers;
+		if typeof loggers == "array" {
+			for logger in loggers {
+				logger->setLogLevel(level);
+			}
+		}
+		let this->_logLevel = level;
 	}
 
 	/**

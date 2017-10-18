@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,13 +28,36 @@ use Phalcon\Validation\Validator;
  *
  * Check for numeric character(s)
  *
- *<code>
- *use Phalcon\Validation\Validator\Digit as DigitValidator;
+ * <code>
+ * use Phalcon\Validation;
+ * use Phalcon\Validation\Validator\Digit as DigitValidator;
  *
- *$validator->add('height', new DigitValidator(array(
- *   'message' => ':field must be numeric'
- *)));
- *</code>
+ * $validator = new Validation();
+ *
+ * $validator->add(
+ *     "height",
+ *     new DigitValidator(
+ *         [
+ *             "message" => ":field must be numeric",
+ *         ]
+ *     )
+ * );
+ *
+ * $validator->add(
+ *     [
+ *         "height",
+ *         "width",
+ *     ],
+ *     new DigitValidator(
+ *         [
+ *             "message" => [
+ *                 "height" => "height must be numeric",
+ *                 "width"  => "width must be numeric",
+ *             ],
+ *         ]
+ *     )
+ * );
+ * </code>
  */
 class Digit extends Validator
 {
@@ -44,31 +67,29 @@ class Digit extends Validator
 	 */
 	public function validate(<Validation> validation, string! field) -> boolean
 	{
-		var value, message, label, replacePairs;
+		var value, message, label, replacePairs, code;
 
 		let value = validation->getValue(field);
 
-		if this->isSetOption("allowEmpty") && empty value {
+		if is_int(value) || ctype_digit(value) {
 			return true;
 		}
 
-		if !ctype_digit(value) {
+		let label = this->prepareLabel(validation, field),
+			message = this->prepareMessage(validation, field, "Digit"),
+			code = this->prepareCode(field);
 
-			let label = this->getOption("label");
-			if empty label {
-				let label = validation->getLabel(field);
-			}
+		let replacePairs = [":field": label];
 
-			let message = this->getOption("message");
-			let replacePairs = [":field": label];
-			if empty message {
-				let message = validation->getDefaultMessage("Digit");
-			}
+		validation->appendMessage(
+			new Message(
+				strtr(message, replacePairs),
+				field,
+				"Digit",
+				code
+			)
+		);
 
-			validation->appendMessage(new Message(strtr(message, replacePairs), field, "Digit"));
-			return false;
-		}
-
-		return true;
+		return false;
 	}
 }

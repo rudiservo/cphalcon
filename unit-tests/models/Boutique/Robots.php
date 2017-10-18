@@ -5,6 +5,8 @@ namespace Boutique;
 class Robots extends \Phalcon\Mvc\Model
 {
 
+	const setterEpilogue = " setText";
+
 	/**
 	 * @Primary
 	 * @Identity
@@ -33,7 +35,25 @@ class Robots extends \Phalcon\Mvc\Model
 	public $datetime;
 
 	/**
+	 * @Column(type="datetime", nullable=true)
+	 */
+	public $deleted;
+
+	/**
 	 * @Column(type="text", nullable=false)
 	 */
-	public $text;
+	protected $text;
+
+	/**
+	 * Test restriction to not set hidden properties without setters.
+	 */
+	protected $serial;
+
+	public function getText() {
+		return $this->text;
+	}
+
+	public function setText($value) {
+		return ($this->text = $value . self::setterEpilogue);
+	}
 }

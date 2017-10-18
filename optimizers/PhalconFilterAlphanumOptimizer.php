@@ -4,10 +4,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,12 +28,12 @@ use Zephir\Optimizers\OptimizerAbstract;
 
 class PhalconFilterAlphanumOptimizer extends OptimizerAbstract
 {
-
 	/**
-	 *
 	 * @param array $expression
 	 * @param Call $call
 	 * @param CompilationContext $context
+	 * @return bool|CompiledExpression
+	 * @throws CompilerException
 	 */
 	public function optimize(array $expression, Call $call, CompilationContext $context)
 	{
@@ -63,8 +63,10 @@ class PhalconFilterAlphanumOptimizer extends OptimizerAbstract
 		$context->headersManager->add('kernel/filter');
 
 		$resolvedParams = $call->getReadOnlyResolvedParams($expression['parameters'], $context, $expression);
-		$context->codePrinter->output('zephir_filter_alphanum(' . $symbolVariable->getName() . ', ' . $resolvedParams[0] . ');');
+
+		$symbol = $context->backend->getVariableCode($symbolVariable);
+		$context->codePrinter->output('zephir_filter_alphanum(' . $symbol . ', ' . $resolvedParams[0] . ');');
+
 		return new CompiledExpression('variable', $symbolVariable->getRealName(), $expression);
 	}
-
 }

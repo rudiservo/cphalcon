@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,15 +28,41 @@ use Phalcon\Validation\Validator;
  *
  * Checks if a value is identical to other
  *
- *<code>
- *use Phalcon\Validation\Validator\Identical;
+ * <code>
+ * use Phalcon\Validation;
+ * use Phalcon\Validation\Validator\Identical;
  *
- *$validator->add('terms', new Identical(array(
- *   'accepted' => 'yes',
- *   'message' => 'Terms and conditions must be accepted'
- *)));
- *</code>
+ * $validator = new Validation();
  *
+ * $validator->add(
+ *     "terms",
+ *     new Identical(
+ *         [
+ *             "accepted" => "yes",
+ *             "message" => "Terms and conditions must be accepted",
+ *         ]
+ *     )
+ * );
+ *
+ * $validator->add(
+ *     [
+ *         "terms",
+ *         "anotherTerms",
+ *     ],
+ *     new Identical(
+ *         [
+ *             "accepted" => [
+ *                 "terms"        => "yes",
+ *                 "anotherTerms" => "yes",
+ *             ],
+ *             "message" => [
+ *                 "terms"        => "Terms and conditions must be accepted",
+ *                 "anotherTerms" => "Another terms  must be accepted",
+ *             ],
+ *         ]
+ *     )
+ * );
+ * </code>
  */
 class Identical extends Validator
 {
@@ -46,32 +72,42 @@ class Identical extends Validator
 	 */
 	public function validate(<Validation> validation, string! field) -> boolean
 	{
-		var message, label, replacePairs, value, valid;
+		var message, label, replacePairs, value, valid, accepted, valueOption, code;
 
 		let value = validation->getValue(field);
 
 		if this->hasOption("accepted") {
-			let valid = value == this->getOption("accepted");
+			let accepted = this->getOption("accepted");
+			if typeof accepted == "array" {
+				let accepted = accepted[field];
+			}
+			let valid = value == accepted;
 		} else {
 			if this->hasOption("value") {
-				let valid = value == this->getOption("value");
+				let valueOption = this->getOption("value");
+				if typeof valueOption == "array" {
+					let valueOption = valueOption[field];
+				}
+				let valid = value == valueOption;
 			}
 		}
 
 		if !valid {
+			let label = this->prepareLabel(validation, field),
+				message = this->prepareMessage(validation, field, "Identical"),
+				code = this->prepareCode(field);
 
-			let label = this->getOption("label");
-			if empty label {
-				let label = validation->getLabel(field);
-			}
-
-			let message = this->getOption("message");
 			let replacePairs = [":field": label];
-			if empty message {
-				let message = validation->getDefaultMessage("Identical");
-			}
 
-			validation->appendMessage(new Message(strtr(message, replacePairs), field, "Identical"));
+			validation->appendMessage(
+				new Message(
+					strtr(message, replacePairs),
+					field,
+					"Identical",
+					code
+				)
+			);
+
 			return false;
 		}
 

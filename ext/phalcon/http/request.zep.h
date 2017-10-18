@@ -3,6 +3,8 @@ extern zend_class_entry *phalcon_http_request_ce;
 
 ZEPHIR_INIT_CLASS(Phalcon_Http_Request);
 
+PHP_METHOD(Phalcon_Http_Request, getHttpMethodParameterOverride);
+PHP_METHOD(Phalcon_Http_Request, setHttpMethodParameterOverride);
 PHP_METHOD(Phalcon_Http_Request, setDI);
 PHP_METHOD(Phalcon_Http_Request, getDI);
 PHP_METHOD(Phalcon_Http_Request, get);
@@ -19,13 +21,18 @@ PHP_METHOD(Phalcon_Http_Request, hasServer);
 PHP_METHOD(Phalcon_Http_Request, getHeader);
 PHP_METHOD(Phalcon_Http_Request, getScheme);
 PHP_METHOD(Phalcon_Http_Request, isAjax);
+PHP_METHOD(Phalcon_Http_Request, isSoap);
 PHP_METHOD(Phalcon_Http_Request, isSoapRequested);
+PHP_METHOD(Phalcon_Http_Request, isSecure);
 PHP_METHOD(Phalcon_Http_Request, isSecureRequest);
 PHP_METHOD(Phalcon_Http_Request, getRawBody);
 PHP_METHOD(Phalcon_Http_Request, getJsonRawBody);
 PHP_METHOD(Phalcon_Http_Request, getServerAddress);
 PHP_METHOD(Phalcon_Http_Request, getServerName);
 PHP_METHOD(Phalcon_Http_Request, getHttpHost);
+PHP_METHOD(Phalcon_Http_Request, setStrictHostCheck);
+PHP_METHOD(Phalcon_Http_Request, isStrictHostCheck);
+PHP_METHOD(Phalcon_Http_Request, getPort);
 PHP_METHOD(Phalcon_Http_Request, getURI);
 PHP_METHOD(Phalcon_Http_Request, getClientAddress);
 PHP_METHOD(Phalcon_Http_Request, getMethod);
@@ -39,13 +46,15 @@ PHP_METHOD(Phalcon_Http_Request, isPatch);
 PHP_METHOD(Phalcon_Http_Request, isHead);
 PHP_METHOD(Phalcon_Http_Request, isDelete);
 PHP_METHOD(Phalcon_Http_Request, isOptions);
+PHP_METHOD(Phalcon_Http_Request, isPurge);
+PHP_METHOD(Phalcon_Http_Request, isTrace);
+PHP_METHOD(Phalcon_Http_Request, isConnect);
 PHP_METHOD(Phalcon_Http_Request, hasFiles);
 PHP_METHOD(Phalcon_Http_Request, hasFileHelper);
 PHP_METHOD(Phalcon_Http_Request, getUploadedFiles);
 PHP_METHOD(Phalcon_Http_Request, smoothFiles);
 PHP_METHOD(Phalcon_Http_Request, getHeaders);
 PHP_METHOD(Phalcon_Http_Request, getHTTPReferer);
-PHP_METHOD(Phalcon_Http_Request, _getQualityHeader);
 PHP_METHOD(Phalcon_Http_Request, _getBestQuality);
 PHP_METHOD(Phalcon_Http_Request, getContentType);
 PHP_METHOD(Phalcon_Http_Request, getAcceptableContent);
@@ -56,6 +65,11 @@ PHP_METHOD(Phalcon_Http_Request, getLanguages);
 PHP_METHOD(Phalcon_Http_Request, getBestLanguage);
 PHP_METHOD(Phalcon_Http_Request, getBasicAuth);
 PHP_METHOD(Phalcon_Http_Request, getDigestAuth);
+PHP_METHOD(Phalcon_Http_Request, _getQualityHeader);
+
+ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request_sethttpmethodparameteroverride, 0, 0, 1)
+	ZEND_ARG_INFO(0, httpMethodParameterOverride)
+ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request_setdi, 0, 0, 1)
 	ZEND_ARG_OBJ_INFO(0, dependencyInjector, Phalcon\\DiInterface, 0)
@@ -134,6 +148,10 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request_getjsonrawbody, 0, 0, 0)
 	ZEND_ARG_INFO(0, associative)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request_setstricthostcheck, 0, 0, 0)
+	ZEND_ARG_INFO(0, flag)
+ZEND_END_ARG_INFO()
+
 ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request_getclientaddress, 0, 0, 0)
 	ZEND_ARG_INFO(0, trustForwardedHeader)
 ZEND_END_ARG_INFO()
@@ -169,17 +187,19 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request_smoothfiles, 0, 0, 6)
 	ZEND_ARG_INFO(0, prefix)
 ZEND_END_ARG_INFO()
 
-ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request__getqualityheader, 0, 0, 2)
-	ZEND_ARG_INFO(0, serverIndex)
-	ZEND_ARG_INFO(0, name)
-ZEND_END_ARG_INFO()
-
 ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request__getbestquality, 0, 0, 2)
 	ZEND_ARG_ARRAY_INFO(0, qualityParts, 0)
 	ZEND_ARG_INFO(0, name)
 ZEND_END_ARG_INFO()
 
+ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_http_request__getqualityheader, 0, 0, 2)
+	ZEND_ARG_INFO(0, serverIndex)
+	ZEND_ARG_INFO(0, name)
+ZEND_END_ARG_INFO()
+
 ZEPHIR_INIT_FUNCS(phalcon_http_request_method_entry) {
+	PHP_ME(Phalcon_Http_Request, getHttpMethodParameterOverride, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, setHttpMethodParameterOverride, arginfo_phalcon_http_request_sethttpmethodparameteroverride, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, setDI, arginfo_phalcon_http_request_setdi, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getDI, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, get, arginfo_phalcon_http_request_get, ZEND_ACC_PUBLIC)
@@ -196,13 +216,18 @@ ZEPHIR_INIT_FUNCS(phalcon_http_request_method_entry) {
 	PHP_ME(Phalcon_Http_Request, getHeader, arginfo_phalcon_http_request_getheader, ZEND_ACC_PUBLIC|ZEND_ACC_FINAL)
 	PHP_ME(Phalcon_Http_Request, getScheme, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, isAjax, NULL, ZEND_ACC_PUBLIC)
-	PHP_ME(Phalcon_Http_Request, isSoapRequested, NULL, ZEND_ACC_PUBLIC)
-	PHP_ME(Phalcon_Http_Request, isSecureRequest, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isSoap, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isSoapRequested, NULL, ZEND_ACC_DEPRECATED|ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isSecure, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isSecureRequest, NULL, ZEND_ACC_DEPRECATED|ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getRawBody, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getJsonRawBody, arginfo_phalcon_http_request_getjsonrawbody, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getServerAddress, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getServerName, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getHttpHost, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, setStrictHostCheck, arginfo_phalcon_http_request_setstricthostcheck, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isStrictHostCheck, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, getPort, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getURI, NULL, ZEND_ACC_PUBLIC|ZEND_ACC_FINAL)
 	PHP_ME(Phalcon_Http_Request, getClientAddress, arginfo_phalcon_http_request_getclientaddress, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getMethod, NULL, ZEND_ACC_PUBLIC|ZEND_ACC_FINAL)
@@ -216,13 +241,15 @@ ZEPHIR_INIT_FUNCS(phalcon_http_request_method_entry) {
 	PHP_ME(Phalcon_Http_Request, isHead, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, isDelete, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, isOptions, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isPurge, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isTrace, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, isConnect, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, hasFiles, arginfo_phalcon_http_request_hasfiles, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, hasFileHelper, arginfo_phalcon_http_request_hasfilehelper, ZEND_ACC_PROTECTED|ZEND_ACC_FINAL)
 	PHP_ME(Phalcon_Http_Request, getUploadedFiles, arginfo_phalcon_http_request_getuploadedfiles, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, smoothFiles, arginfo_phalcon_http_request_smoothfiles, ZEND_ACC_PROTECTED|ZEND_ACC_FINAL)
 	PHP_ME(Phalcon_Http_Request, getHeaders, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getHTTPReferer, NULL, ZEND_ACC_PUBLIC)
-	PHP_ME(Phalcon_Http_Request, _getQualityHeader, arginfo_phalcon_http_request__getqualityheader, ZEND_ACC_PROTECTED|ZEND_ACC_FINAL)
 	PHP_ME(Phalcon_Http_Request, _getBestQuality, arginfo_phalcon_http_request__getbestquality, ZEND_ACC_PROTECTED|ZEND_ACC_FINAL)
 	PHP_ME(Phalcon_Http_Request, getContentType, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getAcceptableContent, NULL, ZEND_ACC_PUBLIC)
@@ -233,5 +260,6 @@ ZEPHIR_INIT_FUNCS(phalcon_http_request_method_entry) {
 	PHP_ME(Phalcon_Http_Request, getBestLanguage, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getBasicAuth, NULL, ZEND_ACC_PUBLIC)
 	PHP_ME(Phalcon_Http_Request, getDigestAuth, NULL, ZEND_ACC_PUBLIC)
+	PHP_ME(Phalcon_Http_Request, _getQualityHeader, arginfo_phalcon_http_request__getqualityheader, ZEND_ACC_PROTECTED|ZEND_ACC_FINAL)
 	PHP_FE_END
 };

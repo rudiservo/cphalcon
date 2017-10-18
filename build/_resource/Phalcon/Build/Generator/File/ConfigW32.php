@@ -21,28 +21,22 @@ class Generator_File_ConfigW32
     protected $outputFile;
 
     /**
-     * @param string $sourceDir
+     * @param string $rootDir
      * @param string $outputDir
      */
-    public function __construct($sourceDir, $outputDir)
+    public function __construct($rootDir, $outputDir)
     {
-        $this->sourceFile = $sourceDir . '/config.w32';
-        $this->outputFile = $outputDir . '/config.w32';
+        $this->sourceFile = $rootDir . str_replace('/', DIRECTORY_SEPARATOR, '/build/_resource/config/config.w32');
+        $this->outputFile = $outputDir . DIRECTORY_SEPARATOR . 'config.w32';
     }
 
     /**
-     * Create config.w32 from the original one, by leaving only "phalcon.c" among included source files
+     * Create config.m4 from the original one, by leaving only "phalcon.c" among included source files
      *
-     * @return array
+     * @return bool
      */
     public function generate()
     {
-        $originalContent = file_get_contents($this->sourceFile);
-
-        $generatedContent = preg_replace('/(\s*ADD_SOURCES\(.*?\n){1,}/', "\n", $originalContent);
-
-        $generatedContent = str_replace('EXTENSION("phalcon", "phalcon.c"', 'EXTENSION("phalcon", "phalcon.zep.c"', $generatedContent);
-
-        file_put_contents($this->outputFile, $generatedContent);
+        return copy($this->sourceFile, $this->outputFile);
     }
 }

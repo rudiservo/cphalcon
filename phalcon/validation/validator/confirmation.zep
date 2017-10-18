@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -29,14 +29,41 @@ use Phalcon\Validation\Validator;
  *
  * Checks that two values have the same value
  *
- *<code>
- *use Phalcon\Validation\Validator\Confirmation;
+ * <code>
+ * use Phalcon\Validation;
+ * use Phalcon\Validation\Validator\Confirmation;
  *
- *$validator->add('password', new Confirmation(array(
- *   'message' => 'Password doesn\'t match confirmation',
- *   'with' => 'confirmPassword'
- *)));
- *</code>
+ * $validator = new Validation();
+ *
+ * $validator->add(
+ *     "password",
+ *     new Confirmation(
+ *         [
+ *             "message" => "Password doesn't match confirmation",
+ *             "with"    => "confirmPassword",
+ *         ]
+ *     )
+ * );
+ *
+ * $validator->add(
+ *     [
+ *         "password",
+ *         "email",
+ *     ],
+ *     new Confirmation(
+ *         [
+ *             "message" => [
+ *                 "password" => "Password doesn't match confirmation",
+ *                 "email"    => "Email doesn't match confirmation",
+ *             ],
+ *             "with" => [
+ *                 "password" => "confirmPassword",
+ *                 "email"    => "confirmEmail",
+ *             ],
+ *         ]
+ *     )
+ * );
+ * </code>
  */
 class Confirmation extends Validator
 {
@@ -46,32 +73,41 @@ class Confirmation extends Validator
 	 */
 	public function validate(<Validation> validation, string! field) -> boolean
 	{
-		var fieldWith, value, valueWith, message, label, labelWith, replacePairs;
+		var fieldWith, value, valueWith, message, label, labelWith, replacePairs, code;
 
-		let fieldWith = this->getOption("with"),
-			value = validation->getValue(field),
+		let fieldWith = this->getOption("with");
+
+		if typeof fieldWith == "array" {
+			let fieldWith = fieldWith[field];
+		}
+
+		let value = validation->getValue(field),
 			valueWith = validation->getValue(fieldWith);
 
 		if !this->compare(value, valueWith) {
-
-			let label = this->getOption("label");
-			if empty label {
-				let label = validation->getLabel(field);
-			}
+			let label = this->prepareLabel(validation, field),
+				message = this->prepareMessage(validation, field, "Confirmation"),
+				code = this->prepareCode(field);
 
 			let labelWith = this->getOption("labelWith");
+			if typeof labelWith == "array" {
+				let labelWith = labelWith[fieldWith];
+			}
 			if empty labelWith {
 				let labelWith = validation->getLabel(fieldWith);
 			}
 
-			let message = this->getOption("message");
 			let replacePairs = [":field": label, ":with":  labelWith];
 
-			if empty message {
-				let message = validation->getDefaultMessage("Confirmation");
-			}
+			validation->appendMessage(
+				new Message(
+					strtr(message, replacePairs),
+					field,
+					"Confirmation",
+					code
+				)
+			);
 
-			validation->appendMessage(new Message(strtr(message, replacePairs), field, "Confirmation"));
 			return false;
 		}
 

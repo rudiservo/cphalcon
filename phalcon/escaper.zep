@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,9 +31,11 @@ use Phalcon\Escaper\Exception;
  * This component only works with UTF-8. The PREG extension needs to be compiled with UTF-8 support.
  *
  *<code>
- *	$escaper = new \Phalcon\Escaper();
- *	$escaped = $escaper->escapeCss("font-family: <Verdana>");
- *	echo $escaped; // font\2D family\3A \20 \3C Verdana\3E
+ * $escaper = new \Phalcon\Escaper();
+ * 
+ * $escaped = $escaper->escapeCss("font-family: <Verdana>");
+ * 
+ * echo $escaped; // font\2D family\3A \20 \3C Verdana\3E
  *</code>
  */
 class Escaper implements EscaperInterface
@@ -44,12 +46,14 @@ class Escaper implements EscaperInterface
 	protected _htmlEscapeMap = null;
 
 	protected _htmlQuoteType = 3;
+	
+	protected _doubleEncode = true;
 
 	/**
 	 * Sets the encoding to be used by the escaper
 	 *
 	 *<code>
-	 * $escaper->setEncoding('utf-8');
+	 * $escaper->setEncoding("utf-8");
 	 *</code>
 	 */
 	public function setEncoding(string encoding) -> void
@@ -75,6 +79,18 @@ class Escaper implements EscaperInterface
 	public function setHtmlQuoteType(int quoteType) -> void
 	{
 		let this->_htmlQuoteType = quoteType;
+	}
+	
+	/**
+	 * Sets the double_encode to be used by the escaper
+	 *
+	 *<code>
+	 * $escaper->setDoubleEncode(false);
+	 *</code>
+	 */
+	public function setDoubleEncode(boolean doubleEncode) -> void
+	{
+		let this->_doubleEncode = doubleEncode;
 	}
 
 	/**
@@ -140,7 +156,7 @@ class Escaper implements EscaperInterface
 	 */
 	public function escapeHtml(string text) -> string
 	{
-		return htmlspecialchars(text, this->_htmlQuoteType, this->_encoding);
+		return htmlspecialchars(text, this->_htmlQuoteType, this->_encoding, this->_doubleEncode);
 	}
 
 	/**
@@ -148,7 +164,7 @@ class Escaper implements EscaperInterface
 	 */
 	public function escapeHtmlAttr(string attribute) -> string
 	{
-		return htmlspecialchars(attribute, ENT_QUOTES, this->_encoding);
+		return htmlspecialchars(attribute, ENT_QUOTES, this->_encoding, this->_doubleEncode);
 	}
 
 	/**

@@ -42,6 +42,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Cache_Backend) {
 
 	zend_declare_property_bool(phalcon_cache_backend_ce, SL("_started"), 0, ZEND_ACC_PROTECTED TSRMLS_CC);
 
+	zend_class_implements(phalcon_cache_backend_ce TSRMLS_CC, 1, phalcon_cache_backendinterface_ce);
 	return SUCCESS;
 
 }
@@ -50,7 +51,7 @@ PHP_METHOD(Phalcon_Cache_Backend, getFrontend) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_frontend");
+	RETURN_MEMBER(getThis(), "_frontend");
 
 }
 
@@ -62,7 +63,8 @@ PHP_METHOD(Phalcon_Cache_Backend, setFrontend) {
 
 
 
-	zephir_update_property_this(this_ptr, SL("_frontend"), frontend TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_frontend"), frontend TSRMLS_CC);
+	RETURN_THISW();
 
 }
 
@@ -70,7 +72,7 @@ PHP_METHOD(Phalcon_Cache_Backend, getOptions) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_options");
+	RETURN_MEMBER(getThis(), "_options");
 
 }
 
@@ -82,7 +84,8 @@ PHP_METHOD(Phalcon_Cache_Backend, setOptions) {
 
 
 
-	zephir_update_property_this(this_ptr, SL("_options"), options TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_options"), options TSRMLS_CC);
+	RETURN_THISW();
 
 }
 
@@ -90,7 +93,7 @@ PHP_METHOD(Phalcon_Cache_Backend, getLastKey) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_lastKey");
+	RETURN_MEMBER(getThis(), "_lastKey");
 
 }
 
@@ -102,7 +105,8 @@ PHP_METHOD(Phalcon_Cache_Backend, setLastKey) {
 
 
 
-	zephir_update_property_this(this_ptr, SL("_lastKey"), lastKey TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_lastKey"), lastKey TSRMLS_CC);
+	RETURN_THISW();
 
 }
 
@@ -124,10 +128,10 @@ PHP_METHOD(Phalcon_Cache_Backend, __construct) {
 
 
 	if (zephir_array_isset_string_fetch(&prefix, options, SS("prefix"), 1 TSRMLS_CC)) {
-		zephir_update_property_this(this_ptr, SL("_prefix"), prefix TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_prefix"), prefix TSRMLS_CC);
 	}
-	zephir_update_property_this(this_ptr, SL("_frontend"), frontend TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_options"), options TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_frontend"), frontend TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_options"), options TSRMLS_CC);
 
 }
 
@@ -141,7 +145,7 @@ PHP_METHOD(Phalcon_Cache_Backend, __construct) {
 PHP_METHOD(Phalcon_Cache_Backend, start) {
 
 	zend_bool fresh = 0;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *keyName, *lifetime = NULL, *existingCache = NULL, *_0$$3;
 
 	ZEPHIR_MM_GROW();
@@ -163,17 +167,17 @@ PHP_METHOD(Phalcon_Cache_Backend, start) {
 		fresh = 0;
 	}
 	if (fresh) {
-		zephir_update_property_this(this_ptr, SL("_fresh"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_fresh"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_fresh"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_fresh"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
 	if (1) {
-		zephir_update_property_this(this_ptr, SL("_started"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_started"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_started"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_started"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
 	if (Z_TYPE_P(lifetime) != IS_NULL) {
-		zephir_update_property_this(this_ptr, SL("_lastLifetime"), lifetime TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_lastLifetime"), lifetime TSRMLS_CC);
 	}
 	RETURN_CCTOR(existingCache);
 
@@ -184,7 +188,7 @@ PHP_METHOD(Phalcon_Cache_Backend, start) {
  */
 PHP_METHOD(Phalcon_Cache_Backend, stop) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *stopBuffer_param = NULL, *_0$$3;
 	zend_bool stopBuffer;
 
@@ -204,9 +208,9 @@ PHP_METHOD(Phalcon_Cache_Backend, stop) {
 		zephir_check_call_status();
 	}
 	if (0) {
-		zephir_update_property_this(this_ptr, SL("_started"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_started"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_started"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_started"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
 	ZEPHIR_MM_RESTORE();
 
@@ -219,7 +223,7 @@ PHP_METHOD(Phalcon_Cache_Backend, isFresh) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_fresh");
+	RETURN_MEMBER(getThis(), "_fresh");
 
 }
 
@@ -230,7 +234,7 @@ PHP_METHOD(Phalcon_Cache_Backend, isStarted) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_started");
+	RETURN_MEMBER(getThis(), "_started");
 
 }
 
@@ -243,7 +247,7 @@ PHP_METHOD(Phalcon_Cache_Backend, getLifetime) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_lastLifetime");
+	RETURN_MEMBER(getThis(), "_lastLifetime");
 
 }
 

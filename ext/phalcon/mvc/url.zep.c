@@ -30,13 +30,17 @@
  * This components helps in the generation of: URIs, URLs and Paths
  *
  *<code>
+ * // Generate a URL appending the URI to the base URI
+ * echo $url->get("products/edit/1");
  *
- * //Generate a URL appending the URI to the base URI
- * echo $url->get('products/edit/1');
- *
- * //Generate a URL for a predefined route
- * echo $url->get(array('for' => 'blog-post', 'title' => 'some-cool-stuff', 'year' => '2012'));
- *
+ * // Generate a URL for a predefined route
+ * echo $url->get(
+ *     [
+ *         "for"   => "blog-post",
+ *         "title" => "some-cool-stuff",
+ *         "year"  => "2012",
+ *     ]
+ * );
  *</code>
  */
 ZEPHIR_INIT_CLASS(Phalcon_Mvc_Url) {
@@ -70,7 +74,7 @@ PHP_METHOD(Phalcon_Mvc_Url, setDI) {
 
 
 
-	zephir_update_property_this(this_ptr, SL("_dependencyInjector"), dependencyInjector TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_dependencyInjector"), dependencyInjector TSRMLS_CC);
 
 }
 
@@ -81,7 +85,7 @@ PHP_METHOD(Phalcon_Mvc_Url, getDI) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_dependencyInjector");
+	RETURN_MEMBER(getThis(), "_dependencyInjector");
 
 }
 
@@ -89,8 +93,9 @@ PHP_METHOD(Phalcon_Mvc_Url, getDI) {
  * Sets a prefix for all the URIs to be generated
  *
  *<code>
- *	$url->setBaseUri('/invo/');
- *	$url->setBaseUri('/invo/index.php/');
+ * $url->setBaseUri("/invo/");
+ *
+ * $url->setBaseUri("/invo/index.php/");
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_Url, setBaseUri) {
@@ -101,11 +106,11 @@ PHP_METHOD(Phalcon_Mvc_Url, setBaseUri) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &baseUri_param);
 
-	if (unlikely(Z_TYPE_P(baseUri_param) != IS_STRING && Z_TYPE_P(baseUri_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(baseUri_param) != IS_STRING && Z_TYPE_P(baseUri_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'baseUri' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(baseUri_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(baseUri_param) == IS_STRING)) {
 		zephir_get_strval(baseUri, baseUri_param);
 	} else {
 		ZEPHIR_INIT_VAR(baseUri);
@@ -113,10 +118,10 @@ PHP_METHOD(Phalcon_Mvc_Url, setBaseUri) {
 	}
 
 
-	zephir_update_property_this(this_ptr, SL("_baseUri"), baseUri TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_baseUri"), baseUri TSRMLS_CC);
 	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_staticBaseUri"), PH_NOISY_CC);
 	if (Z_TYPE_P(_0) == IS_NULL) {
-		zephir_update_property_this(this_ptr, SL("_staticBaseUri"), baseUri TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_staticBaseUri"), baseUri TSRMLS_CC);
 	}
 	RETURN_THIS();
 
@@ -126,7 +131,7 @@ PHP_METHOD(Phalcon_Mvc_Url, setBaseUri) {
  * Sets a prefix for all static URLs generated
  *
  *<code>
- *	$url->setStaticBaseUri('/invo/');
+ * $url->setStaticBaseUri("/invo/");
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_Url, setStaticBaseUri) {
@@ -137,11 +142,11 @@ PHP_METHOD(Phalcon_Mvc_Url, setStaticBaseUri) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &staticBaseUri_param);
 
-	if (unlikely(Z_TYPE_P(staticBaseUri_param) != IS_STRING && Z_TYPE_P(staticBaseUri_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(staticBaseUri_param) != IS_STRING && Z_TYPE_P(staticBaseUri_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'staticBaseUri' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(staticBaseUri_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(staticBaseUri_param) == IS_STRING)) {
 		zephir_get_strval(staticBaseUri, staticBaseUri_param);
 	} else {
 		ZEPHIR_INIT_VAR(staticBaseUri);
@@ -149,7 +154,7 @@ PHP_METHOD(Phalcon_Mvc_Url, setStaticBaseUri) {
 	}
 
 
-	zephir_update_property_this(this_ptr, SL("_staticBaseUri"), staticBaseUri TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_staticBaseUri"), staticBaseUri TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -181,7 +186,7 @@ PHP_METHOD(Phalcon_Mvc_Url, getBaseUri) {
 		} else {
 			ZEPHIR_CONCAT_SVS(baseUri, "/", uri, "/");
 		}
-		zephir_update_property_this(this_ptr, SL("_baseUri"), baseUri TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_baseUri"), baseUri TSRMLS_CC);
 	}
 	RETURN_CCTOR(baseUri);
 
@@ -193,7 +198,7 @@ PHP_METHOD(Phalcon_Mvc_Url, getBaseUri) {
 PHP_METHOD(Phalcon_Mvc_Url, getStaticBaseUri) {
 
 	zval *staticBaseUri = NULL;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
@@ -212,7 +217,7 @@ PHP_METHOD(Phalcon_Mvc_Url, getStaticBaseUri) {
  * Sets a base path for all the generated paths
  *
  *<code>
- *	$url->setBasePath('/var/www/htdocs/');
+ * $url->setBasePath("/var/www/htdocs/");
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_Url, setBasePath) {
@@ -223,11 +228,11 @@ PHP_METHOD(Phalcon_Mvc_Url, setBasePath) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &basePath_param);
 
-	if (unlikely(Z_TYPE_P(basePath_param) != IS_STRING && Z_TYPE_P(basePath_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(basePath_param) != IS_STRING && Z_TYPE_P(basePath_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'basePath' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(basePath_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(basePath_param) == IS_STRING)) {
 		zephir_get_strval(basePath, basePath_param);
 	} else {
 		ZEPHIR_INIT_VAR(basePath);
@@ -235,7 +240,7 @@ PHP_METHOD(Phalcon_Mvc_Url, setBasePath) {
 	}
 
 
-	zephir_update_property_this(this_ptr, SL("_basePath"), basePath TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_basePath"), basePath TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -247,7 +252,7 @@ PHP_METHOD(Phalcon_Mvc_Url, getBasePath) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_basePath");
+	RETURN_MEMBER(getThis(), "_basePath");
 
 }
 
@@ -255,17 +260,33 @@ PHP_METHOD(Phalcon_Mvc_Url, getBasePath) {
  * Generates a URL
  *
  *<code>
- * //Generate a URL appending the URI to the base URI
- * echo $url->get('products/edit/1');
+ * // Generate a URL appending the URI to the base URI
+ * echo $url->get("products/edit/1");
  *
- * //Generate a URL for a predefined route
- * echo $url->get(array('for' => 'blog-post', 'title' => 'some-cool-stuff', 'year' => '2015'));
+ * // Generate a URL for a predefined route
+ * echo $url->get(
+ *     [
+ *         "for"   => "blog-post",
+ *         "title" => "some-cool-stuff",
+ *         "year"  => "2015",
+ *     ]
+ * );
  *
  * // Generate a URL with GET arguments (/show/products?id=1&name=Carrots)
- * echo $url->get('show/products', array('id' => 1, 'name' => 'Carrots'));
+ * echo $url->get(
+ *     "show/products",
+ *     [
+ *         "id"   => 1,
+ *         "name" => "Carrots",
+ *     ]
+ * );
  *
  * // Generate an absolute URL by setting the third parameter as false.
- * echo $url->get('https://phalconphp.com/', null, false);
+ * echo $url->get(
+ *     "https://phalconphp.com/",
+ *     null,
+ *     false
+ * );
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_Url, get) {
@@ -273,7 +294,7 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 	unsigned char _17$$14, _19$$14, _24$$16;
 	zend_bool _0$$3, _1$$3, _15$$14, _16$$14, _18$$14, _22$$16, _23$$16, _25$$19;
 	zval *strUri = NULL, *_14$$14 = NULL;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *uri = NULL, *args = NULL, *local = NULL, *baseUri = NULL, *router = NULL, *dependencyInjector = NULL, *routeName = NULL, *route = NULL, *queryString = NULL, *_2$$4, *_3$$4, _4$$4, *_5$$9, *_9$$9 = NULL, *_12$$9, *_13$$9 = NULL, *_6$$11, *_7$$11 = NULL, *_8$$11, *_10$$13, *_11$$13, _20$$15, *_21$$15, _26$$20, *_27$$20, *_28$$21, *_29$$22;
 
 	ZEPHIR_MM_GROW();
@@ -302,9 +323,9 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 	if (Z_TYPE_P(local) == IS_NULL) {
 		_0$$3 = Z_TYPE_P(uri) == IS_STRING;
 		if (_0$$3) {
-			_1$$3 = zephir_memnstr_str(uri, SL("//"), "phalcon/mvc/url.zep", 187);
+			_1$$3 = zephir_memnstr_str(uri, SL("//"), "phalcon/mvc/url.zep", 208);
 			if (!(_1$$3)) {
-				_1$$3 = zephir_memnstr_str(uri, SL(":"), "phalcon/mvc/url.zep", 187);
+				_1$$3 = zephir_memnstr_str(uri, SL(":"), "phalcon/mvc/url.zep", 208);
 			}
 			_0$$3 = _1$$3;
 		}
@@ -312,7 +333,7 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 			ZEPHIR_INIT_VAR(_2$$4);
 			ZEPHIR_INIT_VAR(_3$$4);
 			ZEPHIR_SINIT_VAR(_4$$4);
-			ZVAL_STRING(&_4$$4, "#^(//)|([a-z0-9]+://)|([a-z0-9]+:)#i", 0);
+			ZVAL_STRING(&_4$$4, "#^((//)|([a-z0-9]+://)|([a-z0-9]+:))#i", 0);
 			zephir_preg_match(_3$$4, &_4$$4, uri, _2$$4, 0, 0 , 0  TSRMLS_CC);
 			ZEPHIR_INIT_NVAR(local);
 			if (zephir_is_true(_3$$4)) {
@@ -332,7 +353,7 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 	if (Z_TYPE_P(uri) == IS_ARRAY) {
 		ZEPHIR_OBS_VAR(routeName);
 		if (!(zephir_array_isset_string_fetch(&routeName, uri, SS("for"), 0 TSRMLS_CC))) {
-			ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_url_exception_ce, "It's necessary to define the route name with the parameter 'for'", "phalcon/mvc/url.zep", 205);
+			ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_url_exception_ce, "It's necessary to define the route name with the parameter 'for'", "phalcon/mvc/url.zep", 226);
 			return;
 		}
 		_5$$9 = zephir_fetch_nproperty_this(this_ptr, SL("_router"), PH_NOISY_CC);
@@ -341,7 +362,7 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 			_6$$11 = zephir_fetch_nproperty_this(this_ptr, SL("_dependencyInjector"), PH_NOISY_CC);
 			ZEPHIR_CPY_WRT(dependencyInjector, _6$$11);
 			if (Z_TYPE_P(dependencyInjector) != IS_OBJECT) {
-				ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_url_exception_ce, "A dependency injector container is required to obtain the 'router' service", "phalcon/mvc/url.zep", 217);
+				ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_url_exception_ce, "A dependency injector container is required to obtain the 'router' service", "phalcon/mvc/url.zep", 238);
 				return;
 			}
 			ZEPHIR_INIT_VAR(_8$$11);
@@ -350,7 +371,7 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 			zephir_check_temp_parameter(_8$$11);
 			zephir_check_call_status();
 			ZEPHIR_CPY_WRT(router, _7$$11);
-			zephir_update_property_this(this_ptr, SL("_router"), router TSRMLS_CC);
+			zephir_update_property_this(getThis(), SL("_router"), router TSRMLS_CC);
 		}
 		ZEPHIR_CALL_METHOD(&_9$$9, router, "getroutebyname", NULL, 0, routeName);
 		zephir_check_call_status();
@@ -362,7 +383,7 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 			ZEPHIR_CONCAT_SVS(_11$$13, "Cannot obtain a route using the name '", routeName, "'");
 			ZEPHIR_CALL_METHOD(NULL, _10$$13, "__construct", NULL, 9, _11$$13);
 			zephir_check_call_status();
-			zephir_throw_exception_debug(_10$$13, "phalcon/mvc/url.zep", 229 TSRMLS_CC);
+			zephir_throw_exception_debug(_10$$13, "phalcon/mvc/url.zep", 250 TSRMLS_CC);
 			ZEPHIR_MM_RESTORE();
 			return;
 		}
@@ -417,11 +438,11 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
 		}
 	}
 	if (zephir_is_true(args)) {
-		ZEPHIR_CALL_FUNCTION(&queryString, "http_build_query", NULL, 362, args);
+		ZEPHIR_CALL_FUNCTION(&queryString, "http_build_query", NULL, 394, args);
 		zephir_check_call_status();
 		_25$$19 = Z_TYPE_P(queryString) == IS_STRING;
 		if (_25$$19) {
-			_25$$19 = (zephir_fast_strlen_ev(queryString)) ? 1 : 0;
+			_25$$19 = ((zephir_fast_strlen_ev(queryString)) ? 1 : 0);
 		}
 		if (_25$$19) {
 			ZEPHIR_SINIT_VAR(_26$$20);
@@ -452,12 +473,16 @@ PHP_METHOD(Phalcon_Mvc_Url, get) {
  * echo $url->getStatic("img/logo.png");
  *
  * // Generate a URL for a static predefined route
- * echo $url->getStatic(array('for' => 'logo-cdn'));
+ * echo $url->getStatic(
+ *     [
+ *         "for" => "logo-cdn",
+ *     ]
+ * );
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_Url, getStatic) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *uri = NULL, *_0 = NULL, *_1, *_2;
 
 	ZEPHIR_MM_GROW();

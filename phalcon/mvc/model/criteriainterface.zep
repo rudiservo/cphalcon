@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -109,7 +109,7 @@ interface CriteriaInterface
 	 * Appends a BETWEEN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->betweenWhere('price', 100.25, 200.50);
+	 * $criteria->betweenWhere("price", 100.25, 200.50);
 	 *</code>
 	 *
 	 * @param string expr
@@ -123,7 +123,7 @@ interface CriteriaInterface
 	 * Appends a NOT BETWEEN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->notBetweenWhere('price', 100.25, 200.50);
+	 * $criteria->notBetweenWhere("price", 100.25, 200.50);
 	 *</code>
 	 *
 	 * @param string expr
@@ -137,7 +137,7 @@ interface CriteriaInterface
 	 * Appends an IN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->inWhere('id', [1, 2, 3]);
+	 * $criteria->inWhere("id", [1, 2, 3]);
 	 *</code>
 	 */
 	public function inWhere(string! expr, array! values) -> <CriteriaInterface>;
@@ -146,7 +146,7 @@ interface CriteriaInterface
 	 * Appends a NOT IN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->notInWhere('id', [1, 2, 3]);
+	 * $criteria->notInWhere("id", [1, 2, 3]);
 	 *</code>
 	 */
 	public function notInWhere(string! expr, array! values) -> <CriteriaInterface>;
@@ -180,7 +180,7 @@ interface CriteriaInterface
 	 *
 	 * @return string|null
 	 */
-	public function getOrder();
+	public function getOrderBy();
 
 	/**
 	 * Returns all the parameters defined in the criteria

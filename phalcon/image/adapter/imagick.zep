@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,7 +21,6 @@ namespace Phalcon\Image\Adapter;
 
 use Phalcon\Image\Adapter;
 use Phalcon\Image\Exception;
-use Phalcon\Image\AdapterInterface;
 
 /**
  * Phalcon\Image\Adapter\Imagick
@@ -29,14 +28,16 @@ use Phalcon\Image\AdapterInterface;
  * Image manipulation support. Allows images to be resized, cropped, etc.
  *
  *<code>
- * $image = new Phalcon\Image\Adapter\Imagick("upload/test.jpg");
+ * $image = new \Phalcon\Image\Adapter\Imagick("upload/test.jpg");
+ *
  * $image->resize(200, 200)->rotate(90)->crop(100, 100);
+ *
  * if ($image->save()) {
- *     echo 'success';
+ *     echo "success";
  * }
  *</code>
  */
-class Imagick extends Adapter implements AdapterInterface
+class Imagick extends Adapter
 {
 	protected static _version = 0;
 	protected static _checked = false;
@@ -119,17 +120,20 @@ class Imagick extends Adapter implements AdapterInterface
 	 */
 	protected function _resize(int width, int height)
 	{
-		this->_image->setIteratorIndex(0);
+		var image;
+		let image = this->_image;
+
+		image->setIteratorIndex(0);
 
 		loop {
-			this->_image->scaleImage(width, height);
-			if this->_image->nextImage() === false {
+			image->scaleImage(width, height);
+			if image->nextImage() === false {
 				break;
 			}
 		}
 
-		let this->_width = this->_image->getImageWidth();
-		let this->_height = this->_image->getImageHeight();
+		let this->_width = image->getImageWidth();
+		let this->_height = image->getImageHeight();
 	}
 
 	/**
@@ -142,22 +146,24 @@ class Imagick extends Adapter implements AdapterInterface
 	 */
 	protected function _liquidRescale(int width, int height, int deltaX, int rigidity)
 	{
-		var ret;
-		this->_image->setIteratorIndex(0);
+		var ret, image;
+		let image = this->_image;
+
+		image->setIteratorIndex(0);
 
 		loop {
-			let ret = this->_image->liquidRescaleImage(width, height, deltaX, rigidity);
+			let ret = image->liquidRescaleImage(width, height, deltaX, rigidity);
 			if ret !== true {
 				throw new Exception("Imagick::liquidRescale failed");
 			}
 
-			if this->_image->nextImage() === false {
+			if image->nextImage() === false {
 				break;
 			}
 		}
 
-		let this->_width = this->_image->getImageWidth();
-		let this->_height = this->_image->getImageHeight();
+		let this->_width = image->getImageWidth();
+		let this->_height = image->getImageHeight();
 	}
 
 	/**
@@ -166,7 +172,6 @@ class Imagick extends Adapter implements AdapterInterface
 	protected function _crop(int width, int height, int offsetX, int offsetY)
 	{
 		var image;
-
 		let image = this->_image;
 
 		image->setIteratorIndex(0);
@@ -347,13 +352,23 @@ class Imagick extends Adapter implements AdapterInterface
 	 */
 	protected function _watermark(<Adapter> image, int offsetX, int offsetY, int opacity)
 	{
-		var watermark, ret;
+		var watermark, ret, version, method;
 
 		let opacity = opacity / 100,
-			watermark = new \Imagick();
+			watermark = new \Imagick(),
+			method = "setImageOpacity";
+
+		// Imagick >= 2.0.0
+		if likely method_exists(watermark, "getVersion") {
+			let version = watermark->getVersion();
+
+			if version["versionNumber"] >= 0x700 {
+				let method = "setImageAlpha";
+			}
+		}
 
 		watermark->readImageBlob(image->render());
-		watermark->setImageOpacity(opacity);
+		watermark->{method}(opacity);
 
 		this->_image->setIteratorIndex(0);
 
@@ -511,8 +526,6 @@ class Imagick extends Adapter implements AdapterInterface
 
 	/**
 	 * Composite one image onto another
-	 *
-	 * @param Adapter $mask mask Image instance
 	 */
 	protected function _mask(<Adapter> image)
 	{
@@ -646,7 +659,15 @@ class Imagick extends Adapter implements AdapterInterface
 			if strcasecmp(ext, "jpg") == 0 || strcasecmp(ext, "jpeg") == 0 {
 				this->_image->setImageCompression(constant("Imagick::COMPRESSION_JPEG"));
 			}
-			this->_image->setImageCompressionQuality(quality);
+
+			if quality >= 0 {
+				if quality < 1 {
+					let quality = 1;
+				} elseif quality > 100 {
+					let quality = 100;
+				}
+				this->_image->setImageCompressionQuality(quality);
+			}
 			this->_image->writeImage(file);
 		}
 	}
@@ -700,8 +721,8 @@ class Imagick extends Adapter implements AdapterInterface
 
 	/**
 	 * Sets the limit for a particular resource in megabytes
-	 * @param int type Refer to the list of resourcetype constants (@see http://php.net/manual/ru/imagick.constants.php#imagick.constants.resourcetypes.)
-	 * @param int limit The resource limit. The unit depends on the type of the resource being limited.
+	 *
+	 * @link http://php.net/manual/ru/imagick.constants.php#imagick.constants.resourcetypes
 	 */
 	public function setResourceLimit(int type, int limit)
 	{

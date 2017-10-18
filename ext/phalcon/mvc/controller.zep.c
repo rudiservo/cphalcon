@@ -27,30 +27,32 @@
  * and passing that data on to the views for presentation.
  *
  *<code>
- *<?php
+ * <?php
  *
- *class PeopleController extends \Phalcon\Mvc\Controller
- *{
+ * class PeopleController extends \Phalcon\Mvc\Controller
+ * {
+ *     // This action will be executed by default
+ *     public function indexAction()
+ *     {
  *
- *  //This action will be executed by default
- *  public function indexAction()
- *  {
+ *     }
  *
- *  }
+ *     public function findAction()
+ *     {
  *
- *  public function findAction()
- *  {
+ *     }
  *
- *  }
- *
- *  public function saveAction()
- *  {
- *   //Forwards flow to the index action
- *   return $this->dispatcher->forward(array('controller' => 'people', 'action' => 'index'));
- *  }
- *
- *}
- *
+ *     public function saveAction()
+ *     {
+ *         // Forwards flow to the index action
+ *         return $this->dispatcher->forward(
+ *             [
+ *                 "controller" => "people",
+ *                 "action"     => "index",
+ *             ]
+ *         );
+ *     }
+ * }
  *</code>
  */
 ZEPHIR_INIT_CLASS(Phalcon_Mvc_Controller) {
@@ -67,7 +69,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_Controller) {
  */
 PHP_METHOD(Phalcon_Mvc_Controller, __construct) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 

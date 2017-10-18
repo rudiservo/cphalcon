@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -19,15 +19,14 @@
 
 namespace Phalcon\Flash;
 
-use Phalcon\FlashInterface;
 use Phalcon\Flash as FlashBase;
 
 /**
  * Phalcon\Flash\Direct
  *
- * This is a variant of the Phalcon\Flash that inmediately outputs any message passed to it
+ * This is a variant of the Phalcon\Flash that immediately outputs any message passed to it
  */
-class Direct extends FlashBase implements FlashInterface
+class Direct extends FlashBase
 {
 
 	/**

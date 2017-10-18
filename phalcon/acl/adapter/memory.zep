@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,9 +22,14 @@ namespace Phalcon\Acl\Adapter;
 use Phalcon\Acl;
 use Phalcon\Acl\Adapter;
 use Phalcon\Acl\Role;
+use Phalcon\Acl\RoleInterface;
 use Phalcon\Acl\Resource;
 use Phalcon\Acl\Exception;
 use Phalcon\Events\Manager as EventsManager;
+use Phalcon\Acl\RoleAware;
+use Phalcon\Acl\ResourceAware;
+use Phalcon\Acl\RoleInterface;
+use Phalcon\Acl\ResourceInterface;
 
 /**
  * Phalcon\Acl\Adapter\Memory
@@ -32,55 +37,63 @@ use Phalcon\Events\Manager as EventsManager;
  * Manages ACL lists in memory
  *
  *<code>
+ * $acl = new \Phalcon\Acl\Adapter\Memory();
  *
- *	$acl = new \Phalcon\Acl\Adapter\Memory();
+ * $acl->setDefaultAction(
+ *     \Phalcon\Acl::DENY
+ * );
  *
- *	$acl->setDefaultAction(Phalcon\Acl::DENY);
+ * // Register roles
+ * $roles = [
+ *     "users"  => new \Phalcon\Acl\Role("Users"),
+ *     "guests" => new \Phalcon\Acl\Role("Guests"),
+ * ];
+ * foreach ($roles as $role) {
+ *     $acl->addRole($role);
+ * }
  *
- *	//Register roles
- *	$roles = array(
- *		'users' => new \Phalcon\Acl\Role('Users'),
- *		'guests' => new \Phalcon\Acl\Role('Guests')
- *	);
- *	foreach ($roles as $role) {
- *		$acl->addRole($role);
- *	}
+ * // Private area resources
+ * $privateResources = [
+ *     "companies" => ["index", "search", "new", "edit", "save", "create", "delete"],
+ *     "products"  => ["index", "search", "new", "edit", "save", "create", "delete"],
+ *     "invoices"  => ["index", "profile"],
+ * ];
  *
- *	//Private area resources
- *	$privateResources = array(
- *		'companies' => array('index', 'search', 'new', 'edit', 'save', 'create', 'delete'),
- *		'products' => array('index', 'search', 'new', 'edit', 'save', 'create', 'delete'),
- *		'invoices' => array('index', 'profile')
- *	);
- *	foreach ($privateResources as $resource => $actions) {
- *		$acl->addResource(new Phalcon\Acl\Resource($resource), $actions);
- *	}
+ * foreach ($privateResources as $resourceName => $actions) {
+ *     $acl->addResource(
+ *         new \Phalcon\Acl\Resource($resourceName),
+ *         $actions
+ *     );
+ * }
  *
- *	//Public area resources
- *	$publicResources = array(
- *		'index' => array('index'),
- *		'about' => array('index'),
- *		'session' => array('index', 'register', 'start', 'end'),
- *		'contact' => array('index', 'send')
- *	);
- *	foreach ($publicResources as $resource => $actions) {
- *		$acl->addResource(new Phalcon\Acl\Resource($resource), $actions);
- *	}
+ * // Public area resources
+ * $publicResources = [
+ *     "index"   => ["index"],
+ *     "about"   => ["index"],
+ *     "session" => ["index", "register", "start", "end"],
+ *     "contact" => ["index", "send"],
+ * ];
  *
- *	//Grant access to public areas to both users and guests
- *	foreach ($roles as $role){
- *		foreach ($publicResources as $resource => $actions) {
- *			$acl->allow($role->getName(), $resource, '*');
- *		}
- *	}
+ * foreach ($publicResources as $resourceName => $actions) {
+ *     $acl->addResource(
+ *         new \Phalcon\Acl\Resource($resourceName),
+ *         $actions
+ *     );
+ * }
  *
- *	//Grant access to private area to role Users
- *	foreach ($privateResources as $resource => $actions) {
- * 		foreach ($actions as $action) {
- *			$acl->allow('Users', $resource, $action);
- *		}
- *	}
+ * // Grant access to public areas to both users and guests
+ * foreach ($roles as $role){
+ *     foreach ($publicResources as $resource => $actions) {
+ *         $acl->allow($role->getName(), $resource, "*");
+ *     }
+ * }
  *
+ * // Grant access to private area to role Users
+ * foreach ($privateResources as $resource => $actions) {
+ *     foreach ($actions as $action) {
+ *         $acl->allow("Users", $resource, $action);
+ *     }
+ * }
  *</code>
  */
 class Memory extends Adapter
@@ -136,6 +149,20 @@ class Memory extends Adapter
 	protected _accessList;
 
 	/**
+	 * Function List
+	 *
+	 * @var mixed
+	 */
+	protected _func;
+
+	/**
+	 * Default action for no arguments is allow
+	 *
+	 * @var mixed
+	 */
+	protected _noArgumentsDefaultAction = Acl::ALLOW;
+
+	/**
 	 * Phalcon\Acl\Adapter\Memory constructor
 	 */
 	public function __construct()
@@ -149,22 +176,29 @@ class Memory extends Adapter
 	 *
 	 * Example:
 	 * <code>
-	 * 	$acl->addRole(new Phalcon\Acl\Role('administrator'), 'consultant');
-	 * 	$acl->addRole('administrator', 'consultant');
+	 * $acl->addRole(
+	 *     new Phalcon\Acl\Role("administrator"),
+	 *     "consultant"
+	 * );
+	 *
+	 * $acl->addRole("administrator", "consultant");
 	 * </code>
 	 *
-	 * @param  array|string accessInherits
+	 * @param  array|string         accessInherits
+	 * @param  RoleInterface|string role
 	 */
 	public function addRole(role, accessInherits = null) -> boolean
 	{
 		var roleName, roleObject;
 
-		if typeof role == "object" {
+		if typeof role == "object" && role instanceof RoleInterface {
 			let roleName = role->getName();
 			let roleObject = role;
-		} else {
+		} elseif is_string(role) {
 			let roleName = role;
 			let roleObject = new Role(role);
+		} else {
+			throw new Exception("Role must be either an string or implement RoleInterface");
 		}
 
 		if isset this->_rolesNames[roleName] {
@@ -173,7 +207,6 @@ class Memory extends Adapter
 
 		let this->_roles[] = roleObject;
 		let this->_rolesNames[roleName] = true;
-		let this->_access[roleName . "!*!*"] = this->_defaultAccess;
 
 		if accessInherits != null {
 			return this->addInherit(roleName, accessInherits);
@@ -194,7 +227,7 @@ class Memory extends Adapter
 			throw new Exception("Role '" . roleName . "' does not exist in the role list");
 		}
 
-		if typeof roleToInherit == "object" {
+		if typeof roleToInherit == "object" && roleToInherit instanceof RoleInterface {
 			let roleInheritName = roleToInherit->getName();
 		} else {
 			let roleInheritName = roleToInherit;
@@ -253,13 +286,30 @@ class Memory extends Adapter
 	 *
 	 * Example:
 	 * <code>
-	 * //Add a resource to the the list allowing access to an action
-	 * $acl->addResource(new Phalcon\Acl\Resource('customers'), 'search');
-	 * $acl->addResource('customers', 'search');
+	 * // Add a resource to the the list allowing access to an action
+	 * $acl->addResource(
+	 *     new Phalcon\Acl\Resource("customers"),
+	 *     "search"
+	 * );
 	 *
-	 * //Add a resource  with an access list
-	 * $acl->addResource(new Phalcon\Acl\Resource('customers'), array('create', 'search'));
-	 * $acl->addResource('customers', array('create', 'search'));
+	 * $acl->addResource("customers", "search");
+	 *
+	 * // Add a resource  with an access list
+	 * $acl->addResource(
+	 *     new Phalcon\Acl\Resource("customers"),
+	 *     [
+	 *         "create",
+	 *         "search",
+	 *     ]
+	 * );
+	 *
+	 * $acl->addResource(
+	 *     "customers",
+	 *     [
+	 *         "create",
+	 *         "search",
+	 *     ]
+	 * );
 	 * </code>
 	 *
 	 * @param   Phalcon\Acl\Resource|string resourceValue
@@ -269,7 +319,7 @@ class Memory extends Adapter
 	{
 		var resourceName, resourceObject;
 
-		if typeof resourceValue == "object" {
+		if typeof resourceValue == "object" && resourceValue instanceof ResourceInterface {
 			let resourceName   = resourceValue->getName();
 			let resourceObject = resourceValue;
 		 } else {
@@ -306,13 +356,13 @@ class Memory extends Adapter
 		if typeof accessList == "array" {
 			for accessName in accessList {
 				let accessKey = resourceName . "!" . accessName;
-				if !isset accessList[accessKey] {
+				if !isset this->_accessList[accessKey] {
 					let this->_accessList[accessKey] = exists;
 				}
 			}
 		} else {
 			let accessKey = resourceName . "!" . accessList;
-			if !isset accessList[accessKey] {
+			if !isset this->_accessList[accessKey] {
 				let this->_accessList[accessKey] = exists;
 			}
 		}
@@ -332,14 +382,14 @@ class Memory extends Adapter
 		if typeof accessList == "array" {
 			for accessName in accessList {
 				let accessKey = resourceName . "!" . accessName;
-				if isset accessList[accessKey] {
+				if isset this->_accessList[accessKey] {
 					unset this->_accessList[accessKey];
 				}
 			}
 		} else {
 			if typeof accessList == "string" {
 				let accessKey = resourceName . "!" . accessName;
-				if isset accessList[accessKey] {
+				if isset this->_accessList[accessKey] {
 					unset this->_accessList[accessKey];
 				}
 			}
@@ -349,9 +399,9 @@ class Memory extends Adapter
 	/**
 	 * Checks if a role has access to a resource
 	 */
-	protected function _allowOrDeny(string roleName, string resourceName, var access, var action)
+	protected function _allowOrDeny(string roleName, string resourceName, var access, var action, var func = null)
 	{
-		var defaultAccess, accessList, accessName, accessKey, accessKeyAll, internalAccess;
+		var accessList, accessName, accessKey;
 
 		if !isset this->_rolesNames[roleName] {
 			throw new Exception("Role '" . roleName . "' does not exist in ACL");
@@ -361,9 +411,7 @@ class Memory extends Adapter
 			throw new Exception("Resource '" . resourceName . "' does not exist in ACL");
 		}
 
-		let defaultAccess = this->_defaultAccess;
 		let accessList = this->_accessList;
-		let internalAccess = this->_access;
 
 		if typeof access == "array" {
 
@@ -378,12 +426,8 @@ class Memory extends Adapter
 
 				let accessKey = roleName . "!" .resourceName . "!" . accessName;
 				let this->_access[accessKey] = action;
-
-				if accessName != "*" {
-					let accessKeyAll = roleName . "!" . resourceName . "!*";
-					if !isset internalAccess[accessKeyAll] {
-						let this->_access[accessKeyAll] = defaultAccess;
-					}
+				if func != null {
+				    let this->_func[accessKey] = func;
 				}
 			}
 
@@ -402,17 +446,8 @@ class Memory extends Adapter
 			 * Define the access action for the specified accessKey
 			 */
 			let this->_access[accessKey] = action;
-
-			if access != "*" {
-				let accessKey = roleName . "!" . resourceName . "!*";
-
-				/**
-				 * If there is no default action for all the rest actions in the resource set the
-				 * default one
-				 */
-				if !isset internalAccess[accessKey] {
-					let this->_access[accessKey] = this->_defaultAccess;
-				}
+			if func != null {
+				let this->_func[accessKey] = func;
 			}
 
 		}
@@ -426,27 +461,27 @@ class Memory extends Adapter
 	 * Example:
 	 * <code>
 	 * //Allow access to guests to search on customers
-	 * $acl->allow('guests', 'customers', 'search');
+	 * $acl->allow("guests", "customers", "search");
 	 *
 	 * //Allow access to guests to search or create on customers
-	 * $acl->allow('guests', 'customers', array('search', 'create'));
+	 * $acl->allow("guests", "customers", ["search", "create"]);
 	 *
 	 * //Allow access to any role to browse on products
-	 * $acl->allow('*', 'products', 'browse');
+	 * $acl->allow("*", "products", "browse");
 	 *
 	 * //Allow access to any role to browse on any resource
-	 * $acl->allow('*', '*', 'browse');
+	 * $acl->allow("*", "*", "browse");
 	 * </code>
 	 */
-	public function allow(string roleName, string resourceName, var access)
+	public function allow(string roleName, string resourceName, var access, var func = null)
 	{
 		var innerRoleName;
 
 		if roleName != "*" {
-			return this->_allowOrDeny(roleName, resourceName, access, Acl::ALLOW);
+			return this->_allowOrDeny(roleName, resourceName, access, Acl::ALLOW, func);
 		} else {
 			for innerRoleName, _ in this->_rolesNames {
-				this->_allowOrDeny(innerRoleName, resourceName, access, Acl::ALLOW);
+				this->_allowOrDeny(innerRoleName, resourceName, access, Acl::ALLOW, func);
 			}
 		}
 	}
@@ -459,27 +494,27 @@ class Memory extends Adapter
 	 * Example:
 	 * <code>
 	 * //Deny access to guests to search on customers
-	 * $acl->deny('guests', 'customers', 'search');
+	 * $acl->deny("guests", "customers", "search");
 	 *
 	 * //Deny access to guests to search or create on customers
-	 * $acl->deny('guests', 'customers', array('search', 'create'));
+	 * $acl->deny("guests", "customers", ["search", "create"]);
 	 *
 	 * //Deny access to any role to browse on products
-	 * $acl->deny('*', 'products', 'browse');
+	 * $acl->deny("*", "products", "browse");
 	 *
 	 * //Deny access to any role to browse on any resource
-	 * $acl->deny('*', '*', 'browse');
+	 * $acl->deny("*", "*", "browse");
 	 * </code>
 	 */
-	public function deny(string roleName, string resourceName, var access)
+	public function deny(string roleName, string resourceName, var access, var func = null)
 	{
 		var innerRoleName;
 
 		if roleName != "*" {
-			return this->_allowordeny(roleName, resourceName, access, Acl::DENY);
+			return this->_allowordeny(roleName, resourceName, access, Acl::DENY, func);
 		} else {
 			for innerRoleName, _ in this->_rolesNames {
-				this->_allowordeny(innerRoleName, resourceName, access, Acl::DENY);
+				this->_allowordeny(innerRoleName, resourceName, access, Acl::DENY, func);
 			}
 		}
 	}
@@ -489,23 +524,53 @@ class Memory extends Adapter
 	 *
 	 * <code>
 	 * //Does andres have access to the customers resource to create?
-	 * $acl->isAllowed('andres', 'Products', 'create');
+	 * $acl->isAllowed("andres", "Products", "create");
 	 *
 	 * //Do guests have access to any resource to edit?
-	 * $acl->isAllowed('guests', '*', 'edit');
+	 * $acl->isAllowed("guests", "*", "edit");
 	 * </code>
+	 *
+	 * @param  RoleInterface|RoleAware|string roleName
+	 * @param  ResourceInterface|ResourceAware|string resourceName
 	 */
-	public function isAllowed(string roleName, string resourceName, string access) -> boolean
+	public function isAllowed(var roleName, var resourceName, string access, array parameters = null) -> boolean
 	{
 		var eventsManager, accessList, accessKey,
 			haveAccess = null, roleInherits, inheritedRole, rolesNames,
-			inheritedRoles;
+			inheritedRoles, funcAccess = null, resourceObject = null, roleObject = null, funcList,
+			reflectionFunction, reflectionParameters, parameterNumber, parametersForFunction,
+			numberOfRequiredParameters, userParametersSizeShouldBe, reflectionClass, parameterToCheck,
+			reflectionParameter;
+
+		if typeof roleName == "object" {
+			if roleName instanceof RoleAware {
+				let roleObject = roleName;
+				let roleName = roleObject->getRoleName();
+			} elseif roleName instanceof RoleInterface {
+				let roleName = roleName->getName();
+			} else {
+				throw new Exception("Object passed as roleName must implement Phalcon\\Acl\\RoleAware or Phalcon\\Acl\\RoleInterface");
+			}
+		}
+
+		if typeof resourceName == "object" {
+			if resourceName instanceof ResourceAware {
+				let resourceObject = resourceName;
+				let resourceName = resourceObject->getResourceName();
+			} elseif resourceName instanceof ResourceInterface {
+				let resourceName = resourceName->getName();
+			} else {
+				throw new Exception("Object passed as resourceName must implement Phalcon\\Acl\\ResourceAware or Phalcon\\Acl\\ResourceInterface");
+			}
+
+		}
 
 		let this->_activeRole = roleName;
 		let this->_activeResource = resourceName;
 		let this->_activeAccess = access;
 		let accessList = this->_access;
 		let eventsManager = <EventsManager> this->_eventsManager;
+		let funcList = this->_func;
 
 		if typeof eventsManager == "object" {
 			if eventsManager->fire("acl:beforeCheckAccess", this) === false {
@@ -530,6 +595,8 @@ class Memory extends Adapter
 			let haveAccess = accessList[accessKey];
 		}
 
+		fetch funcAccess, funcList[accessKey];
+
 		/**
 		 * Check in the inherits roles
 		 */
@@ -547,6 +614,7 @@ class Memory extends Adapter
 						if isset accessList[accessKey] {
 							let haveAccess = accessList[accessKey];
 						}
+						fetch funcAccess, funcList[accessKey];
 					}
 				}
 			}
@@ -564,6 +632,7 @@ class Memory extends Adapter
 			 */
 			if isset accessList[accessKey] {
 				let haveAccess = accessList[accessKey];
+				fetch funcAccess, funcList[accessKey];
 			} else {
 				if typeof inheritedRoles == "array" {
 					for inheritedRole in inheritedRoles {
@@ -572,6 +641,7 @@ class Memory extends Adapter
 						/**
 						 * In the inherited roles
 						 */
+						fetch funcAccess, funcList[accessKey];
 						if isset accessList[accessKey] {
 							let haveAccess = accessList[accessKey];
 							break;
@@ -593,6 +663,7 @@ class Memory extends Adapter
 			 */
 			if isset accessList[accessKey] {
 				let haveAccess = accessList[accessKey];
+				fetch funcAccess, funcList[accessKey];
 			} else {
 				if typeof inheritedRoles == "array" {
 					for inheritedRole in inheritedRoles {
@@ -601,10 +672,11 @@ class Memory extends Adapter
 						/**
 						 * In the inherited roles
 						 */
-						 if isset accessList[accessKey] {
+						fetch funcAccess, funcList[accessKey];
+						if isset accessList[accessKey] {
 							let haveAccess = accessList[accessKey];
 							break;
-						 }
+						}
 					}
 				}
 			}
@@ -616,16 +688,119 @@ class Memory extends Adapter
 		}
 
 		if haveAccess == null {
-			return false;
+			return this->_defaultAccess == Acl::ALLOW;
 		}
 
-		return (haveAccess == Acl::ALLOW);
+		/**
+		 * If we have funcAccess then do all the checks for it
+		 */
+		if funcAccess !== null {
+			let reflectionFunction = new \ReflectionFunction(funcAccess);
+			let reflectionParameters = reflectionFunction->getParameters();
+			let parameterNumber = count(reflectionParameters);
+
+			// No parameters, just return haveAccess and call function without array
+			if parameterNumber === 0 {
+				return haveAccess == Acl::ALLOW && call_user_func(funcAccess);
+			}
+
+			let parametersForFunction = [];
+			let numberOfRequiredParameters = reflectionFunction->getNumberOfRequiredParameters();
+			let userParametersSizeShouldBe = parameterNumber;
+
+			for reflectionParameter in reflectionParameters {
+				let reflectionClass = reflectionParameter->getClass();
+				let parameterToCheck = reflectionParameter->getName();
+
+				if reflectionClass !== null {
+					// roleObject is this class
+					if roleObject !== null && reflectionClass->isInstance(roleObject) {
+						let parametersForFunction[] = roleObject;
+						let userParametersSizeShouldBe--;
+
+						continue;
+					}
+
+					// resourceObject is this class
+					if resourceObject !== null && reflectionClass->isInstance(resourceObject) {
+						let parametersForFunction[] = resourceObject;
+						let userParametersSizeShouldBe--;
+
+						continue;
+					}
+
+					// This is some user defined class, check if his parameter is instance of it
+					if isset parameters[parameterToCheck] && typeof parameters[parameterToCheck] == "object" && !reflectionClass->isInstance(parameters[parameterToCheck]) {
+						throw new Exception(
+							"Your passed parameter doesn't have the same class as the parameter in defined function when check " . roleName . " can " . access . " " . resourceName . ". Class passed: " . get_class(parameters[parameterToCheck])." , Class in defined function: " . reflectionClass->getName() . "."
+						);
+					}
+				}
+
+				if isset parameters[parameterToCheck] {
+					// We can't check type of ReflectionParameter in PHP 5.x so we just add it as it is
+					let parametersForFunction[] = parameters[parameterToCheck];
+				}
+			}
+
+			if count(parameters) > userParametersSizeShouldBe {
+				trigger_error(
+					"Number of parameters in array is higher than the number of parameters in defined function when check " . roleName . " can " . access . " " . resourceName . ". Remember that more parameters than defined in function will be ignored.",
+					E_USER_WARNING
+				);
+			}
+
+			// We dont have any parameters so check default action
+			if count(parametersForFunction) == 0 {
+				if numberOfRequiredParameters > 0 {
+					trigger_error(
+						"You didn't provide any parameters when check " . roleName . " can " . access . " "  . resourceName . ". We will use default action when no arguments."
+					);
+
+					return haveAccess == Acl::ALLOW && this->_noArgumentsDefaultAction == Acl::ALLOW;
+				}
+
+				// Number of required parameters == 0 so call funcAccess without any arguments
+				return haveAccess == Acl::ALLOW && call_user_func(funcAccess);
+			}
+
+			// Check necessary parameters
+			if count(parametersForFunction) >= numberOfRequiredParameters {
+				return haveAccess == Acl::ALLOW && call_user_func_array(funcAccess, parametersForFunction);
+			}
+
+			// We don't have enough parameters
+			throw new Exception(
+				"You didn't provide all necessary parameters for defined function when check " . roleName . " can " . access . " " . resourceName
+			);
+		}
+
+		return haveAccess == Acl::ALLOW;
+	}
+
+	/**
+	 * Sets the default access level (Phalcon\Acl::ALLOW or Phalcon\Acl::DENY)
+	 * for no arguments provided in isAllowed action if there exists func for
+	 * accessKey
+	 */
+	public function setNoArgumentsDefaultAction(int defaultAccess)
+	{
+		let this->_noArgumentsDefaultAction = defaultAccess;
+	}
+
+	/**
+	 * Returns the default ACL access level for no arguments provided in
+	 * isAllowed action if there exists func for accessKey
+	 */
+	public function getNoArgumentsDefaultAction() -> int
+	{
+		return this->_noArgumentsDefaultAction;
 	}
 
 	/**
 	 * Return an array with every role registered in the list
 	 */
-	public function getRoles() -> <Role[]>
+	public function getRoles() -> <RoleInterface[]>
 	{
 		return this->_roles;
 	}
@@ -633,7 +808,7 @@ class Memory extends Adapter
 	/**
 	 * Return an array with every resource registered in the list
 	 */
-	public function getResources() -> <$Resource[]>
+	public function getResources() -> <ResourceInterface[]>
 	{
 		return this->_resources;
 	}

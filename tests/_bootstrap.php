@@ -1,110 +1,98 @@
 <?php
-// This is global bootstrap for autoloading
 
-define('UNIT_TESTING', true);
+error_reporting(-1);
 
-$root = realpath(dirname(__FILE__));
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+setlocale(LC_ALL, 'en_US.utf-8');
 
-define('ROOT_PATH', $root);
-define('PATH_DATA', $root . '/_data/');
-define('PATH_CACHE', $root . '/_output/tests/cache/');
-define('PATH_LOGS', $root . '/_output/tests/logs/');
+date_default_timezone_set('UTC');
 
-/*
+if (function_exists('mb_internal_encoding')) {
+    mb_internal_encoding('utf-8');
+}
+if (function_exists('mb_substitute_character')) {
+    mb_substitute_character('none');
+}
 
-define('PATH_CONFIG', $root . '/_output/tests/var/config/');
-define('PATH_MICRO', $root . '/tests/app_micro/');
-define('PATH_SINGLE', $root . '/tests/app_single/');
-define('PATH_MULTI', $root . '/tests/app_multi/');
+clearstatcache();
 
-define('PATH_MODELS', $root . '/tests/app/models/');
-define('PATH_VIEWS', $root . '/tests/app/views/');
-define('PATH_CONTROLLERS', $root . '/tests/app/controllers/');
+$root = realpath(dirname(__FILE__)) . DIRECTORY_SEPARATOR;
 
-define('PATH_COLLECTIONS', $root . '/tests/app/collections/');
-define('PATH_VENDORS', $root . '/tests/app/vendor/');
-define('PATH_TASKS', $root . '/tests/app/tasks/');
-*/
+defined('TESTS_PATH')   || define('TESTS_PATH', $root);
+defined('PROJECT_PATH') || define('PROJECT_PATH', dirname(TESTS_PATH) . DIRECTORY_SEPARATOR);
+defined('PATH_DATA')    || define('PATH_DATA', $root .  '_data' . DIRECTORY_SEPARATOR);
+defined('PATH_CACHE')   || define('PATH_CACHE', $root . '_cache' . DIRECTORY_SEPARATOR);
+defined('PATH_OUTPUT')  || define('PATH_OUTPUT', $root .  '_output' . DIRECTORY_SEPARATOR);
+defined('PATH_FIXTURES')|| define('PATH_FIXTURES', $root .  '_fixtures' . DIRECTORY_SEPARATOR);
 
-// loading verify assert BDD style assert
-require_once ROOT_PATH . '/_support/Verify.php';
+unset($root);
 
-error_reporting(E_ALL);
-set_include_path(
-    ROOT_PATH . PATH_SEPARATOR . get_include_path()
-);
+require_once PROJECT_PATH . 'vendor/autoload.php';
+require_once TESTS_PATH . 'shim.php';
 
-// \Codeception\Specify\Config::setDeepClone(false);
+if (extension_loaded('xdebug')) {
+    ini_set('xdebug.cli_color', 1);
+    ini_set('xdebug.collect_params', 0);
+    ini_set('xdebug.dump_globals', 'on');
+    ini_set('xdebug.show_local_vars', 'on');
+    ini_set('xdebug.max_nesting_level', 100);
+    ini_set('xdebug.var_display_max_depth', 4);
+}
 
-// Register the autoloader
-spl_autoload_register('phalconTestAutoloader');
+$defaults = [
+    // General
+    "TEST_CACHE_DIR"            => TESTS_PATH . '_cache' . DIRECTORY_SEPARATOR,
 
-function phalconTestAutoloader($className)
-{
-    if (strpos($className, '\\') > 0) {
-        $className = str_replace('\\', DIRECTORY_SEPARATOR, $className);
+    // Beanstalk
+    "TEST_BT_HOST"              => '127.0.0.1',
+    "TEST_BT_PORT"              => 11300,
+
+    // Memcached
+    "TEST_MC_HOST"              => '127.0.0.1',
+    "TEST_MC_PORT"              => 11211,
+    "TEST_MC_WEIGHT"            => 1,
+
+    // SQLite
+    "TEST_DB_SQLITE_NAME"       => PATH_OUTPUT . 'phalcon_test.sqlite',
+
+    // MySQL
+    "TEST_DB_MYSQL_HOST"        => '127.0.0.1',
+    "TEST_DB_MYSQL_PORT"        => 3306,
+    "TEST_DB_MYSQL_USER"        => 'root',
+    "TEST_DB_MYSQL_PASSWD"      => '',
+    "TEST_DB_MYSQL_NAME"        => 'phalcon_test',
+    "TEST_DB_MYSQL_CHARSET"     => 'utf8',
+
+    // Postgresql
+    "TEST_DB_POSTGRESQL_HOST"   => '127.0.0.1',
+    "TEST_DB_POSTGRESQL_PORT"   => 5432,
+    "TEST_DB_POSTGRESQL_USER"   => 'postgres',
+    "TEST_DB_POSTGRESQL_PASSWD" => '',
+    "TEST_DB_POSTGRESQL_NAME"   => 'phalcon_test',
+    "TEST_DB_POSTGRESQL_SCHEMA" => 'public',
+
+    // Mongo
+    "TEST_DB_MONGO_HOST"        => '127.0.0.1',
+    "TEST_DB_MONGO_PORT"        => 27017,
+    "TEST_DB_MONGO_USER"        => 'admin',
+    "TEST_DB_MONGO_PASSWD"      => '',
+    "TEST_DB_MONGO_NAME"        => 'phalcon_test',
+
+    // Redis
+    "TEST_RS_HOST"              => '127.0.0.1',
+    "TEST_RS_PORT"              => 6379,
+    "TEST_RS_DB"                => 0,
+];
+
+
+
+foreach ($defaults as $key => $defaultValue) {
+    if (defined($key)) {
+        continue;
     }
 
-    $filename = $className . '.php';
-    $fullFile = ROOT_PATH  . DIRECTORY_SEPARATOR . str_replace('Phalcon' . DIRECTORY_SEPARATOR . 'Tests'.  DIRECTORY_SEPARATOR, '', $filename);
+    $value = getenv($key) ?: $defaultValue;
 
-    if (file_exists($fullFile)) {
-        require_once $fullFile;
-    }
-}
-
-function expect($description, $actual = null)
-{
-    return new Codeception\Verify($description, $actual);
-}
-
-function expect_that($truth)
-{
-    expect($truth)->notEmpty();
-}
-
-function expect_not($fallacy)
-{
-    expect($fallacy)->isEmpty();
-}
-
-/**
- * Returns a unique file name
- *
- * @author Nikos Dimopoulos <nikos@phalconphp.com>
- * @since  2014-09-13
- *
- * @param string $prefix    A prefix for the file
- * @param string $suffix    A suffix for the file
- *
- * @return string
- *
- */
-function newFileName($prefix = '', $suffix = 'log')
-{
-    $prefix = ($prefix) ? $prefix . '_' : '';
-    $suffix = ($suffix) ? $suffix       : 'log';
-
-    return uniqid($prefix, true) . '.' . $suffix;
-}
-
-/**
- * Removes a file from the system
- *
- * @author Nikos Dimopoulos <nikos@phalconphp.com>
- * @since  2014-09-13
- *
- * @param string $path
- * @param string $fileName
- */
-function cleanFile($path, $fileName)
-{
-    $file  = (substr($path, -1, 1) != "/") ? ($path . '/') : $path;
-    $file .= $fileName;
-
-    $actual = file_exists($file);
-
-    if ($actual) {
-        unlink($file);
-    }
+    define($key, $value);
 }

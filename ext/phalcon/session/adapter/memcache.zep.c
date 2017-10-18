@@ -24,24 +24,26 @@
  *
  * This adapter store sessions in memcache
  *
- *<code>
+ * <code>
  * use Phalcon\Session\Adapter\Memcache;
  *
- * $session = new Memcache([
- *    'uniqueId'   => 'my-private-app',
- *    'host'       => '127.0.0.1',
- *    'port'       => 11211,
- *    'persistent' => true,
- *    'lifetime'   => 3600,
- *    'prefix'     => 'my_'
- * ]);
+ * $session = new Memcache(
+ *     [
+ *         "uniqueId"   => "my-private-app",
+ *         "host"       => "127.0.0.1",
+ *         "port"       => 11211,
+ *         "persistent" => true,
+ *         "lifetime"   => 3600,
+ *         "prefix"     => "my_",
+ *     ]
+ * );
  *
  * $session->start();
  *
- * $session->set('var', 'some-value');
+ * $session->set("var", "some-value");
  *
- * echo $session->get('var');
- *</code>
+ * echo $session->get("var");
+ * </code>
  */
 ZEPHIR_INIT_CLASS(Phalcon_Session_Adapter_Memcache) {
 
@@ -51,7 +53,6 @@ ZEPHIR_INIT_CLASS(Phalcon_Session_Adapter_Memcache) {
 
 	zend_declare_property_long(phalcon_session_adapter_memcache_ce, SL("_lifetime"), 8600, ZEND_ACC_PROTECTED TSRMLS_CC);
 
-	zend_class_implements(phalcon_session_adapter_memcache_ce TSRMLS_CC, 1, phalcon_session_adapterinterface_ce);
 	return SUCCESS;
 
 }
@@ -60,7 +61,7 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, getMemcache) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_memcache");
+	RETURN_MEMBER(getThis(), "_memcache");
 
 }
 
@@ -68,7 +69,7 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, getLifetime) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_lifetime");
+	RETURN_MEMBER(getThis(), "_lifetime");
 
 }
 
@@ -78,7 +79,7 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, getLifetime) {
 PHP_METHOD(Phalcon_Session_Adapter_Memcache, __construct) {
 
 	zephir_fcall_cache_entry *_14 = NULL;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *options_param = NULL, *lifetime = NULL, *_3, *_4, *_6, *_8 = NULL, *_0$$3, *_1$$4, *_2$$5;
 	zval *options = NULL, *_5, *_7, *_9, *_10, *_11, *_12, *_13;
 
@@ -110,7 +111,7 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, __construct) {
 	}
 	ZEPHIR_OBS_VAR(lifetime);
 	if (zephir_array_isset_string_fetch(&lifetime, options, SS("lifetime"), 0 TSRMLS_CC)) {
-		zephir_update_property_this(this_ptr, SL("_lifetime"), lifetime TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_lifetime"), lifetime TSRMLS_CC);
 	}
 	ZEPHIR_INIT_VAR(_3);
 	object_init_ex(_3, phalcon_cache_backend_memcache_ce);
@@ -121,11 +122,11 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, __construct) {
 	ZEPHIR_OBS_VAR(_6);
 	zephir_read_property_this(&_6, this_ptr, SL("_lifetime"), PH_NOISY_CC);
 	zephir_array_update_string(&_5, SL("lifetime"), &_6, PH_COPY | PH_SEPARATE);
-	ZEPHIR_CALL_METHOD(NULL, _4, "__construct", NULL, 313, _5);
+	ZEPHIR_CALL_METHOD(NULL, _4, "__construct", NULL, 343, _5);
 	zephir_check_call_status();
-	ZEPHIR_CALL_METHOD(NULL, _3, "__construct", NULL, 316, _4, options);
+	ZEPHIR_CALL_METHOD(NULL, _3, "__construct", NULL, 346, _4, options);
 	zephir_check_call_status();
-	zephir_update_property_this(this_ptr, SL("_memcache"), _3 TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_memcache"), _3 TSRMLS_CC);
 	ZEPHIR_INIT_VAR(_7);
 	zephir_create_array(_7, 2, 0 TSRMLS_CC);
 	zephir_array_fast_append(_7, this_ptr);
@@ -162,9 +163,9 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, __construct) {
 	ZEPHIR_INIT_NVAR(_8);
 	ZVAL_STRING(_8, "gc", 1);
 	zephir_array_fast_append(_13, _8);
-	ZEPHIR_CALL_FUNCTION(NULL, "session_set_save_handler", NULL, 410, _7, _9, _10, _11, _12, _13);
+	ZEPHIR_CALL_FUNCTION(NULL, "session_set_save_handler", NULL, 446, _7, _9, _10, _11, _12, _13);
 	zephir_check_call_status();
-	ZEPHIR_CALL_PARENT(NULL, phalcon_session_adapter_memcache_ce, this_ptr, "__construct", &_14, 411, options);
+	ZEPHIR_CALL_PARENT(NULL, phalcon_session_adapter_memcache_ce, getThis(), "__construct", &_14, 447, options);
 	zephir_check_call_status();
 	ZEPHIR_MM_RESTORE();
 
@@ -191,9 +192,9 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, close) {
  */
 PHP_METHOD(Phalcon_Session_Adapter_Memcache, read) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
-	zval *sessionId_param = NULL, *_0, *_1;
-	zval *sessionId = NULL;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
+	zval *sessionId_param = NULL, *_0, *_1 = NULL, *_2;
+	zval *sessionId = NULL, *_3 = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &sessionId_param);
@@ -202,10 +203,11 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, read) {
 
 
 	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_memcache"), PH_NOISY_CC);
-	_1 = zephir_fetch_nproperty_this(this_ptr, SL("_lifetime"), PH_NOISY_CC);
-	ZEPHIR_RETURN_CALL_METHOD(_0, "get", NULL, 0, sessionId, _1);
+	_2 = zephir_fetch_nproperty_this(this_ptr, SL("_lifetime"), PH_NOISY_CC);
+	ZEPHIR_CALL_METHOD(&_1, _0, "get", NULL, 0, sessionId, _2);
 	zephir_check_call_status();
-	RETURN_MM();
+	zephir_get_strval(_3, _1);
+	RETURN_CTOR(_3);
 
 }
 
@@ -214,7 +216,7 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, read) {
  */
 PHP_METHOD(Phalcon_Session_Adapter_Memcache, write) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *sessionId_param = NULL, *data_param = NULL, *_0, *_1;
 	zval *sessionId = NULL, *data = NULL;
 
@@ -227,9 +229,9 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, write) {
 
 	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_memcache"), PH_NOISY_CC);
 	_1 = zephir_fetch_nproperty_this(this_ptr, SL("_lifetime"), PH_NOISY_CC);
-	ZEPHIR_CALL_METHOD(NULL, _0, "save", NULL, 0, sessionId, data, _1);
+	ZEPHIR_RETURN_CALL_METHOD(_0, "save", NULL, 0, sessionId, data, _1);
 	zephir_check_call_status();
-	ZEPHIR_MM_RESTORE();
+	RETURN_MM();
 
 }
 
@@ -238,8 +240,9 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, write) {
  */
 PHP_METHOD(Phalcon_Session_Adapter_Memcache, destroy) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
-	zval *sessionId_param = NULL, *id = NULL, *_0;
+	zend_bool _0;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
+	zval *sessionId_param = NULL, *id = NULL, *_1, *_2 = NULL, *_3$$5, *_4$$5 = NULL;
 	zval *sessionId = NULL;
 
 	ZEPHIR_MM_GROW();
@@ -259,10 +262,22 @@ PHP_METHOD(Phalcon_Session_Adapter_Memcache, destroy) {
 	} else {
 		ZEPHIR_CPY_WRT(id, sessionId);
 	}
-	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_memcache"), PH_NOISY_CC);
-	ZEPHIR_RETURN_CALL_METHOD(_0, "delete", NULL, 0, id);
+	ZEPHIR_CALL_METHOD(NULL, this_ptr, "removesessiondata", NULL, 0);
 	zephir_check_call_status();
-	RETURN_MM();
+	_0 = !(ZEPHIR_IS_EMPTY(id));
+	if (_0) {
+		_1 = zephir_fetch_nproperty_this(this_ptr, SL("_memcache"), PH_NOISY_CC);
+		ZEPHIR_CALL_METHOD(&_2, _1, "exists", NULL, 0, id);
+		zephir_check_call_status();
+		_0 = zephir_is_true(_2);
+	}
+	if (_0) {
+		_3$$5 = zephir_fetch_nproperty_this(this_ptr, SL("_memcache"), PH_NOISY_CC);
+		ZEPHIR_CALL_METHOD(&_4$$5, _3$$5, "delete", NULL, 0, id);
+		zephir_check_call_status();
+		RETURN_MM_BOOL(zephir_get_boolval(_4$$5));
+	}
+	RETURN_MM_BOOL(1);
 
 }
 

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,6 +28,8 @@ use Phalcon\Mvc\Collection\ManagerInterface;
 use Phalcon\Mvc\Collection\BehaviorInterface;
 use Phalcon\Mvc\Collection\Exception;
 use Phalcon\Mvc\Model\MessageInterface;
+use Phalcon\Mvc\Model\Message as Message;
+use Phalcon\ValidationInterface;
 
 /**
  * Phalcon\Mvc\Collection
@@ -48,9 +50,11 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 
 	protected _operationMade = 0;
 
+	protected _dirtyState = 1;
+
 	protected _connection;
 
-	protected _errorMessages;
+	protected _errorMessages = [];
 
 	protected static _reserved;
 
@@ -66,6 +70,12 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 
 	const OP_DELETE = 3;
 
+	const DIRTY_STATE_PERSISTENT = 0;
+
+	const DIRTY_STATE_TRANSIENT = 1;
+
+	const DIRTY_STATE_DETACHED = 2;
+
 	/**
 	 * Phalcon\Mvc\Collection constructor
 	 */
@@ -79,7 +89,7 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		}
 
 		if typeof dependencyInjector != "object" {
-			throw new Exception("A dependency injector container is required to obtain the services related to the ORM");
+			throw new Exception("A dependency injector container is required to obtain the services related to the ODM");
 		}
 
 		let this->_dependencyInjector = dependencyInjector;
@@ -196,13 +206,16 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		var reserved;
 
 		let reserved = self::_reserved;
-		if reserved === null {
+		if typeof reserved != "array" {
 			let reserved = [
 				"_connection": true,
 				"_dependencyInjector": true,
 				"_source": true,
 				"_operationMade": true,
-				"_errorMessages": true
+				"_errorMessages": true,
+				"_dirtyState": true,
+				"_modelsManager": true,
+				"_skipped" : true
 			];
 			let self::_reserved = reserved;
 		}
@@ -231,15 +244,14 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 */
 	public function getSource() -> string
 	{
-		var source, collection;
+		var collection;
 
-		let source = this->_source;
-		if !source {
+		if !this->_source {
 			let collection = this;
-			let source = uncamelize(get_class_ns(collection));
-			let this->_source = source;
+			let this->_source = uncamelize(get_class_ns(collection));
 		}
-		return source;
+
+		return this->_source;
 	}
 
 	/**
@@ -266,21 +278,18 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 */
 	public function getConnection()
 	{
-		var connection;
-
-		let connection = this->_connection;
-		if typeof connection != "object" {
-			let connection = this->_modelsManager->getConnection(this);
-			let this->_connection = connection;
+		if typeof this->_connection != "object" {
+			let this->_connection = this->_modelsManager->getConnection(this);
 		}
-		return connection;
+
+		return this->_connection;
 	}
 
 	/**
 	 * Reads an attribute value by its name
 	 *
 	 *<code>
-	 *	echo $robot->readAttribute('name');
+	 *	echo $robot->readAttribute("name");
 	 *</code>
 	 *
 	 * @param string attribute
@@ -299,13 +308,13 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Writes an attribute value by its name
 	 *
 	 *<code>
-	 *	$robot->writeAttribute('name', 'Rosey');
+	 *	$robot->writeAttribute("name", "Rosey");
 	 *</code>
 	 *
 	 * @param string attribute
 	 * @param mixed value
 	 */
-	public function writeAttribute(string! attribute, var value)
+	public function writeAttribute(string attribute, var value)
 	{
 		let this->{attribute} = value;
 	}
@@ -350,11 +359,17 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 			let base = new {className}();
 
 			if !(base instanceof CollectionInterface || base instanceof Collection\Document) {
-				throw new Exception("Object of class '" . className . "' must be an implementation of Phalcon\\Mvc\\CollectionInterface or an instance of Phalcon\\Mvc\\Collection\\Document");
+				throw new Exception(
+					"Object of class '" . className . "' must be an implementation of Phalcon\\Mvc\\CollectionInterface or an instance of Phalcon\\Mvc\\Collection\\Document"
+				);
 			}
 		} else {
 			let base = collection;
 		}
+
+        if base instanceof Collection {
+		    base->setDirtyState(self::DIRTY_STATE_PERSISTENT);
+        }
 
 		let source = collection->getSource();
 		if empty source {
@@ -433,7 +448,7 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		 * Requesting a complete resultset
 		 */
 		let collections = [];
-		for document in iterator_to_array(documentsCursor) {
+		for document in iterator_to_array(documentsCursor, false) {
 
 			/**
 			 * Assign the values to the base object
@@ -600,18 +615,19 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	{
 		var eventName;
 
-		if success === true {
+		if success {
 			if !disableEvents {
-
-				if exists === true {
+				if exists {
 					let eventName = "afterUpdate";
 				} else {
 					let eventName = "afterCreate";
 				}
+
 				this->fireEvent(eventName);
 
 				this->fireEvent("afterSave");
 			}
+
 			return success;
 		}
 
@@ -627,33 +643,93 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Executes validators on every validation call
 	 *
 	 *<code>
-	 *use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionIn;
+	 * use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionIn;
 	 *
-	 *class Subscriptors extends \Phalcon\Mvc\Collection
-	 *{
+	 * class Subscriptors extends \Phalcon\Mvc\Collection
+	 * {
+	 *     public function validation()
+	 *     {
+	 *         // Old, deprecated syntax, use new one below
+	 *         $this->validate(
+	 *             new ExclusionIn(
+	 *                 [
+	 *                     "field"  => "status",
+	 *                     "domain" => ["A", "I"],
+	 *                 ]
+	 *             )
+	 *         );
 	 *
-	 *	public function validation()
-	 *	{
-	 *		this->validate(new ExclusionIn(array(
-	 *			'field' => 'status',
-	 *			'domain' => array('A', 'I')
-	 *		)));
-	 *		if (this->validationHasFailed() == true) {
-	 *			return false;
-	 *		}
-	 *	}
+	 *         if ($this->validationHasFailed() == true) {
+	 *             return false;
+	 *         }
+	 *     }
+	 * }
+	 *</code>
 	 *
-	 *}
+	 *<code>
+	 * use Phalcon\Validation\Validator\ExclusionIn as ExclusionIn;
+	 * use Phalcon\Validation;
+	 *
+	 * class Subscriptors extends \Phalcon\Mvc\Collection
+	 * {
+	 *     public function validation()
+	 *     {
+	 *         $validator = new Validation();
+	 *         $validator->add("status",
+	 *             new ExclusionIn(
+	 *                 [
+	 *                     "domain" => ["A", "I"]
+	 *                 ]
+	 *             )
+	 *         );
+	 *
+	 *         return $this->validate($validator);
+	 *     }
+	 * }
 	 *</code>
 	 */
-	protected function validate(<Model\ValidatorInterface> validator) -> void
+	protected function validate(var validator)
 	{
-		var message;
+		var messages, message;
 
-		if validator->validate(this) === false {
-			for message in validator->getMessages() {
-				let this->_errorMessages[] = message;
+		if validator instanceof Model\ValidatorInterface {
+			if validator->validate(this) === false {
+				for message in validator->getMessages() {
+					let this->_errorMessages[] = message;
+				}
 			}
+		} elseif validator instanceof ValidationInterface {
+			let messages = validator->validate(null, this);
+
+			// Call the validation, if it returns not the boolean
+			// we append the messages to the current object
+			if typeof messages != "boolean" {
+
+				messages->rewind();
+
+				// for message in iterator(messages) {
+				while messages->valid() {
+
+					let message = messages->current();
+
+					this->appendMessage(
+						new Message(
+							message->getMessage(),
+							message->getField(),
+							message->getType()
+						)
+					);
+
+					messages->next();
+				}
+
+				// If there is a message, it returns false otherwise true
+				return !count(messages);
+			}
+
+			return messages;
+		} else {
+			throw new Exception("You should pass Phalcon\\Mvc\\Model\\ValidatorInterface or Phalcon\\ValidationInterface object");
 		}
 	}
 
@@ -661,36 +737,31 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Check whether validation process has generated any messages
 	 *
 	 *<code>
-	 *use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionIn;
+	 * use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionIn;
 	 *
-	 *class Subscriptors extends \Phalcon\Mvc\Collection
-	 *{
+	 * class Subscriptors extends \Phalcon\Mvc\Collection
+	 * {
+	 *     public function validation()
+	 *     {
+	 *         $this->validate(
+	 *             new ExclusionIn(
+	 *                 [
+	 *                     "field"  => "status",
+	 *                     "domain" => ["A", "I"],
+	 *                 ]
+	 *             )
+	 *         );
 	 *
-	 *	public function validation()
-	 *	{
-	 *		this->validate(new ExclusionIn(array(
-	 *			'field' => 'status',
-	 *			'domain' => array('A', 'I')
-	 *		)));
-	 *		if (this->validationHasFailed() == true) {
-	 *			return false;
-	 *		}
-	 *	}
-	 *
-	 *}
+	 *         if ($this->validationHasFailed() == true) {
+	 *             return false;
+	 *         }
+	 *     }
+	 * }
 	 *</code>
 	 */
 	public function validationHasFailed() -> boolean
 	{
-		var errorMessages;
-
-		let errorMessages = this->_errorMessages;
-		if typeof errorMessages == "array" {
-			if count(errorMessages) {
-				return true;
-			}
-		}
-		return false;
+		return (count(this->_errorMessages) > 0);
 	}
 
 	/**
@@ -761,7 +832,7 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 */
 	protected function _exists(collection) -> boolean
 	{
-		var id, mongoId;
+		var id, mongoId, exists;
 
 		if !fetch id, this->_id {
 			return false;
@@ -783,9 +854,24 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		}
 
 		/**
+		 * If we already know if the document exists we don't check it
+		 */
+		 if !this->_dirtyState {
+			return true;
+		 }
+
+		/**
 		 * Perform the count using the function provided by the driver
 		 */
-		return collection->count(["_id": mongoId]) > 0;
+		let exists = collection->count(["_id": mongoId]) > 0;
+
+		if exists {
+			let this->_dirtyState = self::DIRTY_STATE_PERSISTENT;
+		} else {
+			let this->_dirtyState = self::DIRTY_STATE_TRANSIENT;
+		}
+
+		return exists;
 	}
 
 	/**
@@ -793,17 +879,22 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 *
 	 * <code>
 	 * $robot = new Robots();
-	 * $robot->type = 'mechanical';
-	 * $robot->name = 'Astro Boy';
+	 *
+	 * $robot->type = "mechanical";
+	 * $robot->name = "Astro Boy";
 	 * $robot->year = 1952;
-	 * if ($robot->save() == false) {
-	 *	echo "Umh, We can't store robots right now ";
-	 *	foreach ($robot->getMessages() as message) {
-	 *		echo message;
-	 *	}
-	 *} else {
-	 *	echo "Great, a new robot was saved successfully!";
-	 *}
+	 *
+	 * if ($robot->save() === false) {
+	 *     echo "Umh, We can't store robots right now ";
+	 *
+	 *     $messages = $robot->getMessages();
+	 *
+	 *     foreach ($messages as $message) {
+	 *         echo $message;
+	 *     }
+	 * } else {
+	 *     echo "Great, a new robot was saved successfully!";
+	 * }
 	 * </code>
 	 */
 	public function getMessages() -> <MessageInterface[]>
@@ -815,19 +906,21 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Appends a customized message on the validation process
 	 *
 	 *<code>
-	 *	use \Phalcon\Mvc\Model\Message as Message;
+	 * use \Phalcon\Mvc\Model\Message as Message;
 	 *
-	 *	class Robots extends \Phalcon\Mvc\Model
-	 *	{
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function beforeSave()
+	 *     {
+	 *         if ($this->name === "Peter") {
+	 *             $message = new Message(
+	 *                 "Sorry, but a robot cannot be named Peter"
+	 *             );
 	 *
-	 *		public function beforeSave()
-	 *		{
-	 *			if ($this->name == 'Peter') {
-	 *				message = new Message("Sorry, but a robot cannot be named Peter");
-	 *				$this->appendMessage(message);
-	 *			}
-	 *		}
-	 *	}
+	 *             $this->appendMessage(message);
+	 *         }
+	 *     }
+	 * }
 	 *</code>
 	 */
 	public function appendMessage(<MessageInterface> message)
@@ -836,16 +929,16 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	}
 
 	/**
-	 * Creates/Updates a collection based on the values in the attributes
+	 * Shared Code for CU Operations
+	 * Prepares Collection
 	 */
-	public function save() -> boolean
+	protected function prepareCU()
 	{
-		var dependencyInjector, connection, exists, source, data,
-			success, status, id, ok, collection, disableEvents;
+		var dependencyInjector, connection, source, collection;
 
 		let dependencyInjector = this->_dependencyInjector;
 		if typeof dependencyInjector != "object" {
-			throw new Exception("A dependency injector container is required to obtain the services related to the ORM");
+			throw new Exception("A dependency injector container is required to obtain the services related to the ODM");
 		}
 
 		let source = this->getSource();
@@ -859,6 +952,18 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		 * Choose a collection according to the collection name
 		 */
 		let collection = connection->selectCollection(source);
+
+		return collection;
+	}
+
+	/**
+	 * Creates/Updates a collection based on the values in the attributes
+	 */
+	public function save() -> boolean
+	{
+		var exists, data, success, status, id, ok, collection;
+
+		let collection = this->prepareCU();
 
 		/**
 		 * Check the dirty state of the current operation to update the current operation
@@ -876,12 +981,10 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		 */
 		let this->_errorMessages = [];
 
-		let disableEvents = self::_disableEvents;
-
 		/**
 		 * Execute the preSave hook
 		 */
-		if this->_preSave(dependencyInjector, disableEvents, exists) === false {
+		if this->_preSave(this->_dependencyInjector, self::_disableEvents, exists) === false {
 			return false;
 		}
 
@@ -902,7 +1005,211 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 						if fetch id, data["_id"] {
 							let this->_id = id;
 						}
+						let this->_dirtyState = self::DIRTY_STATE_PERSISTENT;
 					}
+				}
+			}
+		}
+
+		/**
+		 * Call the postSave hooks
+		 */
+		return this->_postSave(self::_disableEvents, success, exists);
+	}
+
+	/**
+	 * Creates a collection based on the values in the attributes
+	 */
+	public function create() -> boolean
+	{
+		var exists, data, success, status, id, ok, collection;
+
+		let collection = this->prepareCU();
+
+		/**
+		 * Check the dirty state of the current operation to update the current operation
+		 */
+		let exists = false;
+		let this->_operationMade = self::OP_CREATE;
+
+		/**
+		 * The messages added to the validator are reset here
+		 */
+		let this->_errorMessages = [];
+
+		/**
+		 * Execute the preSave hook
+		 */
+		if this->_preSave(this->_dependencyInjector, self::_disableEvents, exists) === false {
+			return false;
+		}
+
+		let data = this->toArray();
+
+		let success = false;
+
+		/**
+		 * We always use safe stores to get the success state
+		 * Save the document
+		 */
+		let status = collection->insert(data, ["w": true]);
+		if typeof status == "array" {
+			if fetch ok, status["ok"] {
+				if ok {
+					let success = true;
+					if exists === false {
+						if fetch id, data["_id"] {
+							let this->_id = id;
+						}
+						let this->_dirtyState = self::DIRTY_STATE_PERSISTENT;
+					}
+				}
+			}
+		}
+
+		/**
+		 * Call the postSave hooks
+		 */
+		return this->_postSave(self::_disableEvents, success, exists);
+	}
+
+	/**
+	 * Creates a document based on the values in the attributes, if not found by criteria
+	 * Preferred way to avoid duplication is to create index on attribute
+	 *
+	 * <code>
+	 * $robot = new Robot();
+	 *
+	 * $robot->name = "MyRobot";
+	 * $robot->type = "Droid";
+	 *
+	 * // Create only if robot with same name and type does not exist
+	 * $robot->createIfNotExist(
+	 *     [
+	 *         "name",
+	 *         "type",
+	 *     ]
+	 * );
+	 * </code>
+	 */
+	public function createIfNotExist(array! criteria) -> boolean
+	{
+		var exists, data, keys, query,
+			success, status, doc, collection;
+
+		if empty criteria {
+			throw new Exception("Criteria parameter must be array with one or more attributes of the model");
+		}
+
+		/**
+		 * Choose a collection according to the collection name
+		 */
+		let collection = this->prepareCU();
+
+		/**
+		 * Assume non-existence to fire beforeCreate events - no update does occur anyway
+		 */
+		let exists = false;
+
+		/**
+		 * Reset current operation
+		 */
+
+		let this->_operationMade = self::OP_NONE;
+
+		/**
+		 * The messages added to the validator are reset here
+		 */
+		let this->_errorMessages = [];
+
+		/**
+		 * Execute the preSave hook
+		 */
+		if this->_preSave(this->_dependencyInjector, self::_disableEvents, exists) === false {
+			return false;
+		}
+
+		let keys = array_flip( criteria );
+		let data = this->toArray();
+
+		if array_diff_key( keys, data ) {
+			throw new Exception("Criteria parameter must be array with one or more attributes of the model");
+		}
+
+		let query = array_intersect_key( data, keys );
+
+		let success = false;
+
+		/**
+		 * $setOnInsert in conjunction with upsert ensures creating a new document
+		 * "new": false returns null if new document created, otherwise new or old document could be returned
+		 */
+		let status = collection->findAndModify(query,
+			["$setOnInsert": data],
+			null,
+			["new": false, "upsert": true]);
+		if status == null {
+			let doc = collection->findOne(query);
+			if typeof doc == "array" {
+				let success = true;
+				let this->_operationMade = self::OP_CREATE;
+				let this->_id = doc["_id"];
+			}
+		} else {
+			this->appendMessage( new Message("Document already exists") );
+		}
+
+		/**
+		 * Call the postSave hooks
+		 */
+		return this->_postSave(self::_disableEvents, success, exists);
+	}
+
+	/**
+	 * Creates/Updates a collection based on the values in the attributes
+	 */
+	public function update() -> boolean
+	{
+		var exists, data, success, status, ok, collection;
+
+		let collection = this->prepareCU();
+
+		/**
+		 * Check the dirty state of the current operation to update the current operation
+		 */
+		let exists = this->_exists(collection);
+
+		if !exists {
+			throw new Exception("The document cannot be updated because it doesn't exist");
+		}
+
+		let this->_operationMade = self::OP_UPDATE;
+
+		/**
+		 * The messages added to the validator are reset here
+		 */
+		let this->_errorMessages = [];
+
+		/**
+		 * Execute the preSave hook
+		 */
+		if this->_preSave(this->_dependencyInjector, self::_disableEvents, exists) === false {
+			return false;
+		}
+
+		let data = this->toArray();
+
+		let success = false;
+
+		/**
+		 * We always use safe stores to get the success state
+		 * Save the document
+		 */
+		let status = collection->update(["_id": $this->_id], data, ["w": true]);
+		if typeof status == "array" {
+			if fetch ok, status["ok"] {
+				if ok {
+					let success = true;
 				}
 			}
 		} else {
@@ -912,20 +1219,35 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 		/**
 		 * Call the postSave hooks
 		 */
-		return this->_postSave(disableEvents, success, exists);
+		return this->_postSave(self::_disableEvents, success, exists);
 	}
 
 	/**
 	 * Find a document by its id (_id)
 	 *
-	 * @param string|\MongoId id
-	 * @return \Phalcon\Mvc\Collection
+	 * <code>
+	 * // Find user by using \MongoId object
+	 * $user = Users::findById(
+	 *     new \MongoId("545eb081631d16153a293a66")
+	 * );
+	 *
+	 * // Find user by using id as sting
+	 * $user = Users::findById("45cbc4a0e4123f6920000002");
+	 *
+	 * // Validate input
+	 * if ($user = Users::findById($_POST["id"])) {
+	 *     // ...
+	 * }
+	 * </code>
 	 */
-	public static function findById(id) -> <Collection>
+	public static function findById(var id) -> <Collection> | null
 	{
 		var className, collection, mongoId;
 
 		if typeof id != "object" {
+			if !preg_match("/^[a-f\d]{24}$/i", id) {
+				return null;
+			}
 
 			let className = get_called_class();
 
@@ -951,23 +1273,46 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Allows to query the first record that match the specified conditions
 	 *
 	 * <code>
-	 *
-	 * //What's the first robot in the robots table?
+	 * // What's the first robot in the robots table?
 	 * $robot = Robots::findFirst();
+	 *
 	 * echo "The robot name is ", $robot->name, "\n";
 	 *
-	 * //What's the first mechanical robot in robots table?
-	 * $robot = Robots::findFirst(array(
-	 *     array("type" => "mechanical")
-	 * ));
+	 * // What's the first mechanical robot in robots table?
+	 * $robot = Robots::findFirst(
+	 *     [
+	 *         [
+	 *             "type" => "mechanical",
+	 *         ]
+	 *     ]
+	 * );
+	 *
 	 * echo "The first mechanical robot name is ", $robot->name, "\n";
 	 *
-	 * //Get first virtual robot ordered by name
-	 * $robot = Robots::findFirst(array(
-	 *     array("type" => "mechanical"),
-	 *     "order" => array("name" => 1)
-	 * ));
+	 * // Get first virtual robot ordered by name
+	 * $robot = Robots::findFirst(
+	 *     [
+	 *         [
+	 *             "type" => "mechanical",
+	 *         ],
+	 *         "order" => [
+	 *             "name" => 1,
+	 *         ],
+	 *     ]
+	 * );
+	 *
 	 * echo "The first virtual robot name is ", $robot->name, "\n";
+	 *
+	 * // Get first robot by id (_id)
+	 * $robot = Robots::findFirst(
+	 *     [
+	 *         [
+	 *             "_id" => new \MongoId("45cbc4a0e4123f6920000002"),
+	 *         ]
+	 *     ]
+	 * );
+	 *
+	 * echo "The robot id is ", $robot->_id, "\n";
 	 * </code>
 	 */
 	public static function findFirst(array parameters = null) -> array
@@ -987,32 +1332,51 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Allows to query a set of records that match the specified conditions
 	 *
 	 * <code>
-	 *
-	 * //How many robots are there?
+	 * // How many robots are there?
 	 * $robots = Robots::find();
+	 *
 	 * echo "There are ", count($robots), "\n";
 	 *
-	 * //How many mechanical robots are there?
-	 * $robots = Robots::find(array(
-	 *     array("type" => "mechanical")
-	 * ));
+	 * // How many mechanical robots are there?
+	 * $robots = Robots::find(
+	 *     [
+	 *         [
+	 *             "type" => "mechanical",
+	 *         ]
+	 *     ]
+	 * );
+	 *
 	 * echo "There are ", count(robots), "\n";
 	 *
-	 * //Get and print virtual robots ordered by name
-	 * $robots = Robots::findFirst(array(
-	 *     array("type" => "virtual"),
-	 *     "order" => array("name" => 1)
-	 * ));
+	 * // Get and print virtual robots ordered by name
+	 * $robots = Robots::findFirst(
+	 *     [
+	 *         [
+	 *             "type" => "virtual"
+	 *         ],
+	 *         "order" => [
+	 *             "name" => 1,
+	 *         ]
+	 *     ]
+	 * );
+	 *
 	 * foreach ($robots as $robot) {
 	 *	   echo $robot->name, "\n";
 	 * }
 	 *
-	 * //Get first 100 virtual robots ordered by name
-	 * $robots = Robots::find(array(
-	 *     array("type" => "virtual"),
-	 *     "order" => array("name" => 1),
-	 *     "limit" => 100
-	 * ));
+	 * // Get first 100 virtual robots ordered by name
+	 * $robots = Robots::find(
+	 *     [
+	 *         [
+	 *             "type" => "virtual",
+	 *         ],
+	 *         "order" => [
+	 *             "name" => 1,
+	 *         ],
+	 *         "limit" => 100,
+	 *     ]
+	 * );
+	 *
 	 * foreach ($robots as $robot) {
 	 *	   echo $robot->name, "\n";
 	 * }
@@ -1031,10 +1395,10 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Perform a count over a collection
 	 *
 	 *<code>
-	 * echo 'There are ', Robots::count(), ' robots';
+	 * echo "There are ", Robots::count(), " robots";
 	 *</code>
 	 */
-	public static function count(array parameters = null) -> array
+	public static function count(array parameters = null) -> int
 	{
 		var className, collection, connection;
 
@@ -1118,12 +1482,15 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Deletes a model instance. Returning true on success or false otherwise.
 	 *
 	 * <code>
-	 *	$robot = Robots::findFirst();
-	 *	$robot->delete();
+	 * $robot = Robots::findFirst();
 	 *
-	 *	foreach (Robots::find() as $robot) {
-	 *		$robot->delete();
-	 *	}
+	 * $robot->delete();
+	 *
+	 * $robots = Robots::find();
+	 *
+	 * foreach ($robots as $robot) {
+	 *     $robot->delete();
+	 * }
 	 * </code>
 	 */
 	public function delete() -> boolean
@@ -1191,12 +1558,30 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 				if !disableEvents {
 					this->fireEvent("afterDelete");
 				}
+				let this->_dirtyState = self::DIRTY_STATE_DETACHED;
 			}
 		} else {
 			let success = false;
 		}
 
 		return success;
+	}
+
+	/**
+	 * Sets the dirty state of the object using one of the DIRTY_STATE_* constants
+	 */
+	public function setDirtyState(int dirtyState) -> <CollectionInterface>
+	{
+		let this->_dirtyState = dirtyState;
+		return this;
+	}
+
+	/**
+	 * Returns one of the DIRTY_STATE_* constants telling if the document exists in the collection or not
+	 */
+	public function getDirtyState() -> int
+	{
+		return this->_dirtyState;
 	}
 
 	/**
@@ -1219,7 +1604,9 @@ abstract class Collection implements EntityInterface, CollectionInterface, Injec
 	 * Returns the instance as an array representation
 	 *
 	 *<code>
-	 * print_r($robot->toArray());
+	 * print_r(
+	 *     $robot->toArray()
+	 * );
 	 *</code>
 	 */
 	public function toArray() -> array

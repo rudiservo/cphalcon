@@ -7,7 +7,7 @@
   | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
   +------------------------------------------------------------------------+
   | This source file is subject to the New BSD License that is bundled     |
-  | with this package in the file docs/LICENSE.txt.                        |
+  | with this package in the file LICENSE.txt.                             |
   |                                                                        |
   | If you did not receive a copy of the license and are unable to         |
   | obtain it through the world-wide-web, please send an email             |
@@ -549,34 +549,6 @@ class DbDescribeTest extends PHPUnit_Framework_TestCase
 
 		$connection = new Phalcon\Db\Adapter\Pdo\Mysql($configMysql);
 
-		//List tables
-		$expectedTables = array (
-			'albums',
-			'artists',
-			'customers',
-			'issue_11036',
-			'issue_1534',
-			'issue_2019',
-			'm2m_parts',
-			'm2m_robots',
-			'm2m_robots_parts',
-			'parts',
-			'personas',
-			'personnes',
-			'prueba',
-			'robots',
-			'robots_parts',
-			'songs',
-			'subscriptores',
-			'tipo_documento',
-		);
-
-		$tables = $connection->listTables();
-		$this->assertEquals($tables, $expectedTables);
-
-		$tables = $connection->listTables('phalcon_test');
-		$this->assertEquals($tables, $expectedTables);
-
 		//Table exist
 		$this->assertEquals($connection->tableExists('personas'), 1);
 		$this->assertEquals($connection->tableExists('noexist'), 0);
@@ -652,7 +624,9 @@ class DbDescribeTest extends PHPUnit_Framework_TestCase
 			'_referencedTable' => 'robots',
 			'_columns' => array('robots_id'),
 				'_referencedColumns' => array('id'),
-				'_referencedSchema' => 'phalcon_test'
+				'_referencedSchema' => 'phalcon_test',
+				'_onUpdate' => 'RESTRICT',
+				'_onDelete' => 'RESTRICT'
 			)),
 			'robots_parts_ibfk_2' => Phalcon\Db\Reference::__set_state(array(
 				'_referenceName' => 'robots_parts_ibfk_2',
@@ -660,6 +634,8 @@ class DbDescribeTest extends PHPUnit_Framework_TestCase
 				'_columns' => array('parts_id'),
 				'_referencedColumns' => array('id'),
 				'_referencedSchema' => 'phalcon_test',
+				'_onUpdate' => 'RESTRICT',
+				'_onDelete' => 'RESTRICT'
 			)),
 		);
 
@@ -673,7 +649,6 @@ class DbDescribeTest extends PHPUnit_Framework_TestCase
 
 	public function testDbPostgresql()
 	{
-
 		require 'unit-tests/config.db.php';
 		if (empty($configPostgresql)) {
 			$this->markTestSkipped("Skipped");
@@ -681,31 +656,6 @@ class DbDescribeTest extends PHPUnit_Framework_TestCase
 		}
 
 		$connection = new Phalcon\Db\Adapter\Pdo\Postgresql($configPostgresql);
-
-		//List tables
-		$expectedTables = array (
-			0 => 'customers',
-			1 => 'parts',
-			2 => 'personas',
-			3 => 'personnes',
-			4 => 'prueba',
-			5 => 'robots',
-			6 => 'robots_parts',
-			7 => 'subscriptores',
-			8 => 'tipo_documento',
-		);
-
-		$tables = $connection->listTables();
-		$this->assertEquals($tables, $expectedTables);
-
-		$tables = $connection->listTables('public');
-		$this->assertEquals($tables, $expectedTables);
-
-		//Table exist
-		$this->assertEquals($connection->tableExists('personas'), 1);
-		$this->assertEquals($connection->tableExists('noexist'), 0);
-		$this->assertEquals($connection->tableExists('personas', 'public'), 1);
-		$this->assertEquals($connection->tableExists('personas', 'test'), 0);
 
 		//Columns
 		$expectedDescribe = $this->getExpectedColumnsPostgresql();

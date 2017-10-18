@@ -4,10 +4,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,10 +31,11 @@ class PhvoltParseViewOptimizer extends OptimizerAbstract
 {
 
 	/**
-	 *
 	 * @param array $expression
 	 * @param Call $call
 	 * @param CompilationContext $context
+	 * @return bool|CompiledExpression
+	 * @throws CompilerException
 	 */
 	public function optimize(array $expression, Call $call, CompilationContext $context)
 	{
@@ -69,7 +70,8 @@ class PhvoltParseViewOptimizer extends OptimizerAbstract
 
 		$call->addCallStatusFlag($context);
 
-		$context->codePrinter->output('ZEPHIR_LAST_CALL_STATUS = phvolt_parse_view(' . $symbolVariable->getName() . ', ' . $resolvedParams[0] . ', ' . $resolvedParams[1] . ' TSRMLS_CC);');
+		$symbol = $context->backend->getVariableCode($symbolVariable);
+		$context->codePrinter->output('ZEPHIR_LAST_CALL_STATUS = phvolt_parse_view(' . $symbol . ', ' . $resolvedParams[0] . ', ' . $resolvedParams[1] . ' TSRMLS_CC);');
 
 		$call->checkTempParameters($context);
 		$call->addCallStatusOrJump($context);

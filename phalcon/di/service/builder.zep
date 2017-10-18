@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -174,7 +174,9 @@ class Builder
 		if fetch paramCalls, definition["calls"] {
 
 			if typeof instance != "object" {
-				throw new Exception("The definition has setter injection parameters but the constructor didn't return an instance");
+				throw new Exception(
+					"The definition has setter injection parameters but the constructor didn't return an instance"
+				);
 			}
 
 			if typeof paramCalls != "array" {
@@ -238,7 +240,9 @@ class Builder
 		if fetch paramCalls, definition["properties"] {
 
 			if typeof instance != "object" {
-				throw new Exception("The definition has properties injection parameters but the constructor didn't return an instance");
+				throw new Exception(
+					"The definition has properties injection parameters but the constructor didn't return an instance"
+				);
 			}
 
 			if typeof paramCalls != "array" {

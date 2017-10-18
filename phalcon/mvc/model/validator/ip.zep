@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,54 +22,68 @@ namespace Phalcon\Mvc\Model\Validator;
 use Phalcon\Mvc\EntityInterface;
 use Phalcon\Mvc\Model\Exception;
 use Phalcon\Mvc\Model\Validator;
-use Phalcon\Mvc\Model\ValidatorInterface;
 
 /**
  * Phalcon\Mvc\Model\Validator\IP
  *
  * Validates that a value is ipv4 address in valid range
  *
+ * This validator is only for use with Phalcon\Mvc\Collection. If you are using
+ * Phalcon\Mvc\Model, please use the validators provided by Phalcon\Validation.
+ *
  *<code>
- *use Phalcon\Mvc\Model\Validator\Ip;
+ * use Phalcon\Mvc\Model\Validator\Ip;
  *
- *class Data extends Phalcon\Mvc\Model
- *{
+ * class Data extends \Phalcon\Mvc\Collection
+ * {
+ *     public function validation()
+ *     {
+ *         // Any pubic IP
+ *         $this->validate(
+ *             new IP(
+ *                 [
+ *                     "field"         => "server_ip",
+ *                     "version"       => IP::VERSION_4 | IP::VERSION_6, // v6 and v4. The same if not specified
+ *                     "allowReserved" => false,   // False if not specified. Ignored for v6
+ *                     "allowPrivate"  => false,   // False if not specified
+ *                     "message"       => "IP address has to be correct",
+ *                 ]
+ *             )
+ *         );
  *
- *  public function validation()
- *  {
- *      // Any pubic IP
- *      $this->validate(new IP(array(
- *          'field'             => 'server_ip',
- *          'version'           => IP::VERSION_4 | IP::VERSION_6, // v6 and v4. The same if not specified
- *          'allowReserved'     => false,   // False if not specified. Ignored for v6
- *          'allowPrivate'      => false,   // False if not specified
- *          'message'           => 'IP address has to be correct'
- *      )));
+ *         // Any public v4 address
+ *         $this->validate(
+ *             new IP(
+ *                 [
+ *                     "field"   => "ip_4",
+ *                     "version" => IP::VERSION_4,
+ *                     "message" => "IP address has to be correct",
+ *                 ]
+ *             )
+ *         );
  *
- *      // Any public v4 address
- *      $this->validate(new IP(array(
- *          'field'             => 'ip_4',
- *          'version'           => IP::VERSION_4,
- *          'message'           => 'IP address has to be correct'
- *      )));
+ *         // Any v6 address
+ *         $this->validate(
+ *             new IP(
+ *                 [
+ *                     "field"        => "ip6",
+ *                     "version"      => IP::VERSION_6,
+ *                     "allowPrivate" => true,
+ *                     "message"      => "IP address has to be correct",
+ *                 ]
+ *             )
+ *         );
  *
- *      // Any v6 address
- *      $this->validate(new IP(array(
- *          'field'             => 'ip6',
- *          'version'           => IP::VERSION_6,
- *          'allowPrivate'      => true,
- *          'message'           => 'IP address has to be correct'
- *      )));
- *
- *      if ($this->validationHasFailed() == true) {
- *          return false;
- *      }
- *  }
- *
- *}
+ *         if ($this->validationHasFailed() === true) {
+ *             return false;
+ *         }
+ *     }
+ * }
  *</code>
+ *
+ * @deprecated 3.1.0
  */
-class Ip extends Validator implements ValidatorInterface
+class Ip extends Validator
 {
 	const VERSION_4  = FILTER_FLAG_IPV4;
 	const VERSION_6  = FILTER_FLAG_IPV6;

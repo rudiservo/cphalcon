@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -26,7 +26,7 @@ namespace Phalcon;
  */
 class Debug
 {
-	public _uri = "//static.phalconphp.com/www/debug/2.0.0/";
+	public _uri = "//static.phalconphp.com/www/debug/3.0.x/";
 
 	public _theme = "default";
 
@@ -169,32 +169,21 @@ class Debug
 		let dump = [];
 		for k, v in argument {
 
-			if is_scalar(v) {
-				if v == "" {
-					let varDump = "[" . k . "] =&gt; (empty string)";
-				} else {
-					let varDump = "[" . k . "] =&gt; " . this->_escapeString(v);
-				}
-				let dump[] = varDump;
-				continue;
+			if v == "" {
+				let varDump = "(empty string)";
+			} elseif is_scalar(v) {
+				let varDump = this->_escapeString(v);
+			} elseif typeof v == "array" {
+				let varDump = "Array(" . this->_getArrayDump(v, n + 1) . ")";
+			} elseif typeof v == "object" {
+				let varDump = "Object(" . get_class(v) . ")";
+			} elseif typeof v == "null" {
+				let varDump = "null";
+			} else {
+				let varDump = v;
 			}
 
-			if typeof v == "array" {
-				let dump[] = "[" . k . "] =&gt; Array(" . this->_getArrayDump(v, n + 1) . ")";
-				continue;
-			}
-
-			if typeof v == "object" {
-				let dump[] = "[" . k . "] =&gt; Object(" . get_class(v) . ")";
-				continue;
-			}
-
-			if typeof v == "null" {
-				let dump[] = "[" . k . "] =&gt; null";
-				continue;
-			}
-
-			let dump[] = "[" . k . "] =&gt; " . v;
+			let dump[] = "[" . k . "] =&gt; " . varDump;
 		}
 
 		return join(", ", dump);
@@ -280,8 +269,11 @@ class Debug
 
 	/**
 	 * Returns the major framework's version
+	 *
+	 * @deprecated Will be removed in 4.0.0
+	 * @see Phalcon\Version::getPart()
 	 */
-	public function getMajorVersion() -> string
+	deprecated public function getMajorVersion() -> string
 	{
 		var parts;
 
@@ -294,9 +286,16 @@ class Debug
 	 */
 	public function getVersion() -> string
 	{
-		return "<div class=\"version\">Phalcon Framework <a target=\"_new\" href=\"//docs.phalconphp.com/en/" .
-			this->getMajorVersion() . "/\">" .
-			\Phalcon\Version::get() . "</a></div>";
+		var link;
+
+		let link = [
+			"action": "https://docs.phalconphp.com/en/" . Version::getPart(Version::VERSION_MAJOR) . ".0.0/",
+			"text"  : Version::get(),
+			"local" : false,
+			"target": "_new"
+		];
+
+		return "<div class='version'>Phalcon Framework " . Tag::linkTo(link) . "</div>";
 	}
 
 	/**
@@ -307,7 +306,8 @@ class Debug
 		var uri, sources;
 
 		let uri = this->_uri;
-		let sources  = "<link href=\"" . uri . "jquery/jquery-ui.css\" type=\"text/css\" rel=\"stylesheet\" />";
+		let sources  = "<link href=\"" . uri . "bower_components/jquery-ui/themes/ui-lightness/jquery-ui.min.css\" type=\"text/css\" rel=\"stylesheet\" />";
+		let sources .= "<link href=\"" . uri . "bower_components/jquery-ui/themes/ui-lightness/theme.css\" type=\"text/css\" rel=\"stylesheet\" />";
 		let sources .= "<link href=\"" . uri . "themes/default/style.css\" type=\"text/css\" rel=\"stylesheet\" />";
 		return sources;
 	}
@@ -320,9 +320,9 @@ class Debug
 		var uri, sources;
 
 		let uri = this->_uri;
-		let sources  = "<script type=\"text/javascript\" src=\"" . uri . "jquery/jquery.js\"></script>";
-		let sources .= "<script type=\"text/javascript\" src=\"" . uri . "jquery/jquery-ui.js\"></script>";
-		let sources .= "<script type=\"text/javascript\" src=\"" . uri . "jquery/jquery.scrollTo.js\"></script>";
+		let sources  = "<script type=\"text/javascript\" src=\"" . uri . "bower_components/jquery/dist/jquery.min.js\"></script>";
+		let sources .= "<script type=\"text/javascript\" src=\"" . uri . "bower_components/jquery-ui/jquery-ui.min.js\"></script>";
+		let sources .= "<script type=\"text/javascript\" src=\"" . uri . "bower_components/jquery.scrollTo/jquery.scrollTo.min.js\"></script>";
 		let sources .= "<script type=\"text/javascript\" src=\"" . uri . "prettify/prettify.js\"></script>";
 		let sources .= "<script type=\"text/javascript\" src=\"" . uri . "pretty.js\"></script>";
 		return sources;
@@ -336,7 +336,8 @@ class Debug
 		var className, prepareInternalClass, preparedFunctionName, html, classReflection, prepareUriClass,
 			functionName, functionReflection, traceArgs, arguments, argument,
 			filez, line, showFiles, lines, numberLines, showFileFragment,
-			beforeLine, firstLine, afterLine, lastLine, i, linePosition, currentLine;
+			beforeLine, firstLine, afterLine, lastLine, i, linePosition, currentLine,
+			classNameWithLink, functionNameWithLink;
 
 		/**
 		 * Every trace in the backtrace have a unique number
@@ -358,7 +359,7 @@ class Debug
 				/**
 				 * Generate a link to the official docs
 				 */
-				let html .= "<span class=\"error-class\"><a target=\"_new\" href=\"//api.phalconphp.com/class/" . prepareUriClass . ".html\">" . className . "</a></span>";
+				let classNameWithLink = "<a target=\"_new\" href=\"//api.phalconphp.com/class/" . prepareUriClass . ".html\">" . className . "</a>";
 			} else {
 
 				let classReflection = new \ReflectionClass(className);
@@ -373,11 +374,13 @@ class Debug
 					/**
 					 * Generate a link to the official docs
 					 */
-					let html .= "<span class=\"error-class\"><a target=\"_new\" href=\"http://php.net/manual/en/class." . prepareInternalClass . ".php\">" . className . "</a></span>";
+					let classNameWithLink = "<a target=\"_new\" href=\"http://php.net/manual/en/class." . prepareInternalClass . ".php\">" . className . "</a>";
 				} else {
-					let html .= "<span class=\"error-class\">" . className . "</span>";
+					let classNameWithLink = className;
 				}
 			}
+
+			let html .= "<span class=\"error-class\">" . classNameWithLink . "</span>";
 
 			/**
 			 * Object access operator: static/instance
@@ -390,7 +393,7 @@ class Debug
 		 */
 		let functionName = trace["function"];
 		if isset trace["class"] {
-			let html .= "<span class=\"error-function\">" . functionName . "</span>";
+			let functionNameWithLink = functionName;
 		} else {
 
 			/**
@@ -408,38 +411,36 @@ class Debug
 					 * Prepare function's name according to the conventions in the docs
 					 */
 					let preparedFunctionName = str_replace("_", "-", functionName);
-					let html .= "<span class=\"error-function\"><a target=\"_new\" href=\"http://php.net/manual/en/function." . preparedFunctionName . ".php\">" . functionName . "</a></span>";
+					let functionNameWithLink = "<a target=\"_new\" href=\"http://php.net/manual/en/function." . preparedFunctionName . ".php\">" . functionName . "</a>";
 				} else {
-					let html .= "<span class=\"error-function\">" . functionName . "</span>";
+					let functionNameWithLink = functionName;
 				}
 			} else {
-				let html .= "<span class=\"error-function\">" . functionName . "</span>";
+				let functionNameWithLink = functionName;
 			}
 		}
+
+		let html .= "<span class=\"error-function\">" . functionNameWithLink . "</span>";
 
 		/**
 		 * Check for arguments in the function
 		 */
 		if fetch traceArgs, trace["args"] {
 
-			if count(traceArgs) {
-				let arguments = [];
-				for argument in traceArgs {
-
-					/**
-					 * Every argument is generated using _getVarDump
-					 * Append the HTML generated to the argument's list
-					 */
-					let arguments[] = "<span class=\"error-parameter\">" . this->_getVarDump(argument) . "</span>";
-				}
+			let arguments = [];
+			for argument in traceArgs {
 
 				/**
-				 * Join all the arguments
+				 * Every argument is generated using _getVarDump
+				 * Append the HTML generated to the argument's list
 				 */
-				let html .= "(" . join(", ", arguments)  . ")";
-			} else {
-				let html .= "()";
+				let arguments[] = "<span class=\"error-parameter\">" . this->_getVarDump(argument) . "</span>";
 			}
+
+			/**
+			 * Join all the arguments
+			 */
+			let html .= "(" . join(", ", arguments)  . ")";
 		}
 
 		/**

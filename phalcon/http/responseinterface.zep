@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -14,6 +14,7 @@
  +------------------------------------------------------------------------+
  | Authors: Andres Gutierrez <andres@phalconphp.com>                      |
  |          Eduar Carvajal <eduar@phalconphp.com>                         |
+ |          Zamrony P. Juhara <zamronypj@yahoo.com>                       |
  +------------------------------------------------------------------------+
  */
 
@@ -41,10 +42,6 @@ interface ResponseInterface
 
 	/**
 	 * Overwrites a header in the response
-	 *
-	 * @param string name
-	 * @param string value
-	 * @return \Phalcon\Http\ResponseInterface
 	 */
 	public function setHeader(string name, value) -> <ResponseInterface>;
 
@@ -54,7 +51,7 @@ interface ResponseInterface
 	public function setRawHeader(string header) -> <ResponseInterface>;
 
 	/**
-	 * Resets all the stablished headers
+	 * Resets all the established headers
 	 */
 	public function resetHeaders() -> <ResponseInterface>;
 
@@ -62,6 +59,7 @@ interface ResponseInterface
 	 * Sets output expire time header
 	 */
 	public function setExpires(<\DateTime> datetime) -> <ResponseInterface>;
+
 	/**
 	 * Sends a Not-Modified response
 	 */
@@ -77,12 +75,12 @@ interface ResponseInterface
 	public function setContentType(string contentType, charset = null) -> <ResponseInterface>;
 
 	/**
+	 * Sets the response content-length
+	 */
+	public function setContentLength(int contentLength) -> <ResponseInterface>;
+
+	/**
 	 * Redirect by HTTP to another action or URL
-	 *
-	 * @param string location
-	 * @param boolean externalRedirect
-	 * @param int statusCode
-	 * @return \Phalcon\Http\ResponseInterface
 	 */
 	public function redirect(location = null, boolean externalRedirect = false, int statusCode = 302) -> <ResponseInterface>;
 
@@ -95,19 +93,17 @@ interface ResponseInterface
 	 * Sets HTTP response body. The parameter is automatically converted to JSON
 	 *
 	 *<code>
-	 *	response->setJsonContent(array("status" => "OK"));
+	 * $response->setJsonContent(
+	 *     [
+	 *         "status" => "OK",
+	 *     ]
+	 * );
 	 *</code>
-	 *
-	 * @param string content
-	 * @return \Phalcon\Http\ResponseInterface
 	 */
 	public function setJsonContent(content) -> <ResponseInterface>;
 
 	/**
 	 * Appends a string to the HTTP response body
-	 *
-	 * @param string content
-	 * @return \Phalcon\Http\ResponseInterface
 	 */
 	public function appendContent(content) -> <ResponseInterface>;
 
@@ -133,9 +129,6 @@ interface ResponseInterface
 
 	/**
 	 * Sets an attached file to be sent at the end of the request
-	 *
-	 * @param string filePath
-	 * @param string attachmentName
 	 */
 	public function setFileToSend(string filePath, attachmentName = null) -> <ResponseInterface>;
 

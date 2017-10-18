@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,14 +22,13 @@ namespace Phalcon\Logger\Formatter;
 
 use Phalcon\Logger;
 use Phalcon\Logger\Formatter;
-use Phalcon\Logger\FormatterInterface;
 
 /**
  * Phalcon\Logger\Formatter\Firephp
  *
  * Formats messages so that they can be sent to FirePHP
  */
-class Firephp extends Formatter implements FormatterInterface
+class Firephp extends Formatter
 {
 	protected _showBacktrace = true;
 
@@ -120,11 +119,7 @@ class Firephp extends Formatter implements FormatterInterface
 
 		if this->_showBacktrace {
 			var param, backtraceItem, key;
-			let param = false;
-
-			if !version_compare(PHP_VERSION, "5.3.6", "<") {
-				let param = DEBUG_BACKTRACE_IGNORE_ARGS;
-			}
+			let param = DEBUG_BACKTRACE_IGNORE_ARGS;
 
 			let backtrace = debug_backtrace(param),
 				lastTrace = end(backtrace);

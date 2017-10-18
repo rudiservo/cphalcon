@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -157,14 +157,7 @@ class Relation implements RelationInterface
 	 */
 	public function isForeignKey() -> boolean
 	{
-		var options;
-		let options = this->_options;
-		if typeof options == "array" {
-			if isset options["foreignKey"] {
-				return true;
-			}
-		}
-		return false;
+		return isset this->_options["foreignKey"];
 	}
 
 	/**

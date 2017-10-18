@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,7 +21,6 @@ namespace Phalcon\Mvc\View\Engine;
 
 use Phalcon\DiInterface;
 use Phalcon\Mvc\View\Engine;
-use Phalcon\Mvc\View\EngineInterface;
 use Phalcon\Mvc\View\Engine\Volt\Compiler;
 use Phalcon\Mvc\View\Exception;
 
@@ -30,9 +29,8 @@ use Phalcon\Mvc\View\Exception;
  *
  * Designer friendly and fast template engine for PHP written in Zephir/C
  */
-class Volt extends Engine implements EngineInterface
+class Volt extends Engine
 {
-
 	protected _options;
 
 	protected _compiler;
@@ -121,7 +119,6 @@ class Volt extends Engine implements EngineInterface
 
 		if mustClean {
 			this->_view->setContent(ob_get_contents());
-			//ob_clean();
 		}
 	}
 
@@ -130,21 +127,15 @@ class Volt extends Engine implements EngineInterface
 	 */
 	public function length(var item) -> int
 	{
-		var length;
-
-		let length = 0;
-
 		if typeof item == "object" || typeof item == "array" {
-			let length = count(item);
-		} else {
-			if function_exists("mb_strlen") {
-				let length = mb_strlen(item);
-			} else {
-				let length = strlen(item);
-			}
+			return count(item);
 		}
 
-		return length;
+		if function_exists("mb_strlen") {
+			return mb_strlen(item);
+		}
+
+		return strlen(item);
 	}
 
 	/**
@@ -160,6 +151,7 @@ class Volt extends Engine implements EngineInterface
 			if function_exists("mb_strpos") {
 				return mb_strpos(haystack, needle) !== false;
 			}
+
 			return strpos(haystack, needle) !== false;
 		}
 
@@ -261,6 +253,7 @@ class Volt extends Engine implements EngineInterface
 			if length !== null {
 				return mb_substr(value, start, length);
 			}
+
 			return mb_substr(value, start);
 		}
 
@@ -270,6 +263,7 @@ class Volt extends Engine implements EngineInterface
 		if length !== null {
 			return substr(value, start, length);
 		}
+
 		return substr(value, start);
 	}
 
@@ -285,7 +279,7 @@ class Volt extends Engine implements EngineInterface
 	/**
 	 * Checks if a macro is defined and calls it
 	 */
-	public function callMacro(string! name, array arguments)
+	public function callMacro(string! name, array arguments = []) -> var
 	{
 		var macro;
 

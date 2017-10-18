@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,34 +28,44 @@ namespace Phalcon\Mvc\Router;
  * $router = new \Phalcon\Mvc\Router();
  *
  * //Create a group with a common module and controller
- * $blog = new Group(array(
- * 	'module' => 'blog',
- * 	'controller' => 'index'
- * ));
+ * $blog = new Group(
+ *     [
+ *         "module"     => "blog",
+ *         "controller" => "index",
+ *     ]
+ * );
  *
  * //All the routes start with /blog
- * $blog->setPrefix('/blog');
+ * $blog->setPrefix("/blog");
  *
  * //Add a route to the group
- * $blog->add('/save', array(
- * 	'action' => 'save'
- * ));
+ * $blog->add(
+ *     "/save",
+ *     [
+ *         "action" => "save",
+ *     ]
+ * );
  *
  * //Add another route to the group
- * $blog->add('/edit/{id}', array(
- * 	'action' => 'edit'
- * ));
+ * $blog->add(
+ *     "/edit/{id}",
+ *     [
+ *         "action" => "edit",
+ *     ]
+ * );
  *
  * //This route maps to a controller different than the default
- * $blog->add('/blog', array(
- * 	'controller' => 'about',
- * 	'action' => 'index'
- * ));
+ * $blog->add(
+ *     "/blog",
+ *     [
+ *         "controller" => "about",
+ *         "action"     => "index",
+ *     ]
+ * );
  *
  * //Add the group to the router
  * $router->mount($blog);
  *</code>
- *
  */
 class Group implements GroupInterface
 {
@@ -166,7 +176,7 @@ class Group implements GroupInterface
 	 * Adds a route to the router on any HTTP method
 	 *
 	 *<code>
-	 * router->add('/about', 'About::index');
+	 * $router->add("/about", "About::index");
 	 *</code>
 	 */
 	public function add(string! pattern, var paths = null, var httpMethods = null) -> <RouteInterface>

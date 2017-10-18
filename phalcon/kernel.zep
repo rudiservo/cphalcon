@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -27,7 +27,8 @@ namespace Phalcon;
 class Kernel
 {
 	/**
-	 * Produces a pre-computed hash key based on a string. This function produces different numbers in 32bit/64bit processors
+	 * Produces a pre-computed hash key based on a string. This function
+	 * produces different numbers in 32bit/64bit processors
 	 *
 	 * @param string key
 	 * @return string
@@ -38,6 +39,7 @@ class Kernel
 
 		{
 
+#if PHP_VERSION_ID < 70000
 		char *arKey = Z_STRVAL_P(key), *strKey;
 		int nKeyLength = strlen(arKey);
 		register ulong hash = 5381;
@@ -76,6 +78,9 @@ class Kernel
 		snprintf(strKey, 24, "%lu", hash);
 
 		RETURN_MM_STRING(strKey, 0);
+#else
+		RETURN_MM_NULL();
+#endif
 
 		}
 

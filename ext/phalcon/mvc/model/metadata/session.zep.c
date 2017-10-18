@@ -30,9 +30,11 @@
  * You can query the meta-data by printing $_SESSION['$PMM$']
  *
  *<code>
- * $metaData = new \Phalcon\Mvc\Model\Metadata\Session(array(
- *    'prefix' => 'my-app-id'
- * ));
+ * $metaData = new \Phalcon\Mvc\Model\Metadata\Session(
+ *     [
+ *        "prefix" => "my-app-id",
+ *     ]
+ * );
  *</code>
  */
 ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_MetaData_Session) {
@@ -63,7 +65,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Session, __construct) {
 
 	if (Z_TYPE_P(options) == IS_ARRAY) {
 		if (zephir_array_isset_string_fetch(&prefix, options, SS("prefix"), 1 TSRMLS_CC)) {
-			zephir_update_property_this(this_ptr, SL("_prefix"), prefix TSRMLS_CC);
+			zephir_update_property_this(getThis(), SL("_prefix"), prefix TSRMLS_CC);
 		}
 	}
 
@@ -84,11 +86,11 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Session, read) {
 	zephir_get_global(&_SESSION, SS("_SESSION") TSRMLS_CC);
 	zephir_fetch_params(1, 1, 0, &key_param);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -99,7 +101,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Session, read) {
 	_1 = zephir_fetch_nproperty_this(this_ptr, SL("_prefix"), PH_NOISY_CC);
 	ZEPHIR_INIT_VAR(_2);
 	ZEPHIR_CONCAT_SV(_2, "$PMM$", _1);
-	zephir_array_fetch(&_0, _SESSION, _2, PH_READONLY, "phalcon/mvc/model/metadata/session.zep", 69 TSRMLS_CC);
+	zephir_array_fetch(&_0, _SESSION, _2, PH_READONLY, "phalcon/mvc/model/metadata/session.zep", 71 TSRMLS_CC);
 	if (zephir_array_isset_fetch(&metaData, _0, key, 1 TSRMLS_CC)) {
 		RETURN_CTOR(metaData);
 	}
@@ -122,11 +124,11 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Session, write) {
 	zephir_get_global(&_SESSION, SS("_SESSION") TSRMLS_CC);
 	zephir_fetch_params(1, 2, 0, &key_param, &data);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);

@@ -18,14 +18,13 @@
 #include "kernel/concat.h"
 #include "kernel/exception.h"
 #include "kernel/object.h"
-#include "kernel/hash.h"
 #include "kernel/array.h"
 
 
 /**
- * Phalcon\Mvc\Model\MetaData\Strategy\Instrospection
+ * Phalcon\Mvc\Model\MetaData\Strategy\Introspection
  *
- * Queries the table meta-data in order to instrospect the model's metadata
+ * Queries the table meta-data in order to introspect the model's metadata
  */
 ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_MetaData_Strategy_Introspection) {
 
@@ -44,7 +43,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getMetaData) {
 	zend_bool _16$$9;
 	HashTable *_8;
 	HashPosition _7;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *model, *dependencyInjector, *schema = NULL, *table = NULL, *readConnection = NULL, *columns = NULL, *attributes = NULL, *primaryKeys = NULL, *nonPrimaryKeys = NULL, *completeTable = NULL, *numericTyped = NULL, *notNull = NULL, *fieldTypes = NULL, *automaticDefault = NULL, *identityField = NULL, *fieldBindTypes = NULL, *defaultValues = NULL, *column = NULL, *fieldName = NULL, *defaultValue = NULL, *emptyStringValues = NULL, *_0 = NULL, **_9, *_1$$3, *_2$$3, *_3$$3, *_4$$6, *_5$$6, *_6$$6, *_10$$9 = NULL, *_11$$9 = NULL, *_12$$9 = NULL, *_13$$9 = NULL, *_14$$9 = NULL, *_15$$9 = NULL, *_17$$9 = NULL, *_18$$15 = NULL;
 
 	ZEPHIR_MM_GROW();
@@ -75,7 +74,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getMetaData) {
 		ZEPHIR_CONCAT_SVSV(_3$$3, "Table '", completeTable, "' doesn't exist in database when dumping meta-data for ", _2$$3);
 		ZEPHIR_CALL_METHOD(NULL, _1$$3, "__construct", NULL, 9, _3$$3);
 		zephir_check_call_status();
-		zephir_throw_exception_debug(_1$$3, "phalcon/mvc/model/metadata/strategy/introspection.zep", 66 TSRMLS_CC);
+		zephir_throw_exception_debug(_1$$3, "phalcon/mvc/model/metadata/strategy/introspection.zep", 68 TSRMLS_CC);
 		ZEPHIR_MM_RESTORE();
 		return;
 	}
@@ -96,7 +95,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getMetaData) {
 		ZEPHIR_CONCAT_SVSV(_6$$6, "Cannot obtain table columns for the mapped source '", completeTable, "' used in model ", _5$$6);
 		ZEPHIR_CALL_METHOD(NULL, _4$$6, "__construct", NULL, 9, _6$$6);
 		zephir_check_call_status();
-		zephir_throw_exception_debug(_4$$6, "phalcon/mvc/model/metadata/strategy/introspection.zep", 84 TSRMLS_CC);
+		zephir_throw_exception_debug(_4$$6, "phalcon/mvc/model/metadata/strategy/introspection.zep", 88 TSRMLS_CC);
 		ZEPHIR_MM_RESTORE();
 		return;
 	}
@@ -122,21 +121,21 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getMetaData) {
 	array_init(defaultValues);
 	ZEPHIR_INIT_VAR(emptyStringValues);
 	array_init(emptyStringValues);
-	zephir_is_iterable(columns, &_8, &_7, 0, 0, "phalcon/mvc/model/metadata/strategy/introspection.zep", 161);
+	zephir_is_iterable(columns, &_8, &_7, 0, 0, "phalcon/mvc/model/metadata/strategy/introspection.zep", 165);
 	for (
-	  ; zephir_hash_get_current_data_ex(_8, (void**) &_9, &_7) == SUCCESS
-	  ; zephir_hash_move_forward_ex(_8, &_7)
+	  ; zend_hash_get_current_data_ex(_8, (void**) &_9, &_7) == SUCCESS
+	  ; zend_hash_move_forward_ex(_8, &_7)
 	) {
 		ZEPHIR_GET_HVALUE(column, _9);
 		ZEPHIR_CALL_METHOD(&fieldName, column, "getname", NULL, 0);
 		zephir_check_call_status();
-		zephir_array_append(&attributes, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 105);
+		zephir_array_append(&attributes, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 109);
 		ZEPHIR_CALL_METHOD(&_10$$9, column, "isprimary", NULL, 0);
 		zephir_check_call_status();
 		if (ZEPHIR_IS_TRUE_IDENTICAL(_10$$9)) {
-			zephir_array_append(&primaryKeys, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 111);
+			zephir_array_append(&primaryKeys, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 115);
 		} else {
-			zephir_array_append(&nonPrimaryKeys, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 113);
+			zephir_array_append(&nonPrimaryKeys, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 117);
 		}
 		ZEPHIR_CALL_METHOD(&_11$$9, column, "isnumeric", NULL, 0);
 		zephir_check_call_status();
@@ -146,7 +145,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getMetaData) {
 		ZEPHIR_CALL_METHOD(&_12$$9, column, "isnotnull", NULL, 0);
 		zephir_check_call_status();
 		if (ZEPHIR_IS_TRUE_IDENTICAL(_12$$9)) {
-			zephir_array_append(&notNull, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 127);
+			zephir_array_append(&notNull, fieldName, PH_SEPARATE, "phalcon/mvc/model/metadata/strategy/introspection.zep", 131);
 		}
 		ZEPHIR_CALL_METHOD(&_13$$9, column, "isautoincrement", NULL, 0);
 		zephir_check_call_status();
@@ -199,7 +198,7 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getColumnMaps) {
 
 	HashTable *_1$$3;
 	HashPosition _0$$3;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *model, *dependencyInjector, *orderedColumnMap = NULL, *userColumnMap = NULL, *reversedColumnMap = NULL, *name = NULL, *userName = NULL, **_2$$3;
 
 	ZEPHIR_MM_GROW();
@@ -215,16 +214,16 @@ PHP_METHOD(Phalcon_Mvc_Model_MetaData_Strategy_Introspection, getColumnMaps) {
 		ZEPHIR_CALL_METHOD(&userColumnMap, model, "columnmap", NULL, 0);
 		zephir_check_call_status();
 		if (Z_TYPE_P(userColumnMap) != IS_ARRAY) {
-			ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "columnMap() not returned an array", "phalcon/mvc/model/metadata/strategy/introspection.zep", 194);
+			ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "columnMap() not returned an array", "phalcon/mvc/model/metadata/strategy/introspection.zep", 198);
 			return;
 		}
 		ZEPHIR_INIT_NVAR(reversedColumnMap);
 		array_init(reversedColumnMap);
 		ZEPHIR_CPY_WRT(orderedColumnMap, userColumnMap);
-		zephir_is_iterable(userColumnMap, &_1$$3, &_0$$3, 0, 0, "phalcon/mvc/model/metadata/strategy/introspection.zep", 201);
+		zephir_is_iterable(userColumnMap, &_1$$3, &_0$$3, 0, 0, "phalcon/mvc/model/metadata/strategy/introspection.zep", 205);
 		for (
-		  ; zephir_hash_get_current_data_ex(_1$$3, (void**) &_2$$3, &_0$$3) == SUCCESS
-		  ; zephir_hash_move_forward_ex(_1$$3, &_0$$3)
+		  ; zend_hash_get_current_data_ex(_1$$3, (void**) &_2$$3, &_0$$3) == SUCCESS
+		  ; zend_hash_move_forward_ex(_1$$3, &_0$$3)
 		) {
 			ZEPHIR_GET_HMKEY(name, _1$$3, _0$$3);
 			ZEPHIR_GET_HVALUE(userName, _2$$3);

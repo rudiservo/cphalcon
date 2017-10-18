@@ -25,31 +25,39 @@
  *
  * Check if a value is not included into a list of values
  *
+ * This validator is only for use with Phalcon\Mvc\Collection. If you are using
+ * Phalcon\Mvc\Model, please use the validators provided by Phalcon\Validation.
+ *
  *<code>
- *	use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionInValidator;
+ * use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionInValidator;
  *
- *	class Subscriptors extends \Phalcon\Mvc\Model
- *	{
+ * class Subscriptors extends \Phalcon\Mvc\Collection
+ * {
+ *     public function validation()
+ *     {
+ *         $this->validate(
+ *             new ExclusionInValidator(
+ *                 [
+ *                     "field"  => "status",
+ *                     "domain" => ["A", "I"],
+ *                 ]
+ *             )
+ *         );
  *
- *		public function validation()
- *		{
- *			$this->validate(new ExclusionInValidator(array(
- *				'field' => 'status',
- *				'domain' => array('A', 'I')
- *			)));
- *			if ($this->validationHasFailed() == true) {
- *				return false;
- *			}
- *		}
- *
- *	}
+ *         if ($this->validationHasFailed() === true) {
+ *             return false;
+ *         }
+ *     }
+ * }
  *</code>
+ *
+ * @deprecated 3.1.0
+ * @see Phalcon\Validation\Validator\EclusionIn
  */
 ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_Validator_Exclusionin) {
 
 	ZEPHIR_REGISTER_CLASS_EX(Phalcon\\Mvc\\Model\\Validator, Exclusionin, phalcon, mvc_model_validator_exclusionin, phalcon_mvc_model_validator_ce, phalcon_mvc_model_validator_exclusionin_method_entry, 0);
 
-	zend_class_implements(phalcon_mvc_model_validator_exclusionin_ce TSRMLS_CC, 1, phalcon_mvc_model_validatorinterface_ce);
 	return SUCCESS;
 
 }
@@ -61,7 +69,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Exclusionin, validate) {
 
 	zval *_5$$7;
 	zend_bool _3;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *record, *field = NULL, *domain = NULL, *value = NULL, *message = NULL, *_0 = NULL, *_1 = NULL, *_2 = NULL, *_4$$7 = NULL, *_6$$7 = NULL;
 
 	ZEPHIR_MM_GROW();
@@ -75,7 +83,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Exclusionin, validate) {
 	zephir_check_temp_parameter(_0);
 	zephir_check_call_status();
 	if (Z_TYPE_P(field) != IS_STRING) {
-		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "Field name must be a string", "phalcon/mvc/model/validator/exclusionin.zep", 65);
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "Field name must be a string", "phalcon/mvc/model/validator/exclusionin.zep", 73);
 		return;
 	}
 	ZEPHIR_INIT_NVAR(_0);
@@ -84,7 +92,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Exclusionin, validate) {
 	zephir_check_temp_parameter(_0);
 	zephir_check_call_status();
 	if (ZEPHIR_IS_FALSE_IDENTICAL(_1)) {
-		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "The option 'domain' is required by this validator", "phalcon/mvc/model/validator/exclusionin.zep", 72);
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "The option 'domain' is required by this validator", "phalcon/mvc/model/validator/exclusionin.zep", 80);
 		return;
 	}
 	ZEPHIR_INIT_NVAR(_0);
@@ -93,7 +101,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Exclusionin, validate) {
 	zephir_check_temp_parameter(_0);
 	zephir_check_call_status();
 	if (Z_TYPE_P(domain) != IS_ARRAY) {
-		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "Option 'domain' must be an array", "phalcon/mvc/model/validator/exclusionin.zep", 77);
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "Option 'domain' must be an array", "phalcon/mvc/model/validator/exclusionin.zep", 85);
 		return;
 	}
 	ZEPHIR_CALL_METHOD(&value, record, "readattribute", NULL, 0, field);
@@ -126,7 +134,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Exclusionin, validate) {
 		ZEPHIR_INIT_NVAR(_4$$7);
 		zephir_fast_join_str(_4$$7, SL(", "), domain TSRMLS_CC);
 		zephir_array_update_string(&_5$$7, SL(":domain"), &_4$$7, PH_COPY | PH_SEPARATE);
-		ZEPHIR_CALL_FUNCTION(&_6$$7, "strtr", NULL, 55, message, _5$$7);
+		ZEPHIR_CALL_FUNCTION(&_6$$7, "strtr", NULL, 27, message, _5$$7);
 		zephir_check_call_status();
 		ZEPHIR_INIT_NVAR(_4$$7);
 		ZVAL_STRING(_4$$7, "Exclusion", ZEPHIR_TEMP_PARAM_COPY);

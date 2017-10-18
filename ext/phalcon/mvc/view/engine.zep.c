@@ -32,6 +32,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_View_Engine) {
 
 	zend_declare_property_null(phalcon_mvc_view_engine_ce, SL("_view"), ZEND_ACC_PROTECTED TSRMLS_CC);
 
+	zend_class_implements(phalcon_mvc_view_engine_ce TSRMLS_CC, 1, phalcon_mvc_view_engineinterface_ce);
 	return SUCCESS;
 
 }
@@ -50,8 +51,8 @@ PHP_METHOD(Phalcon_Mvc_View_Engine, __construct) {
 	}
 
 
-	zephir_update_property_this(this_ptr, SL("_view"), view TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_dependencyInjector"), dependencyInjector TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_view"), view TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_dependencyInjector"), dependencyInjector TSRMLS_CC);
 
 }
 
@@ -61,7 +62,7 @@ PHP_METHOD(Phalcon_Mvc_View_Engine, __construct) {
 PHP_METHOD(Phalcon_Mvc_View_Engine, getContent) {
 
 	zval *_0;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
@@ -81,18 +82,18 @@ PHP_METHOD(Phalcon_Mvc_View_Engine, getContent) {
  */
 PHP_METHOD(Phalcon_Mvc_View_Engine, partial) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *partialPath_param = NULL, *params = NULL, *_0;
 	zval *partialPath = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 1, &partialPath_param, &params);
 
-	if (unlikely(Z_TYPE_P(partialPath_param) != IS_STRING && Z_TYPE_P(partialPath_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(partialPath_param) != IS_STRING && Z_TYPE_P(partialPath_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'partialPath' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(partialPath_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(partialPath_param) == IS_STRING)) {
 		zephir_get_strval(partialPath, partialPath_param);
 	} else {
 		ZEPHIR_INIT_VAR(partialPath);
@@ -117,7 +118,7 @@ PHP_METHOD(Phalcon_Mvc_View_Engine, getView) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_view");
+	RETURN_MEMBER(getThis(), "_view");
 
 }
 

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,10 +31,9 @@ use Phalcon\Validation\Message\Group;
  */
 class Group implements \Countable, \ArrayAccess, \Iterator
 {
+	protected _position = 0;
 
-	protected _position;
-
-	protected _messages;
+	protected _messages = [];
 
 	/**
 	 * Phalcon\Validation\Message\Group constructor
@@ -52,7 +51,9 @@ class Group implements \Countable, \ArrayAccess, \Iterator
 	 * Gets an attribute a message using the array syntax
 	 *
 	 *<code>
-	 * print_r($messages[0]);
+	 * print_r(
+	 *     $messages[0]
+	 * );
 	 *</code>
 	 *
 	 * @param int index
@@ -71,7 +72,7 @@ class Group implements \Countable, \ArrayAccess, \Iterator
 	 * Sets an attribute using the array-syntax
 	 *
 	 *<code>
-	 * $messages[0] = new \Phalcon\Validation\Message('This is a message');
+	 * $messages[0] = new \Phalcon\Validation\Message("This is a message");
 	 *</code>
 	 *
 	 * @param int index
@@ -89,7 +90,9 @@ class Group implements \Countable, \ArrayAccess, \Iterator
 	 * Checks if an index exists
 	 *
 	 *<code>
-	 * var_dump(isset($message['database']));
+	 * var_dump(
+	 *     isset($message["database"])
+	 * );
 	 *</code>
 	 *
 	 * @param int index
@@ -104,24 +107,23 @@ class Group implements \Countable, \ArrayAccess, \Iterator
 	 * Removes a message from the list
 	 *
 	 *<code>
-	 * unset($message['database']);
+	 * unset($message["database"]);
 	 *</code>
-	 *
-	 * @param string index
 	 */
 	public function offsetUnset(index)
 	{
 		if isset this->_messages[index] {
-			unset this->_messages[index];
+			array_splice(this->_messages, index, 1);
 		}
-		return false;
 	}
 
 	/**
 	 * Appends a message to the group
 	 *
 	 *<code>
-	 * $messages->appendMessage(new \Phalcon\Validation\Message('This is a message'));
+	 * $messages->appendMessage(
+	 *     new \Phalcon\Validation\Message("This is a message")
+	 * );
 	 *</code>
 	 */
 	public function appendMessage(<MessageInterface> message)
@@ -152,19 +154,27 @@ class Group implements \Countable, \ArrayAccess, \Iterator
 			/**
 			 * An array of messages is simply merged into the current one
 			 */
-			if currentMessages == "array" {
+			if typeof currentMessages == "array" {
 				let finalMessages = array_merge(currentMessages, messages);
 			} else {
 				let finalMessages = messages;
 			}
 			let this->_messages = finalMessages;
+
 		} else {
 
 			/**
 			 * A group of messages is iterated and appended one-by-one to the current list
 			 */
-			for message in iterator(messages) {
+			//for message in iterator(messages) {
+			//	this->appendMessage(message);
+			//}
+
+			messages->rewind();
+			while messages->valid() {
+				let message = messages->current();
 				this->appendMessage(message);
+    			messages->next();
 			}
 		}
 	}
@@ -220,16 +230,10 @@ class Group implements \Countable, \ArrayAccess, \Iterator
 
 	/**
 	 * Returns the current message in the iterator
-	 *
-	 * @return \Phalcon\Validation\Message
 	 */
-	public function current() -> <Message> | boolean
+	public function current() -> <Message>
 	{
-		var message;
-		if fetch message, this->_messages[this->_position] {
-			return message;
-		}
-		return false;
+		return this->_messages[this->_position];
 	}
 
 	/**

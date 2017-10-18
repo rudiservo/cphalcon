@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,7 +20,6 @@
 namespace Phalcon\Cache\Backend;
 
 use Phalcon\Cache\Backend;
-use Phalcon\Cache\BackendInterface;
 use Phalcon\Cache\Exception;
 use Phalcon\Cache\FrontendInterface;
 
@@ -32,28 +31,34 @@ use Phalcon\Cache\FrontendInterface;
  * This adapter uses the special memcached key "_PHCM" to store all the keys internally used by the adapter
  *
  *<code>
+ * use Phalcon\Cache\Backend\Memcache;
+ * use Phalcon\Cache\Frontend\Data as FrontData;
  *
  * // Cache data for 2 days
- * $frontCache = new \Phalcon\Cache\Frontend\Data(array(
- *    "lifetime" => 172800
- * ));
+ * $frontCache = new FrontData(
+ *     [
+ *         "lifetime" => 172800,
+ *     ]
+ * );
  *
- * //Create the Cache setting memcached connection options
- * $cache = new \Phalcon\Cache\Backend\Memcache($frontCache, array(
- *		'host' => 'localhost',
- *		'port' => 11211,
- *  	'persistent' => false
- * ));
+ * // Create the Cache setting memcached connection options
+ * $cache = new Memcache(
+ *     $frontCache,
+ *     [
+ *         "host"       => "localhost",
+ *         "port"       => 11211,
+ *         "persistent" => false,
+ *     ]
+ * );
  *
- * //Cache arbitrary data
- * $cache->save('my-data', array(1, 2, 3, 4, 5));
+ * // Cache arbitrary data
+ * $cache->save("my-data", [1, 2, 3, 4, 5]);
  *
- * //Get data
- * $data = $cache->get('my-data');
- *
+ * // Get data
+ * $data = $cache->get("my-data");
  *</code>
  */
-class Memcache extends Backend implements BackendInterface
+class Memcache extends Backend
 {
 
 	protected _memcache = null;
@@ -83,7 +88,8 @@ class Memcache extends Backend implements BackendInterface
 		}
 
 		if !isset options["statsKey"] {
-			let options["statsKey"] = "_PHCM";
+			// Disable tracking of cached keys per default
+			let options["statsKey"] = "";
 		}
 
 		parent::__construct(frontend, options);
@@ -117,13 +123,28 @@ class Memcache extends Backend implements BackendInterface
 	}
 
 	/**
-	 * Returns a cached content
-	 *
-	 * @param int|string keyName
-	 * @param   long lifetime
-	 * @return  mixed
+	 * Add servers to memcache pool
 	 */
-	public function get(var keyName, var lifetime = null)
+	public function addServers(string! host, int port, boolean persistent = false) -> boolean
+	{
+		var memcache, success;
+		/**
+		 * Check if a connection is created or make a new one
+		 */
+		let memcache = this->_memcache;
+		if typeof memcache != "object" {
+		    this->_connect();
+		    let memcache = this->_memcache;
+		}
+		let success = memcache->addServer(host, port, persistent);
+		let this->_memcache = memcache;
+		return success;
+	}
+
+	/**
+	 * Returns a cached content
+	 */
+	public function get(string keyName, int lifetime = null) -> var | null
 	{
 		var memcache, prefixedKey, cachedContent, retrieve;
 
@@ -154,10 +175,10 @@ class Memcache extends Backend implements BackendInterface
 	 *
 	 * @param int|string keyName
 	 * @param string content
-	 * @param long lifetime
+	 * @param int lifetime
 	 * @param boolean stopBuffer
 	 */
-	public function save(var keyName = null, var content = null, var lifetime = null, boolean stopBuffer = true)
+	public function save(var keyName = null, var content = null, var lifetime = null, boolean stopBuffer = true) -> boolean
 	{
 		var lastKey, frontend, memcache, cachedContent, preparedContent, tmp, ttl, success, options,
 			specialKey, keys, isBuffering;
@@ -165,7 +186,8 @@ class Memcache extends Backend implements BackendInterface
 		if keyName === null {
 			let lastKey = this->_lastKey;
 		} else {
-			let lastKey = this->_prefix . keyName;
+			let lastKey = this->_prefix . keyName,
+				this->_lastKey = lastKey;
 		}
 
 		if !lastKey {
@@ -192,7 +214,11 @@ class Memcache extends Backend implements BackendInterface
 		/**
 		 * Prepare the content in the frontend
 		 */
-		let preparedContent = frontend->beforeStore(cachedContent);
+		if !is_numeric(cachedContent) {
+			let preparedContent = frontend->beforeStore(cachedContent);
+		} else {
+			let preparedContent = cachedContent;
+		}
 
 		if lifetime === null {
 			let tmp = this->_lastLifetime;
@@ -209,11 +235,7 @@ class Memcache extends Backend implements BackendInterface
 		/**
 		* We store without flags
 		*/
-		if is_numeric(cachedContent) {
-			let success = memcache->set(lastKey, cachedContent, 0, ttl);
-		} else {
-			let success = memcache->set(lastKey, preparedContent, 0, ttl);
-		}
+		let success = memcache->set(lastKey, preparedContent, 0, ttl);
 
 		if !success {
 			throw new Exception("Failed storing data in memcached");
@@ -225,7 +247,7 @@ class Memcache extends Backend implements BackendInterface
 			throw new Exception("Unexpected inconsistency in options");
 		}
 
-		if typeof specialKey != "null" {
+		if specialKey != "" {
 			/**
 			 * Update the stats key
 			 */
@@ -251,6 +273,8 @@ class Memcache extends Backend implements BackendInterface
 		}
 
 		let this->_started = false;
+
+		return success;
 	}
 
 	/**
@@ -276,11 +300,13 @@ class Memcache extends Backend implements BackendInterface
 			throw new Exception("Unexpected inconsistency in options");
 		}
 
-		let keys = memcache->get(specialKey);
+		if specialKey != "" {
+			let keys = memcache->get(specialKey);
 
-		if typeof keys == "array" {
-			unset keys[prefixedKey];
-			memcache->set(specialKey, keys);
+			if typeof keys == "array" {
+				unset keys[prefixedKey];
+				memcache->set(specialKey, keys);
+			}
 		}
 
 		/**
@@ -291,14 +317,18 @@ class Memcache extends Backend implements BackendInterface
 	}
 
 	/**
-	 * Query the existing cached keys
+	 * Query the existing cached keys.
 	 *
-	 * @param string prefix
-	 * @return array
+	 * <code>
+	 * $cache->save("users-ids", [1, 2, 3]);
+	 * $cache->save("projects-ids", [4, 5, 6]);
+	 *
+	 * var_dump($cache->queryKeys("users")); // ["users-ids"]
+	 * </code>
 	 */
-	public function queryKeys(prefix = null) -> array
+	public function queryKeys(string prefix = null) -> array
 	{
-		var memcache, options, keys, specialKey, key, realKey;
+		var memcache, options, keys, specialKey, key, idx;
 
 		let memcache = this->_memcache;
 
@@ -313,28 +343,33 @@ class Memcache extends Backend implements BackendInterface
 			throw new Exception("Unexpected inconsistency in options");
 		}
 
+		if specialKey == "" {
+			throw new Exception("Cached keys need to be enabled to use this function (options['statsKey'] == '_PHCM')!");
+		}
+
 		/**
 		 * Get the key from memcached
 		 */
-		let realKey = [];
 		let keys = memcache->get(specialKey);
-		if typeof keys == "array" {
-			for key, _ in keys {
-				if !prefix || starts_with(key, prefix) {
-					let realKey[] = key;
-				}
+		if unlikely typeof keys != "array" {
+			return [];
+		}
+
+		let keys = array_keys(keys);
+		for idx, key in keys {
+			if !empty prefix && !starts_with(key, prefix) {
+				unset keys[idx];
 			}
 		}
 
-		return realKey;
+		return keys;
 	}
 
 	/**
 	 * Checks if cache exists and it isn't expired
 	 *
 	 * @param string keyName
-	 * @param   long lifetime
-	 * @return boolean
+	 * @param int lifetime
 	 */
 	public function exists(keyName = null, lifetime = null) -> boolean
 	{
@@ -367,11 +402,9 @@ class Memcache extends Backend implements BackendInterface
 	/**
 	 * Increment of given $keyName by $value
 	 *
-	 * @param  string keyName
-	 * @param  long value
-	 * @return long
+	 * @param string keyName
 	 */
-	public function increment(keyName = null, value = null)
+	public function increment(keyName = null, int value = 1) -> int | boolean
 	{
 		var memcache, prefix, lastKey;
 
@@ -388,10 +421,6 @@ class Memcache extends Backend implements BackendInterface
 			let prefix = this->_prefix;
 			let lastKey = prefix . keyName;
 			let this->_lastKey = lastKey;
-		}
-
-		if !value {
-			let value = 1;
 		}
 
 		return memcache->increment(lastKey, value);
@@ -400,11 +429,9 @@ class Memcache extends Backend implements BackendInterface
 	/**
 	 * Decrement of $keyName by given $value
 	 *
-	 * @param  string keyName
-	 * @param  long value
-	 * @return long
+	 * @param string keyName
 	 */
-	public function decrement(keyName = null, value = null)
+	public function decrement(keyName = null, int value = 1) -> int | boolean
 	{
 		var memcache, prefix, lastKey;
 
@@ -421,10 +448,6 @@ class Memcache extends Backend implements BackendInterface
 			let prefix = this->_prefix;
 			let lastKey = prefix . keyName;
 			let this->_lastKey = lastKey;
-		}
-
-		if !value {
-			let value = 1;
 		}
 
 		return memcache->decrement(lastKey, value);
@@ -447,19 +470,27 @@ class Memcache extends Backend implements BackendInterface
 		let options = this->_options;
 
 		if !fetch specialKey, options["statsKey"] {
-			throw new \Phalcon\Cache\Exception("Unexpected inconsistency in options");
+			throw new Exception("Unexpected inconsistency in options");
+		}
+
+		if specialKey == "" {
+			throw new Exception("Cached keys need to be enabled to use this function (options['statsKey'] == '_PHCM')!");
 		}
 
 		/**
 		 * Get the key from memcached
 		 */
 		let keys = memcache->get(specialKey);
-		if typeof keys == "array" {
-			for key, _ in keys {
-				memcache->delete(key);
-			}
-			memcache->set(specialKey, keys);
+		if unlikely typeof keys != "array" {
+			return true;
 		}
+
+		for key, _ in keys {
+			memcache->delete(key);
+		}
+
+		memcache->delete(specialKey);
+
 		return true;
 	}
 

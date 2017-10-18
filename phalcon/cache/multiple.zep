@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,42 +28,59 @@ use Phalcon\Cache\BackendInterface;
  * Allows to read to chained backend adapters writing to multiple backends
  *
  *<code>
- *   use Phalcon\Cache\Frontend\Data as DataFrontend,
- *       Phalcon\Cache\Multiple,
- *       Phalcon\Cache\Backend\Apc as ApcCache,
- *       Phalcon\Cache\Backend\Memcache as MemcacheCache,
- *       Phalcon\Cache\Backend\File as FileCache;
+ * use Phalcon\Cache\Frontend\Data as DataFrontend;
+ * use Phalcon\Cache\Multiple;
+ * use Phalcon\Cache\Backend\Apc as ApcCache;
+ * use Phalcon\Cache\Backend\Memcache as MemcacheCache;
+ * use Phalcon\Cache\Backend\File as FileCache;
  *
- *   $ultraFastFrontend = new DataFrontend(array(
- *       "lifetime" => 3600
- *   ));
+ * $ultraFastFrontend = new DataFrontend(
+ *     [
+ *         "lifetime" => 3600,
+ *     ]
+ * );
  *
- *   $fastFrontend = new DataFrontend(array(
- *       "lifetime" => 86400
- *   ));
+ * $fastFrontend = new DataFrontend(
+ *     [
+ *         "lifetime" => 86400,
+ *     ]
+ * );
  *
- *   $slowFrontend = new DataFrontend(array(
- *       "lifetime" => 604800
- *   ));
+ * $slowFrontend = new DataFrontend(
+ *     [
+ *         "lifetime" => 604800,
+ *     ]
+ * );
  *
- *   //Backends are registered from the fastest to the slower
- *   $cache = new Multiple(array(
- *       new ApcCache($ultraFastFrontend, array(
- *           "prefix" => 'cache',
- *       )),
- *       new MemcacheCache($fastFrontend, array(
- *           "prefix" => 'cache',
- *           "host" => "localhost",
- *           "port" => "11211"
- *       )),
- *       new FileCache($slowFrontend, array(
- *           "prefix" => 'cache',
- *           "cacheDir" => "../app/cache/"
- *       ))
- *   ));
+ * //Backends are registered from the fastest to the slower
+ * $cache = new Multiple(
+ *     [
+ *         new ApcCache(
+ *             $ultraFastFrontend,
+ *             [
+ *                 "prefix" => "cache",
+ *             ]
+ *         ),
+ *         new MemcacheCache(
+ *             $fastFrontend,
+ *             [
+ *                 "prefix" => "cache",
+ *                 "host"   => "localhost",
+ *                 "port"   => "11211",
+ *             ]
+ *         ),
+ *         new FileCache(
+ *             $slowFrontend,
+ *             [
+ *                 "prefix"   => "cache",
+ *                 "cacheDir" => "../app/cache/",
+ *             ]
+ *         ),
+ *     ]
+ * );
  *
- *   //Save, saves in every backend
- *   $cache->save('my-key', $data);
+ * //Save, saves in every backend
+ * $cache->save("my-key", $data);
  *</code>
  */
 class Multiple
@@ -98,9 +115,9 @@ class Multiple
 	/**
 	 * Returns a cached content reading the internal backends
 	 *
-	 * @param 	string|int keyName
-	 * @param   long lifetime
-	 * @return  mixed
+	 * @param string|int keyName
+	 * @param int lifetime
+	 * @return mixed
 	 */
 	public function get(var keyName, lifetime = null)
 	{
@@ -120,7 +137,7 @@ class Multiple
 	 * Starts every backend
 	 *
 	 * @param string|int keyName
-	 * @param long lifetime
+	 * @param int lifetime
 	 */
 	public function start(var keyName, lifetime = null) -> void
 	{
@@ -136,7 +153,7 @@ class Multiple
 	*
 	* @param string keyName
 	* @param string content
-	* @param long lifetime
+	* @param int lifetime
 	* @param boolean stopBuffer
 	*/
 	public function save(var keyName = null, content = null, lifetime = null, stopBuffer = null) -> void
@@ -169,8 +186,7 @@ class Multiple
 	 * Checks if cache exists in at least one backend
 	 *
 	 * @param  string|int keyName
-	 * @param  long lifetime
-	 * @return boolean
+	 * @param  int lifetime
 	 */
 	public function exists(var keyName = null, lifetime = null) -> boolean
 	{
@@ -184,18 +200,18 @@ class Multiple
 
 		return false;
 	}
-	
+
 	/**
 	 * Flush all backend(s)
 	 */
 	public function flush() -> boolean
 	{
 		var backend;
-		
+
 		for backend in this->_backends {
 			backend->flush();
 		}
-		
+
 		return true;
 	}
 }

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -19,6 +19,7 @@
 
 namespace Phalcon\Mvc\Model;
 
+use Phalcon\Di;
 use Phalcon\Db\Column;
 use Phalcon\DiInterface;
 use Phalcon\Mvc\Model\Exception;
@@ -33,15 +34,15 @@ use Phalcon\Mvc\Model\ResultsetInterface;
  * Phalcon\Mvc\Model::find() and Phalcon\Mvc\Model::findFirst()
  * using an object-oriented interface.
  *
- *<code>
- *$robots = Robots::query()
- *    ->where("type = :type:")
- *    ->andWhere("year < 2000")
- *    ->bind(array("type" => "mechanical"))
- *    ->limit(5, 10)
- *    ->orderBy("name")
- *    ->execute();
- *</code>
+ * <code>
+ * $robots = Robots::query()
+ *     ->where("type = :type:")
+ *     ->andWhere("year < 2000")
+ *     ->bind(["type" => "mechanical"])
+ *     ->limit(5, 10)
+ *     ->orderBy("name")
+ *     ->execute();
+ * </code>
  */
 class Criteria implements CriteriaInterface, InjectionAwareInterface
 {
@@ -111,7 +112,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 				let this->_params["bind"] = bind + bindParams;
 			} else {
 				let this->_params["bind"] = bindParams;
-			}			
+			}
 		} else {
 			let this->_params["bind"] = bindParams;
 		}
@@ -142,7 +143,12 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 * Sets the columns to be queried
 	 *
 	 *<code>
-	 *	$criteria->columns(array('id', 'name'));
+	 * $criteria->columns(
+	 *     [
+	 *         "id",
+	 *         "name",
+	 *     ]
+	 * );
 	 *</code>
 	 *
 	 * @param string|array columns
@@ -155,13 +161,13 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	}
 
 	/**
-	 * Adds a INNER join to the query
+	 * Adds an INNER join to the query
 	 *
 	 *<code>
-	 *	$criteria->join('Robots');
-	 *	$criteria->join('Robots', 'r.id = RobotsParts.robots_id');
-	 *	$criteria->join('Robots', 'r.id = RobotsParts.robots_id', 'r');
-	 *	$criteria->join('Robots', 'r.id = RobotsParts.robots_id', 'r', 'LEFT');
+	 * $criteria->join("Robots");
+	 * $criteria->join("Robots", "r.id = RobotsParts.robots_id");
+	 * $criteria->join("Robots", "r.id = RobotsParts.robots_id", "r");
+	 * $criteria->join("Robots", "r.id = RobotsParts.robots_id", "r", "LEFT");
 	 *</code>
 	 */
 	public function join(string! model, var conditions = null, var alias = null, var type = null) -> <Criteria>
@@ -185,12 +191,12 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	}
 
 	/**
-	 * Adds a INNER join to the query
+	 * Adds an INNER join to the query
 	 *
 	 *<code>
-	 *	$criteria->innerJoin('Robots');
-	 *	$criteria->innerJoin('Robots', 'r.id = RobotsParts.robots_id');
-	 *	$criteria->innerJoin('Robots', 'r.id = RobotsParts.robots_id', 'r');
+	 * $criteria->innerJoin("Robots");
+	 * $criteria->innerJoin("Robots", "r.id = RobotsParts.robots_id");
+	 * $criteria->innerJoin("Robots", "r.id = RobotsParts.robots_id", "r");
 	 *</code>
 	 */
 	public function innerJoin(string! model, var conditions = null, var alias = null) -> <Criteria>
@@ -202,7 +208,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 * Adds a LEFT join to the query
 	 *
 	 *<code>
-	 *	$criteria->leftJoin('Robots', 'r.id = RobotsParts.robots_id', 'r');
+	 * $criteria->leftJoin("Robots", "r.id = RobotsParts.robots_id", "r");
 	 *</code>
 	 */
 	public function leftJoin(string! model, var conditions = null, var alias = null) -> <Criteria>
@@ -214,7 +220,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 * Adds a RIGHT join to the query
 	 *
 	 *<code>
-	 *	$criteria->rightJoin('Robots', 'r.id = RobotsParts.robots_id', 'r');
+	 * $criteria->rightJoin("Robots", "r.id = RobotsParts.robots_id", "r");
 	 *</code>
 	 */
 	public function rightJoin(string! model, conditions = null, alias = null) -> <Criteria>
@@ -227,7 +233,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 */
 	public function where(string! conditions, var bindParams = null, var bindTypes = null) -> <Criteria>
 	{
-		var currentBindParams, mergedParams, mergedParamsTypes, currentBindTypes;
+		var currentBindParams, currentBindTypes;
 
 		let this->_params["conditions"] = conditions;
 
@@ -236,11 +242,10 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 		 */
 		if typeof bindParams == "array" {
 			if fetch currentBindParams, this->_params["bind"] {
-				let mergedParams = array_merge(currentBindParams, bindParams);
+				let this->_params["bind"] = array_merge(currentBindParams, bindParams);
 			} else {
-				let mergedParams = bindParams;
+				let this->_params["bind"] = bindParams;
 			}
-			let this->_params["bind"] = mergedParams;
 		}
 
 		/**
@@ -248,11 +253,10 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 		 */
 		if typeof bindTypes == "array" {
 			if fetch currentBindTypes, this->_params["bindTypes"] {
-				let mergedParamsTypes = array_merge(currentBindTypes, bindTypes);
+				let this->_params["bindTypes"] = array_merge(currentBindTypes, bindTypes);
 			} else {
-				let mergedParamsTypes = bindTypes;
+				let this->_params["bindTypes"] = bindTypes;
 			}
-			let this->_params["bindTypes"] = mergedParamsTypes;
 		}
 
 		return this;
@@ -264,7 +268,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 * @deprecated 1.0.0
 	 * @see \Phalcon\Mvc\Model\Criteria::andWhere()
 	 */
-	public function addWhere(string! conditions, var bindParams = null, var bindTypes = null) -> <Criteria>
+	deprecated public function addWhere(string! conditions, var bindParams = null, var bindTypes = null) -> <Criteria>
 	{
 		return this->andWhere(conditions, bindParams, bindTypes);
 	}
@@ -274,40 +278,13 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 */
 	public function andWhere(string! conditions, var bindParams = null, var bindTypes = null) -> <Criteria>
 	{
-		var currentBindParams, mergedParams, mergedParamsTypes, currentBindTypes, params, currentConditions;
+		var currentConditions;
 
-		let params = this->_params;
-		if fetch currentConditions, params["conditions"] {
-			let this->_params["conditions"] = "(" . currentConditions . ") AND (" . conditions . ")";
-		} else {
-			let this->_params["conditions"] = conditions;
+		if fetch currentConditions, this->_params["conditions"] {
+			let conditions = "(" . currentConditions . ") AND (" . conditions . ")";
 		}
 
-		/**
-		 * Update or merge existing bound parameters
-		 */
-		if typeof bindParams == "array" {
-			if fetch currentBindParams, params["bind"] {
-				let mergedParams = array_merge(currentBindParams, bindParams);
-			} else {
-				let mergedParams = bindParams;
-			}
-			let this->_params["bind"] = mergedParams;
-		}
-
-		/**
-		 * Update or merge existing bind types parameters
-		 */
-		if typeof bindTypes == "array" {
-			if fetch currentBindTypes, params["bindTypes"] {
-				let mergedParamsTypes = array_merge(currentBindTypes, bindTypes);
-			} else {
-				let mergedParamsTypes = bindTypes;
-			}
-			let this->_params["bindTypes"] = mergedParamsTypes;
-		}
-
-		return this;
+		return this->where(conditions, bindParams, bindTypes);
 	}
 
 	/**
@@ -315,47 +292,20 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 */
 	public function orWhere(string! conditions, var bindParams = null, var bindTypes = null) -> <Criteria>
 	{
-		var currentBindParams, mergedParams, mergedParamsTypes, currentBindTypes, params, currentConditions;
+		var currentConditions;
 
-		let params = this->_params;
-		if fetch currentConditions, params["conditions"] {
-			let this->_params["conditions"] = "(" . currentConditions . ") OR (" . conditions . ")";
-		} else {
-			let this->_params["conditions"] = conditions;
+		if fetch currentConditions, this->_params["conditions"] {
+			let conditions = "(" . currentConditions . ") OR (" . conditions . ")";
 		}
 
-		/**
-		 * Update or merge existing bound parameters
-		 */
-		if typeof bindParams == "array" {
-			if fetch currentBindParams, params["bind"] {
-				let mergedParams = array_merge(currentBindParams, bindParams);
-			} else {
-				let mergedParams = bindParams;
-			}
-			let this->_params["bind"] = mergedParams;
-		}
-
-		/**
-		 * Update or merge existing bind types parameters
-		 */
-		if typeof bindTypes == "array" {
-			if fetch currentBindTypes, params["bindTypes"] {
-				let mergedParamsTypes = array_merge(currentBindTypes, bindTypes);
-			} else {
-				let mergedParamsTypes = bindTypes;
-			}
-			let this->_params["bindTypes"] = mergedParamsTypes;
-		}
-
-		return this;
+		return this->where(conditions, bindParams, bindTypes);
 	}
 
 	/**
 	 * Appends a BETWEEN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->betweenWhere('price', 100.25, 200.50);
+	 * $criteria->betweenWhere("price", 100.25, 200.50);
 	 *</code>
 	 */
 	public function betweenWhere(string! expr, var minimum, var maximum) -> <Criteria>
@@ -392,7 +342,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 * Appends a NOT BETWEEN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->notBetweenWhere('price', 100.25, 200.50);
+	 * $criteria->notBetweenWhere("price", 100.25, 200.50);
 	 *</code>
 	 */
 	public function notBetweenWhere(string! expr, var minimum, var maximum) -> <Criteria>
@@ -432,19 +382,22 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	/**
 	 * Appends an IN condition to the current conditions
 	 *
-	 *<code>
-	 *	$criteria->inWhere('id', [1, 2, 3]);
-	 *</code>
+	 * <code>
+	 * $criteria->inWhere("id", [1, 2, 3]);
+	 * </code>
 	 */
 	public function inWhere(string! expr, array! values) -> <Criteria>
 	{
 		var hiddenParam, bindParams, bindKeys, value, key, queryKey;
 
+		if !count(values) {
+			this->andWhere(expr . " != " . expr);
+			return this;
+		}
+
 		let hiddenParam = this->_hiddenParamNumber;
 
-		let bindParams = [];
-		let bindKeys = [];
-
+		let bindParams = [], bindKeys = [];
 		for value in values {
 
 			/**
@@ -474,7 +427,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	 * Appends a NOT IN condition to the current conditions
 	 *
 	 *<code>
-	 *	$criteria->notInWhere('id', [1, 2, 3]);
+	 * $criteria->notInWhere("id", [1, 2, 3]);
 	 *</code>
 	 */
 	public function notInWhere(string! expr, array! values) -> <Criteria>
@@ -518,10 +471,9 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	/**
 	 * Adds the order-by parameter to the criteria (deprecated)
 	 *
-	 * @deprecated 1.2.1
 	 * @see \Phalcon\Mvc\Model\Criteria::orderBy()
 	 */
-	public function order(string! orderColumns) -> <Criteria>
+	deprecated public function order(string! orderColumns) -> <Criteria>
 	{
 		let this->_params["order"] = orderColumns;
 		return this;
@@ -555,14 +507,27 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	}
 
 	/**
-	 * Adds the limit parameter to the criteria
+	 * Adds the limit parameter to the criteria.
+	 *
+	 * <code>
+	 * $criteria->limit(100);
+	 * $criteria->limit(100, 200);
+	 * $criteria->limit("100", "200");
+	 * </code>
 	 */
-	public function limit(var limit, var offset = null) -> <Criteria>
+	public function limit(int limit, var offset = null) -> <Criteria>
 	{
-		if typeof offset == "null" {
-			let this->_params["limit"] = limit;
-		} else {
+		let limit = abs(limit);
+
+		if unlikely limit == 0 {
+			return this;
+		}
+
+		if is_numeric(offset) {
+			let offset = abs((int) offset);
 			let this->_params["limit"] = ["number": limit, "offset": offset];
+		} else {
+			let this->_params["limit"] = limit;
 		}
 
 		return this;
@@ -654,7 +619,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	/**
 	 * Returns the order clause in the criteria
 	 */
-	public function getOrder() -> string | null
+	public function getOrderBy() -> string | null
 	{
 		var order;
 		if fetch order, this->_params["order"] {
@@ -698,7 +663,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 	}
 
 	/**
-	 * Builds a Phalcon\Mvc\Model\Criteria based on an input array like _POST
+	 * Builds a Phalcon\Mvc\Model\Criteria based on an input array like $_POST
 	 */
 	public static function fromInput(<DiInterface> dependencyInjector, string! modelName, array! data, string! operator = "AND") -> <Criteria>
 	{
@@ -710,7 +675,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 
 			let metaData = dependencyInjector->getShared("modelsMetadata");
 
-			let model = new {modelName}(),
+			let model = new {modelName}(null, dependencyInjector),
 				dataTypes = metaData->getDataTypes(model),
 				columnMap = metaData->getReverseColumnMap(model);
 
@@ -747,7 +712,7 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 		}
 
 		/**
-		 * Create an object instance and pass the paramaters to it
+		 * Create an object instance and pass the parameters to it
 		 */
 		let criteria = new self();
 		if count(conditions) {
@@ -757,6 +722,37 @@ class Criteria implements CriteriaInterface, InjectionAwareInterface
 
 		criteria->setModelName(modelName);
 		return criteria;
+	}
+
+	/**
+	 * Creates a query builder from criteria.
+	 *
+	 * <code>
+	 * $builder = Robots::query()
+	 *     ->where("type = :type:")
+	 *     ->bind(["type" => "mechanical"])
+	 *     ->createBuilder();
+	 * </code>
+	 */
+	public function createBuilder() -> <BuilderInterface>
+	{
+		var dependencyInjector, manager, builder;
+
+		let dependencyInjector = this->getDI();
+		if typeof dependencyInjector != "object" {
+			let dependencyInjector = Di::getDefault();
+			this->setDI(dependencyInjector);
+		}
+
+		let manager = <ManagerInterface> dependencyInjector->getShared("modelsManager");
+
+		/**
+		 * Builds a query with the passed parameters
+		 */
+		let builder = manager->createBuilder(this->_params);
+		builder->from(this->_model);
+
+		return builder;
 	}
 
 	/**

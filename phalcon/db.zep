@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -34,29 +34,33 @@ use \PDO as Pdo;
  * Phalcon\Db is an abstract class. You only can use it with a database adapter like Phalcon\Db\Adapter\Pdo
  *
  *<code>
- *use Phalcon\Db;
- *use Phalcon\Db\Exception;
- *use Phalcon\Db\Adapter\Pdo\Mysql as MysqlConnection;
+ * use Phalcon\Db;
+ * use Phalcon\Db\Exception;
+ * use Phalcon\Db\Adapter\Pdo\Mysql as MysqlConnection;
  *
- *try {
+ * try {
+ *     $connection = new MysqlConnection(
+ *         [
+ *             "host"     => "192.168.0.11",
+ *             "username" => "sigma",
+ *             "password" => "secret",
+ *             "dbname"   => "blog",
+ *             "port"     => "3306",
+ *         ]
+ *     );
  *
- *  $connection = new MysqlConnection(array(
- *     'host' => '192.168.0.11',
- *     'username' => 'sigma',
- *     'password' => 'secret',
- *     'dbname' => 'blog',
- *     'port' => '3306',
- *  ));
+ *     $result = $connection->query(
+ *         "SELECT * FROM robots LIMIT 5"
+ *     );
  *
- *  $result = $connection->query("SELECT * FROM robots LIMIT 5");
- *  $result->setFetchMode(Db::FETCH_NUM);
- *  while ($robot = $result->fetch()) {
- *    print_r($robot);
- *  }
+ *     $result->setFetchMode(Db::FETCH_NUM);
  *
- *} catch (Exception $e) {
- *	echo $e->getMessage(), PHP_EOL;
- *} 
+ *     while ($robot = $result->fetch()) {
+ *         print_r($robot);
+ *     }
+ * } catch (Exception $e) {
+ *     echo $e->getMessage(), PHP_EOL;
+ * }
  * </code>
  */
 abstract class Db

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,7 +21,6 @@
 namespace Phalcon\Db\Adapter\Pdo;
 
 use Phalcon\Db\Column;
-use Phalcon\Db\AdapterInterface;
 use Phalcon\Db\RawValue;
 use Phalcon\Db\Adapter\Pdo as PdoAdapter;
 use Phalcon\Db\Exception;
@@ -30,20 +29,22 @@ use Phalcon\Db\Exception;
  * Phalcon\Db\Adapter\Pdo\Postgresql
  *
  * Specific functions for the Postgresql database system
+ *
  * <code>
+ * use Phalcon\Db\Adapter\Pdo\Postgresql;
  *
- * $config = array(
- *  "host" => "192.168.0.11",
- *  "dbname" => "blog",
- *  "username" => "postgres",
- *  "password" => ""
- * );
+ * $config = [
+ *     "host"     => "localhost",
+ *     "dbname"   => "blog",
+ *     "port"     => 5432,
+ *     "username" => "postgres",
+ *     "password" => "secret",
+ * ];
  *
- * $connection = new \Phalcon\Db\Adapter\Pdo\Postgresql($config);
- *
+ * $connection = new Postgresql($config);
  * </code>
  */
-class Postgresql extends PdoAdapter implements AdapterInterface
+class Postgresql extends PdoAdapter
 {
 
 	protected _type = "pgsql";
@@ -53,16 +54,13 @@ class Postgresql extends PdoAdapter implements AdapterInterface
 	/**
 	 * This method is automatically called in Phalcon\Db\Adapter\Pdo constructor.
 	 * Call it when you need to restore a database connection.
-	 *
-	 * @param array $descriptor
-	 * @return boolean
 	 */
-	public function connect(descriptor = null)
+	public function connect(array descriptor = null) -> boolean
 	{
-		var schema, sql;
+		var schema, sql, status;
 
-		if descriptor === null {
-			let descriptor = this->_descriptor;
+		if empty descriptor {
+			let descriptor = (array) this->_descriptor;
 		}
 
 		if fetch schema, descriptor["schema"] {
@@ -77,19 +75,23 @@ class Postgresql extends PdoAdapter implements AdapterInterface
 			}
 		}
 
-		parent::connect(descriptor);
+		let status = parent::connect(descriptor);
 
 		if ! empty schema {
 			let sql = "SET search_path TO '" . schema . "'";
 			this->execute(sql);
 		}
+
+		return status;
 	}
 
 	/**
 	 * Returns an array of Phalcon\Db\Column objects describing a table
 	 *
 	 * <code>
-	 * print_r($connection->describeColumns("posts"));
+	 * print_r(
+	 *     $connection->describeColumns("posts")
+	 * );
 	 * </code>
 	 */
 	public function describeColumns(string table, string schema = null) -> <Column[]>
@@ -118,161 +120,117 @@ class Postgresql extends PdoAdapter implements AdapterInterface
 				numericSize = field[3],
 				numericScale = field[4];
 
-			loop {
-
+			if memstr(columnType, "smallint(1)") {
 				/**
 				 * Smallint(1) is boolean
 				 */
-				if memstr(columnType, "smallint(1)") {
-					let definition["type"] = Column::TYPE_BOOLEAN,
-						definition["bindType"] = Column::BIND_PARAM_BOOL;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_BOOLEAN,
+					definition["bindType"] = Column::BIND_PARAM_BOOL;
+			} elseif memstr(columnType, "bigint") {
 				/**
 				 * Bigint
 				 */
-				if memstr(columnType, "bigint") {
-					let definition["type"] = Column::TYPE_BIGINTEGER,
-						definition["isNumeric"] = true,
-						definition["bindType"] = Column::BIND_PARAM_INT;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_BIGINTEGER,
+					definition["isNumeric"] = true,
+					definition["bindType"] = Column::BIND_PARAM_INT;
+			} elseif memstr(columnType, "int") {
 				/**
 				 * Int
 				 */
-				if memstr(columnType, "int") {
-					let definition["type"] = Column::TYPE_INTEGER,
-						definition["isNumeric"] = true,
-						definition["size"] = numericSize,
-						definition["bindType"] = Column::BIND_PARAM_INT;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_INTEGER,
+					definition["isNumeric"] = true,
+					definition["size"] = numericSize,
+					definition["bindType"] = Column::BIND_PARAM_INT;
+			} elseif memstr(columnType, "double precision") {
+				/**
+				 * Double Precision
+				 */
+				let definition["type"] = Column::TYPE_DOUBLE,
+					definition["isNumeric"] = true,
+					definition["size"] = numericSize,
+					definition["bindType"] = Column::BIND_PARAM_DECIMAL;
+            } elseif memstr(columnType, "real") {
+				/**
+				 * Real
+				 */
+				let definition["type"] = Column::TYPE_FLOAT,
+					definition["isNumeric"] = true,
+					definition["size"] = numericSize,
+					definition["bindType"] = Column::BIND_PARAM_DECIMAL;
+			} elseif memstr(columnType, "varying") {
 				/**
 				 * Varchar
 				 */
-				if memstr(columnType, "varying") {
-					let definition["type"] = Column::TYPE_VARCHAR,
-						definition["size"] = charSize;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_VARCHAR,
+					definition["size"] = charSize;
+			} elseif memstr(columnType, "date") {
 				/**
 				 * Special type for datetime
 				 */
-				if memstr(columnType, "date") {
-					let definition["type"] = Column::TYPE_DATE,
-						definition["size"] = 0;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_DATE,
+					definition["size"] = 0;
+			} elseif memstr(columnType, "timestamp") {
 				/**
 				 * Timestamp
 				 */
-				if memstr(columnType, "timestamp") {
-					let definition["type"] = Column::TYPE_TIMESTAMP;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_TIMESTAMP;
+			} elseif memstr(columnType, "numeric") {
 				/**
 				 * Numeric
 				 */
-				if memstr(columnType, "numeric") {
-					let definition["type"] = Column::TYPE_DECIMAL,
-						definition["isNumeric"] = true,
-						definition["size"] = numericSize,
-						definition["scale"] = numericScale,
-						definition["bindType"] = Column::BIND_PARAM_DECIMAL;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_DECIMAL,
+					definition["isNumeric"] = true,
+					definition["size"] = numericSize,
+					definition["scale"] = numericScale,
+					definition["bindType"] = Column::BIND_PARAM_DECIMAL;
+			} elseif memstr(columnType, "char") {
 				/**
 				 * Chars are chars
 				 */
-				if memstr(columnType, "char") {
-					let definition["type"] = Column::TYPE_CHAR,
-						definition["size"] = charSize;
-					break;
-				}
-
-				/**
-				 * Date
-				 */
-				if memstr(columnType, "timestamp") {
-					let definition["type"] = Column::TYPE_DATETIME,
-						definition["size"] = 0;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_CHAR,
+					definition["size"] = charSize;
+			} elseif memstr(columnType, "text") {
 				/**
 				 * Text are varchars
 				 */
-				if memstr(columnType, "text") {
-					let definition["type"] = Column::TYPE_TEXT,
-						definition["size"] = charSize;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_TEXT,
+					definition["size"] = charSize;
+			} elseif memstr(columnType, "float") {
 				/**
 				 * Float/Smallfloats/Decimals are float
 				 */
-				if memstr(columnType, "float") {
-					let definition["type"] = Column::TYPE_FLOAT,
-						definition["isNumeric"] = true,
-						definition["size"] = numericSize,
-						definition["bindType"] = Column::BIND_PARAM_DECIMAL;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_FLOAT,
+					definition["isNumeric"] = true,
+					definition["size"] = numericSize,
+					definition["bindType"] = Column::BIND_PARAM_DECIMAL;
+			} elseif memstr(columnType, "bool") {
 				/**
 				 * Boolean
 				 */
-				if memstr(columnType, "bool") {
-					let definition["type"] = Column::TYPE_BOOLEAN,
-						definition["size"] = 0,
-						definition["bindType"] = Column::BIND_PARAM_BOOL;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_BOOLEAN,
+					definition["size"] = 0,
+					definition["bindType"] = Column::BIND_PARAM_BOOL;
+			} elseif memstr(columnType, "jsonb") {
 				/**
 				 * Jsonb
 				 */
-				if memstr(columnType, "jsonb") {
-					let definition["type"] = Column::TYPE_JSONB;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_JSONB;
+			} elseif memstr(columnType, "json") {
 				/**
 				 * Json
 				 */
-				if memstr(columnType, "json") {
-					let definition["type"] = Column::TYPE_JSON;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_JSON;
+			} elseif memstr(columnType, "uuid") {
 				/**
 				 * UUID
 				 */
-				if memstr(columnType, "uuid") {
-					let definition["type"] = Column::TYPE_CHAR,
-						definition["size"] = 36;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_CHAR,
+					definition["size"] = 36;
+			} else {
 				/**
 				 * By default is string
 				 */
 				let definition["type"] = Column::TYPE_VARCHAR;
-				break;
-			}
-
-			/**
-			 * Check if the column is unsigned, only MySQL support this
-			 */
-			if memstr(columnType, "unsigned") {
-				let definition["unsigned"] = true;
 			}
 
 			/**
@@ -412,11 +370,19 @@ class Postgresql extends PdoAdapter implements AdapterInterface
 	 * Returns the default identity value to be inserted in an identity column
 	 *
 	 *<code>
-	 * //Inserting a new robot with a valid default value for the column 'id'
+	 * // Inserting a new robot with a valid default value for the column 'id'
 	 * $success = $connection->insert(
 	 *     "robots",
-	 *     array($connection->getDefaultIdValue(), "Astro Boy", 1952),
-	 *     array("id", "name", "year")
+	 *     [
+	 *         $connection->getDefaultIdValue(),
+	 *         "Astro Boy",
+	 *         1952,
+	 *     ],
+	 *     [
+	 *         "id",
+	 *         "name",
+	 *         "year",
+	 *     ]
 	 * );
 	 *</code>
 	 */

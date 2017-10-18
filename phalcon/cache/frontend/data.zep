@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -27,37 +27,48 @@ use Phalcon\Cache\FrontendInterface;
  * Allows to cache native PHP data in a serialized form
  *
  *<code>
- *<?php
+ * use Phalcon\Cache\Backend\File;
+ * use Phalcon\Cache\Frontend\Data;
  *
- *	// Cache the files for 2 days using a Data frontend
- *	$frontCache = new \Phalcon\Cache\Frontend\Data(array(
- *		"lifetime" => 172800
- *	));
+ * // Cache the files for 2 days using a Data frontend
+ * $frontCache = new Data(
+ *     [
+ *         "lifetime" => 172800,
+ *     ]
+ * );
  *
- *	// Create the component that will cache "Data" to a "File" backend
- *	// Set the cache file directory - important to keep the "/" at the end of
- *	// of the value for the folder
- *	$cache = new \Phalcon\Cache\Backend\File($frontCache, array(
- *		"cacheDir" => "../app/cache/"
- *	));
+ * // Create the component that will cache "Data" to a 'File' backend
+ * // Set the cache file directory - important to keep the '/' at the end of
+ * // of the value for the folder
+ * $cache = new File(
+ *     $frontCache,
+ *     [
+ *         "cacheDir" => "../app/cache/",
+ *     ]
+ * );
  *
- *	// Try to get cached records
- *	$cacheKey = 'robots_order_id.cache';
- *	$robots    = $cache->get($cacheKey);
- *	if ($robots === null) {
+ * $cacheKey = "robots_order_id.cache";
  *
- *		// $robots is null due to cache expiration or data does not exist
- *		// Make the database call and populate the variable
- *		$robots = Robots::find(array("order" => "id"));
+ * // Try to get cached records
+ * $robots = $cache->get($cacheKey);
  *
- *		// Store it in the cache
- *		$cache->save($cacheKey, $robots);
- *	}
+ * if ($robots === null) {
+ *     // $robots is null due to cache expiration or data does not exist
+ *     // Make the database call and populate the variable
+ *     $robots = Robots::find(
+ *         [
+ *             "order" => "id",
+ *         ]
+ *     );
  *
- *	// Use $robots :)
- *	foreach ($robots as $robot) {
- *		echo $robot->name, "\n";
- *	}
+ *     // Store it in the cache
+ *     $cache->save($cacheKey, $robots);
+ * }
+ *
+ * // Use $robots :)
+ * foreach ($robots as $robot) {
+ *     echo $robot->name, "\n";
+ * }
  *</code>
  */
 class Data implements FrontendInterface
@@ -135,8 +146,17 @@ class Data implements FrontendInterface
 	/**
 	 * Unserializes data after retrieval
 	 */
-	public function afterRetrieve(var data)
+	public function afterRetrieve(var data) -> var
 	{
+		if is_numeric(data) {
+			return data;
+		}
+
+		// do not unserialize empty string, null, false, etc
+		if empty data {
+			return data;
+		}
+
 		return unserialize(data);
 	}
 }

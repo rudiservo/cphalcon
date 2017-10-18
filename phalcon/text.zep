@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -37,36 +37,41 @@ abstract class Text
 
 	const RANDOM_NOZERO = 4;
 
+	const RANDOM_DISTINCT = 5;
+
 	/**
 	 * Converts strings to camelize style
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::camelize('coco_bongo'); //CocoBongo
+	 * echo Phalcon\Text::camelize("coco_bongo"); // CocoBongo
+	 * echo Phalcon\Text::camelize("co_co-bon_go", "-"); // Co_coBon_go
+	 * echo Phalcon\Text::camelize("co_co-bon_go", "_-"); // CoCoBonGo
 	 * </code>
 	 */
-	public static function camelize(string! str) -> string
+	public static function camelize(string! str, var delimiter = null) -> string
 	{
-		return str->camelize();
+		return str->camelize(delimiter);
 	}
 
 	/**
 	 * Uncamelize strings which are camelized
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::uncamelize('CocoBongo'); //coco_bongo
+	 * echo Phalcon\Text::uncamelize("CocoBongo"); // coco_bongo
+	 * echo Phalcon\Text::uncamelize("CocoBongo", "-"); // coco-bongo
 	 * </code>
 	 */
-	public static function uncamelize(string! str) -> string
+	public static function uncamelize(string! str, var delimiter = null) -> string
 	{
-		return str->uncamelize();
+		return str->uncamelize(delimiter);
 	}
 
 	/**
 	 * Adds a number to a string or increment that number if it already is defined
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::increment("a"); // "a_1"
-	 *    echo Phalcon\Text::increment("a_1"); // "a_2"
+	 * echo Phalcon\Text::increment("a"); // "a_1"
+	 * echo Phalcon\Text::increment("a_1"); // "a_2"
 	 * </code>
 	 */
 	public static function increment(string str, string separator = "_") -> string
@@ -88,7 +93,10 @@ abstract class Text
 	 * Generates a random string based on the given type. Type is one of the RANDOM_* constants
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::random(Phalcon\Text::RANDOM_ALNUM); //"aloiwkqz"
+	 * use Phalcon\Text;
+	 *
+	 * // "aloiwkqz"
+	 * echo Text::random(Text::RANDOM_ALNUM);
 	 * </code>
 	 */
 	public static function random(int type = 0, long length = 8) -> string
@@ -114,6 +122,10 @@ abstract class Text
 				let pool = range(1, 9);
 				break;
 
+			case Text::RANDOM_DISTINCT:
+				let pool = str_split("2345679ACDEFHJKLMNPRSTUVWXYZ");
+				break;
+
 			default:
 				// Default type \Phalcon\Text::RANDOM_ALNUM
 				let pool = array_merge(range(0, 9), range("a", "z"), range("A", "Z"));
@@ -133,9 +145,9 @@ abstract class Text
 	 * Check if a string starts with a given string
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::startsWith("Hello", "He"); // true
-	 *    echo Phalcon\Text::startsWith("Hello", "he", false); // false
-	 *    echo Phalcon\Text::startsWith("Hello", "he"); // true
+	 * echo Phalcon\Text::startsWith("Hello", "He"); // true
+	 * echo Phalcon\Text::startsWith("Hello", "he", false); // false
+	 * echo Phalcon\Text::startsWith("Hello", "he"); // true
 	 * </code>
 	 */
 	public static function startsWith(string str, string start, boolean ignoreCase = true) -> boolean
@@ -147,9 +159,9 @@ abstract class Text
 	 * Check if a string ends with a given string
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::endsWith("Hello", "llo"); // true
-	 *    echo Phalcon\Text::endsWith("Hello", "LLO", false); // false
-	 *    echo Phalcon\Text::endsWith("Hello", "LLO"); // true
+	 * echo Phalcon\Text::endsWith("Hello", "llo"); // true
+	 * echo Phalcon\Text::endsWith("Hello", "LLO", false); // false
+	 * echo Phalcon\Text::endsWith("Hello", "LLO"); // true
 	 * </code>
 	 */
 	public static function endsWith(string str, string end, boolean ignoreCase = true) -> boolean
@@ -161,7 +173,7 @@ abstract class Text
 	 * Lowercases a string, this function makes use of the mbstring extension if available
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::lower("HELLO"); // hello
+	 * echo Phalcon\Text::lower("HELLO"); // hello
 	 * </code>
 	 */
 	public static function lower(string! str, string! encoding = "UTF-8") -> string
@@ -179,7 +191,7 @@ abstract class Text
 	 * Uppercases a string, this function makes use of the mbstring extension if available
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::upper("hello"); // HELLO
+	 * echo Phalcon\Text::upper("hello"); // HELLO
 	 * </code>
 	 */
 	public static function upper(string! str, string! encoding = "UTF-8") -> string
@@ -197,8 +209,8 @@ abstract class Text
 	 * Reduces multiple slashes in a string to single slashes
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::reduceSlashes("foo//bar/baz"); // foo/bar/baz
-	 *    echo Phalcon\Text::reduceSlashes("http://foo.bar///baz/buz"); // http://foo.bar/baz/buz
+	 * echo Phalcon\Text::reduceSlashes("foo//bar/baz"); // foo/bar/baz
+	 * echo Phalcon\Text::reduceSlashes("http://foo.bar///baz/buz"); // http://foo.bar/baz/buz
 	 * </code>
 	 */
 	public static function reduceSlashes(string str) -> string
@@ -210,8 +222,16 @@ abstract class Text
 	 * Concatenates strings using the separator only once without duplication in places concatenation
 	 *
 	 * <code>
-	 *    $str = Phalcon\Text::concat("/", "/tmp/", "/folder_1/", "/folder_2", "folder_3/");
-	 *    echo $str; // /tmp/folder_1/folder_2/folder_3/
+	 * $str = Phalcon\Text::concat(
+	 *     "/",
+	 *     "/tmp/",
+	 *     "/folder_1/",
+	 *     "/folder_2",
+	 *     "folder_3/"
+	 * );
+	 *
+	 * // /tmp/folder_1/folder_2/folder_3/
+	 * echo $str;
 	 * </code>
 	 *
 	 * @param string separator
@@ -248,41 +268,58 @@ abstract class Text
 	 * Generates random text in accordance with the template
 	 *
 	 * <code>
-	 *    echo Phalcon\Text::dynamic("{Hi|Hello}, my name is a {Bob|Mark|Jon}!"); // Hi my name is a Bob
-	 *    echo Phalcon\Text::dynamic("{Hi|Hello}, my name is a {Bob|Mark|Jon}!"); // Hi my name is a Jon
-	 *    echo Phalcon\Text::dynamic("{Hi|Hello}, my name is a {Bob|Mark|Jon}!"); // Hello my name is a Bob
+	 * // Hi my name is a Bob
+	 * echo Phalcon\Text::dynamic("{Hi|Hello}, my name is a {Bob|Mark|Jon}!");
+	 *
+	 * // Hi my name is a Jon
+	 * echo Phalcon\Text::dynamic("{Hi|Hello}, my name is a {Bob|Mark|Jon}!");
+	 *
+	 * // Hello my name is a Bob
+	 * echo Phalcon\Text::dynamic("{Hi|Hello}, my name is a {Bob|Mark|Jon}!");
+	 *
+	 * // Hello my name is a Zyxep
+	 * echo Phalcon\Text::dynamic("[Hi/Hello], my name is a [Zyxep/Mark]!", "[", "]", "/");
 	 * </code>
 	 */
 	public static function dynamic(string! text, string! leftDelimiter = "{", string! rightDelimiter = "}", string! separator = "|") -> string
 	{
-		var ldS, rdS, result, pattern;
+		var ldS, rdS, pattern, matches, match, words, word, sub;
 
 		if substr_count(text, leftDelimiter) !== substr_count(text, rightDelimiter) {
 			throw new \RuntimeException("Syntax error in string \"" . text . "\"");
 		}
 
-		let ldS 	= preg_quote(leftDelimiter);
-		let rdS 	= preg_quote(rightDelimiter);
-		let pattern = "/" . ldS . "([^" . ldS . rdS . "]+)" . rdS . "/";
-		let result 	= text;
+		let ldS = preg_quote(leftDelimiter),
+			rdS = preg_quote(rightDelimiter),
+			pattern = "/" . ldS . "([^" . ldS . rdS . "]+)" . rdS . "/",
+			matches = [];
 
-		while memstr(result, leftDelimiter) {
-			let result = preg_replace_callback(pattern, function (matches) {
-				var words;
-				let words = explode("|", matches[1]);
-				return words[array_rand(words)];
-			}, result);
+		if !preg_match_all(pattern, text, matches, 2) {
+			return text;
 		}
 
-		return result;
+		if typeof matches == "array" {
+			for match in matches {
+				if !isset match[0] || !isset match[1] {
+					continue;
+				}
+
+				let words = explode(separator, match[1]),
+					word = words[array_rand(words)],
+					sub = preg_quote(match[0], separator),
+					text = preg_replace("/" . sub . "/", word, text, 1);
+			}
+		}
+
+		return text;
 	}
 
 	/**
 	 * Makes a phrase underscored instead of spaced
 	 *
 	 * <code>
-	 *   echo Phalcon\Text::underscore('look behind'); // 'look_behind'
-	 *   echo Phalcon\Text::underscore('Awesome Phalcon'); // 'Awesome_Phalcon'
+	 * echo Phalcon\Text::underscore("look behind"); // "look_behind"
+	 * echo Phalcon\Text::underscore("Awesome Phalcon"); // "Awesome_Phalcon"
 	 * </code>
 	 */
 	public static function underscore(string! text) -> string
@@ -294,8 +331,8 @@ abstract class Text
 	 * Makes an underscored or dashed phrase human-readable
 	 *
 	 * <code>
-	 *   echo Phalcon\Text::humanize('start-a-horse'); // 'start a horse'
-	 *   echo Phalcon\Text::humanize('five_cats'); // 'five cats'
+	 * echo Phalcon\Text::humanize("start-a-horse"); // "start a horse"
+	 * echo Phalcon\Text::humanize("five_cats"); // "five cats"
 	 * </code>
 	 */
 	public static function humanize(string! text) -> string

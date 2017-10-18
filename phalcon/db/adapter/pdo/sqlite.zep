@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,23 +28,24 @@ use Phalcon\Db\Reference;
 use Phalcon\Db\ReferenceInterface;
 use Phalcon\Db\Index;
 use Phalcon\Db\IndexInterface;
-use Phalcon\Db\AdapterInterface;
 use Phalcon\Db\Adapter\Pdo as PdoAdapter;
 
 /**
  * Phalcon\Db\Adapter\Pdo\Sqlite
  *
  * Specific functions for the Sqlite database system
+ *
  * <code>
+ * use Phalcon\Db\Adapter\Pdo\Sqlite;
  *
- * $config = array(
- *  "dbname" => "/tmp/test.sqlite"
+ * $connection = new Sqlite(
+ *     [
+ *         "dbname" => "/tmp/test.sqlite",
+ *     ]
  * );
- *
- * $connection = new \Phalcon\Db\Adapter\Pdo\Sqlite($config);
  * </code>
  */
-class Sqlite extends PdoAdapter implements AdapterInterface
+class Sqlite extends PdoAdapter
 {
 
 	protected _type = "sqlite";
@@ -54,16 +55,13 @@ class Sqlite extends PdoAdapter implements AdapterInterface
 	/**
 	 * This method is automatically called in Phalcon\Db\Adapter\Pdo constructor.
 	 * Call it when you need to restore a database connection.
-	 *
-	 * @param array $descriptor
-	 * @return boolean
 	 */
-	public function connect(descriptor = null)
+	public function connect(array descriptor = null) -> boolean
 	{
 		var dbname;
 
-		if descriptor === null {
-			let descriptor = this->_descriptor;
+		if empty descriptor {
+			let descriptor = (array) this->_descriptor;
 		}
 
 		if !fetch dbname, descriptor["dbname"] {
@@ -72,14 +70,16 @@ class Sqlite extends PdoAdapter implements AdapterInterface
 
 		let descriptor["dsn"] = dbname;
 
-		parent::connect(descriptor);
+		return parent::connect(descriptor);
 	}
 
 	/**
 	 * Returns an array of Phalcon\Db\Column objects describing a table
 	 *
 	 * <code>
-	 * print_r($connection->describeColumns("posts"));
+	 * print_r(
+	 *     $connection->describeColumns("posts")
+	 * );
 	 * </code>
 	 */
 	public function describeColumns(string table, string schema = null) -> <Column[]>
@@ -107,124 +107,85 @@ class Sqlite extends PdoAdapter implements AdapterInterface
 			 */
 			let columnType = field[2];
 
-			loop {
-
+			if memstr(columnType, "tinyint(1)") {
 				/**
 				 * Tinyint(1) is boolean
 				 */
-				if memstr(columnType, "tinyint(1)") {
-					let definition["type"] = Column::TYPE_BOOLEAN,
-						definition["bindType"] = Column::BIND_PARAM_BOOL,
-						columnType = "boolean"; // Change column type to skip size check
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_BOOLEAN,
+					definition["bindType"] = Column::BIND_PARAM_BOOL,
+					columnType = "boolean"; // Change column type to skip size check
+			} elseif memstr(columnType, "bigint") {
 				/**
 				 * Bigint are int
 				 */
-				if memstr(columnType, "bigint") {
-					let definition["type"] = Column::TYPE_BIGINTEGER,
-						definition["isNumeric"] = true,
-						definition["bindType"] = Column::BIND_PARAM_INT;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_BIGINTEGER,
+					definition["isNumeric"] = true,
+					definition["bindType"] = Column::BIND_PARAM_INT;
+			} elseif memstr(columnType, "int") || memstr(columnType, "INT") {
 				/**
 				 * Smallint/Integers/Int are int
 				 */
-				if memstr(columnType, "int") || memstr(columnType, "INT") {
+				let definition["type"] = Column::TYPE_INTEGER,
+					definition["isNumeric"] = true,
+					definition["bindType"] = Column::BIND_PARAM_INT;
 
-					let definition["type"] = Column::TYPE_INTEGER,
-						definition["isNumeric"] = true,
-						definition["bindType"] = Column::BIND_PARAM_INT;
-
-					if field[5] {
-						let definition["autoIncrement"] = true;
-					}
-					break;
+				if field[5] {
+					let definition["autoIncrement"] = true;
 				}
-
+			} elseif memstr(columnType, "varchar") {
 				/**
 				 * Varchar are varchars
 				 */
-				if memstr(columnType, "varchar") {
-					let definition["type"] = Column::TYPE_VARCHAR;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_VARCHAR;
+			} elseif memstr(columnType, "date") {
 				/**
 				 * Date/Datetime are varchars
 				 */
-				if memstr(columnType, "date") {
-					let definition["type"] = Column::TYPE_DATE;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_DATE;
+			} elseif memstr(columnType, "timestamp") {
 				/**
 				 * Timestamp as date
 				 */
-				if memstr(columnType, "timestamp") {
-					let definition["type"] = Column::TYPE_TIMESTAMP;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_TIMESTAMP;
+			} elseif memstr(columnType, "decimal") {
 				/**
 				 * Decimals are floats
 				 */
-				if memstr(columnType, "decimal") {
-					let definition["type"] = Column::TYPE_DECIMAL,
-						definition["isNumeric"] = true,
-						definition["bindType"] = Column::BIND_PARAM_DECIMAL;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_DECIMAL,
+					definition["isNumeric"] = true,
+					definition["bindType"] = Column::BIND_PARAM_DECIMAL;
+			} elseif memstr(columnType, "char") {
 				/**
 				 * Chars are chars
 				 */
-				if memstr(columnType, "char") {
-					let definition["type"] = Column::TYPE_CHAR;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_CHAR;
+			} elseif memstr(columnType, "datetime") {
 				/**
 				 * Special type for datetime
 				 */
-				if memstr(columnType, "datetime") {
-					let definition["type"] = Column::TYPE_DATETIME;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_DATETIME;
+			} elseif memstr(columnType, "text") {
 				/**
 				 * Text are varchars
 				 */
-				if memstr(columnType, "text") {
-					let definition["type"] = Column::TYPE_TEXT;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_TEXT;
+			} elseif memstr(columnType, "float") {
 				/**
 				 * Float/Smallfloats/Decimals are float
 				 */
-				if memstr(columnType, "float") {
-					let definition["type"] = Column::TYPE_FLOAT,
-						definition["isNumeric"] = true,
-						definition["bindType"] = Column::TYPE_DECIMAL;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_FLOAT,
+					definition["isNumeric"] = true,
+					definition["bindType"] = Column::TYPE_DECIMAL;
+			} elseif memstr(columnType, "enum") {
 				/**
 				 * Enum are treated as char
 				 */
-				if memstr(columnType, "enum") {
-					let definition["type"] = Column::TYPE_CHAR;
-					break;
-				}
-
+				let definition["type"] = Column::TYPE_CHAR;
+			} else {
 				/**
 				 * By default is string
 				 */
 				let definition["type"] = Column::TYPE_VARCHAR;
-				break;
 			}
 
 			/**
@@ -295,7 +256,9 @@ class Sqlite extends PdoAdapter implements AdapterInterface
 	 * Lists table indexes
 	 *
 	 * <code>
-	 *   print_r($connection->describeIndexes('robots_parts'));
+	 * print_r(
+	 *     $connection->describeIndexes("robots_parts")
+	 * );
 	 * </code>
 	 *
 	 * @param  string table
@@ -413,11 +376,17 @@ class Sqlite extends PdoAdapter implements AdapterInterface
 	 * Returns the default value to make the RBDM use the default value declared in the table definition
 	 *
 	 *<code>
-	 * //Inserting a new robot with a valid default value for the column 'year'
+	 * // Inserting a new robot with a valid default value for the column 'year'
 	 * $success = $connection->insert(
-	 *	 "robots",
-	 *	 array("Astro Boy", $connection->getDefaultValue()),
-	 *	 array("name", "year")
+	 *     "robots",
+	 *     [
+	 *         "Astro Boy",
+	 *         $connection->getDefaultValue(),
+	 *     ],
+	 *     [
+	 *         "name",
+	 *         "year",
+	 *     ]
 	 * );
 	 *</code>
 	 */

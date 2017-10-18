@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -37,22 +37,23 @@ use Phalcon\Events\EventsAwareInterface;
  * decomposing it into parameters to determine which module, controller, and
  * action of that controller should receive the request
  *
- *<code>
+ * <code>
+ * use Phalcon\Mvc\Router;
  *
- *	$router = new Router();
+ * $router = new Router();
  *
- *	$router->add(
- *		"/documentation/{chapter}/{name}\.{type:[a-z]+}",
- *		array(
- *			"controller" => "documentation",
- *			"action"     => "show"
- *		)
- *	);
+ * $router->add(
+ *     "/documentation/{chapter}/{name}\.{type:[a-z]+}",
+ *     [
+ *         "controller" => "documentation",
+ *         "action"     => "show",
+ *     ]
+ * );
  *
- *	$router->handle();
+ * $router->handle();
  *
- *	echo $router->getControllerName();
- *</code>
+ * echo $router->getControllerName();
+ * </code>
  */
 class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInterface
 {
@@ -70,7 +71,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 
 	protected _action = null;
 
-	protected _params;
+	protected _params = [];
 
 	protected _routes;
 
@@ -88,7 +89,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 
 	protected _defaultAction;
 
-	protected _defaultParams;
+	protected _defaultParams = [];
 
 	protected _removeExtraSlashes;
 
@@ -125,9 +126,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 			]);
 		}
 
-		let this->_params = [],
-			this->_defaultParams = [],
-			this->_routes = routes;
+		let this->_routes = routes;
 	}
 
 	/**
@@ -163,14 +162,14 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	}
 
 	/**
-	 * Get rewrite info. This info is read from $_GET['_url']. This returns '/' if the rewrite information cannot be read
+	 * Get rewrite info. This info is read from $_GET["_url"]. This returns '/' if the rewrite information cannot be read
 	 */
 	public function getRewriteUri() -> string
 	{
 		var url, urlParts, realUri;
 
 		/**
-		 * By default we use $_GET['url'] to obtain the rewrite information
+		 * By default we use $_GET["url"] to obtain the rewrite information
 		 */
 		if !this->_uriSource {
 			if fetch url, _GET["_url"] {
@@ -180,7 +179,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 			}
 		} else {
 			/**
-			 * Otherwise use the standard $_SERVER['REQUEST_URI']
+			 * Otherwise use the standard $_SERVER["REQUEST_URI"]
 			 */
 			if fetch url, _SERVER["REQUEST_URI"] {
 				let urlParts = explode("?", url),
@@ -196,9 +195,11 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	/**
 	 * Sets the URI source. One of the URI_SOURCE_* constants
 	 *
-	 *<code>
-	 *	$router->setUriSource(Router::URI_SOURCE_SERVER_REQUEST_URI);
-	 *</code>
+	 * <code>
+	 * $router->setUriSource(
+	 *     Router::URI_SOURCE_SERVER_REQUEST_URI
+	 * );
+	 * </code>
 	 */
 	public function setUriSource(var uriSource) -> <RouterInterface>
 	{
@@ -256,10 +257,12 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	 * This method must not be used to set a 404 route
 	 *
 	 *<code>
-	 * $router->setDefaults(array(
-	 *		'module' => 'common',
-	 *		'action' => 'index'
-	 * ));
+	 * $router->setDefaults(
+	 *     [
+	 *         "module" => "common",
+	 *         "action" => "index",
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function setDefaults(array! defaults) -> <RouterInterface>
@@ -300,11 +303,11 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	public function getDefaults() -> array
 	{
 		return [
-			"namespace": this->_defaultNamespace,
-			"module": this->_defaultModule,
+			"namespace":  this->_defaultNamespace,
+			"module":     this->_defaultModule,
 			"controller": this->_defaultController,
-			"action": this->_defaultAction,
-			"params": this->_defaultParams
+			"action":     this->_defaultAction,
+			"params":     this->_defaultParams
 		];
 	}
 
@@ -312,11 +315,11 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	 * Handles routing information received from the rewrite engine
 	 *
 	 *<code>
-	 * //Read the info from the rewrite engine
+	 * // Read the info from the rewrite engine
 	 * $router->handle();
 	 *
-	 * //Manually passing an URL
-	 * $router->handle('/posts/edit/1');
+	 * // Manually passing an URL
+	 * $router->handle("/posts/edit/1");
 	 *</code>
 	 */
 	public function handle(string uri = null)
@@ -330,7 +333,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 
 		if !uri {
 			/**
-			 * If 'uri' isn't passed as parameter it reads _GET['_url']
+			 * If 'uri' isn't passed as parameter it reads _GET["_url"]
 			 */
 			let realUri = this->getRewriteUri();
 		} else {
@@ -365,6 +368,8 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 		 * Routes are traversed in reversed order
 		 */
 		for route in reverse this->_routes {
+			let params = [],
+				matches = null;
 
 			/**
 			 * Look for HTTP method constraints
@@ -415,14 +420,14 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 				/**
 				 * Check if the current hostname is the same as the route
 				 */
-				if typeof currentHostName != "object" {
+				if typeof currentHostName == "null" {
 					let currentHostName = request->getHttpHost();
 				}
 
 				/**
 				 * No HTTP_HOST, maybe in CLI mode?
 				 */
-				if typeof currentHostName == "null" {
+				if !currentHostName {
 					continue;
 				}
 
@@ -431,7 +436,11 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 				 */
 				if memstr(hostname, "(") {
 					if !memstr(hostname, "#") {
-						let regexHostName = "#^" . hostname . "$#";
+						let regexHostName = "#^" . hostname;
+						if !memstr(hostname, ":") {
+							let regexHostName .= "(:[[:digit:]]+)?";
+						}
+						let regexHostName .= "$#i";
 					} else {
 						let regexHostName = hostname;
 					}
@@ -496,7 +505,8 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 				/**
 				 * Start from the default paths
 				 */
-				let paths = route->getPaths(), parts = paths;
+				let paths = route->getPaths(),
+					parts = paths;
 
 				/**
 				 * Check if the matches has variables
@@ -509,6 +519,14 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 					let converters = route->getConverters();
 
 					for part, position in paths {
+
+						if typeof part != "string" {
+							throw new Exception("Wrong key in paths: " . part);
+						}
+
+						if typeof position != "string" && typeof position != "integer" {
+							continue;
+						}
 
 						if fetch matchPosition, matches[position] {
 
@@ -534,6 +552,14 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 							if typeof converters == "array" {
 								if fetch converter, converters[part] {
 									let parts[part] = call_user_func_array(converter, [position]);
+								}
+							} else {
+
+								/**
+								 * Remove the path if the parameter was not matched
+								 */
+								if typeof position == "integer" {
+									unset parts[part];
 								}
 							}
 						}
@@ -653,9 +679,9 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	 *<code>
 	 * use Phalcon\Mvc\Router;
 	 *
-	 * $router->add('/about', 'About::index');
-	 * $router->add('/about', 'About::index', ['GET', 'POST']);
-	 * $router->add('/about', 'About::index', ['GET', 'POST'], Router::POSITION_FIRST);
+	 * $router->add("/about", "About::index");
+	 * $router->add("/about", "About::index", ["GET", "POST"]);
+	 * $router->add("/about", "About::index", ["GET", "POST"], Router::POSITION_FIRST);
 	 *</code>
 	 */
 	public function add(string! pattern, var paths = null, var httpMethods = null, var position = Router::POSITION_LAST) -> <RouteInterface>
@@ -738,6 +764,30 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	public function addHead(string! pattern, var paths = null, var position = Router::POSITION_LAST) -> <RouteInterface>
 	{
 		return this->add(pattern, paths, "HEAD", position);
+	}
+
+	/**
+	 * Adds a route to the router that only match if the HTTP method is PURGE (Squid and Varnish support)
+	 */
+	public function addPurge(string! pattern, var paths = null, var position = Router::POSITION_LAST) -> <RouteInterface>
+	{
+		return this->add(pattern, paths, "PURGE", position);
+	}
+
+	/**
+	 * Adds a route to the router that only match if the HTTP method is TRACE
+	 */
+	public function addTrace(string! pattern, var paths = null, var position = Router::POSITION_LAST) -> <RouteInterface>
+	{
+		return this->add(pattern, paths, "TRACE", position);
+	}
+
+	/**
+	 * Adds a route to the router that only match if the HTTP method is CONNECT
+	 */
+	public function addConnect(string! pattern, var paths = null, var position = Router::POSITION_LAST) -> <RouteInterface>
+	{
+		return this->add(pattern, paths, "CONNECT", position);
 	}
 
 	/**
@@ -844,7 +894,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	}
 
 	/**
-	 * Returns the route that matchs the handled URI
+	 * Returns the route that matches the handled URI
 	 */
 	public function getMatchedRoute() -> <RouteInterface>
 	{
@@ -860,7 +910,7 @@ class Router implements InjectionAwareInterface, RouterInterface, EventsAwareInt
 	}
 
 	/**
-	 * Checks if the router macthes any of the defined routes
+	 * Checks if the router matches any of the defined routes
 	 */
 	public function wasMatched() -> boolean
 	{

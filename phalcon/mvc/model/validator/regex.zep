@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,34 +22,42 @@ namespace Phalcon\Mvc\Model\Validator;
 use Phalcon\Mvc\EntityInterface;
 use Phalcon\Mvc\Model\Exception;
 use Phalcon\Mvc\Model\Validator;
-use Phalcon\Mvc\Model\ValidatorInterface;
 
 /**
  * Phalcon\Mvc\Model\Validator\Regex
  *
  * Allows validate if the value of a field matches a regular expression
  *
+ * This validator is only for use with Phalcon\Mvc\Collection. If you are using
+ * Phalcon\Mvc\Model, please use the validators provided by Phalcon\Validation.
+ *
  *<code>
- *use Phalcon\Mvc\Model\Validator\Regex as RegexValidator;
+ * use Phalcon\Mvc\Model\Validator\Regex as RegexValidator;
  *
- *class Subscriptors extends \Phalcon\Mvc\Model
- *{
+ * class Subscriptors extends \Phalcon\Mvc\Collection
+ * {
+ *     public function validation()
+ *     {
+ *         $this->validate(
+ *             new RegexValidator(
+ *                 [
+ *                     "field"   => "created_at",
+ *                     "pattern" => "/^[0-9]{4}[-\/](0[1-9]|1[12])[-\/](0[1-9]|[12][0-9]|3[01])/",
+ *                 ]
+ *             )
+ *         );
  *
- *  public function validation()
- *  {
- *      $this->validate(new RegexValidator(array(
- *          "field" => 'created_at',
- *          'pattern' => '/^[0-9]{4}[-\/](0[1-9]|1[12])[-\/](0[1-9]|[12][0-9]|3[01])/'
- *      )));
- *      if ($this->validationHasFailed() == true) {
- *          return false;
- *      }
- *  }
- *
- *}
+ *         if ($this->validationHasFailed() == true) {
+ *             return false;
+ *         }
+ *     }
+ * }
  *</code>
+ *
+ * @deprecated 3.1.0
+ * @see Phalcon\Validation\Validator\Regex
  */
-class Regex extends Validator implements ValidatorInterface
+class Regex extends Validator
 {
 	/**
 	 * Executes the validator

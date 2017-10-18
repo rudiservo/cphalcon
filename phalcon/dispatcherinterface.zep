@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,6 +31,11 @@ interface DispatcherInterface
 	 * Sets the default action suffix
 	 */
 	public function setActionSuffix(string actionSuffix);
+
+	/**
+	 * Gets the default action suffix
+	 */
+	public function getActionSuffix() -> string;
 
 	/**
 	 * Sets the default namespace
@@ -92,12 +97,20 @@ interface DispatcherInterface
 	public function getParam(param, filters = null);
 
 	/**
+	 * Check if a param exists
+	 *
+	 * @param  mixed param
+	 * @return boolean
+	 */
+	public function hasParam(param) -> boolean;
+
+	/**
 	 * Checks if the dispatch loop is finished or has more pendent controllers/tasks to dispatch
 	 */
 	public function isFinished() -> boolean;
 
 	/**
-	 * Returns value returned by the lastest dispatched action
+	 * Returns value returned by the latest dispatched action
 	 *
 	 * @return mixed
 	 */

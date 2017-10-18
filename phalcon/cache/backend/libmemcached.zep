@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,46 +20,52 @@
 namespace Phalcon\Cache\Backend;
 
 use Phalcon\Cache\Backend;
-use Phalcon\Cache\BackendInterface;
 use Phalcon\Cache\FrontendInterface;
 use Phalcon\Cache\Exception;
 
 /**
  * Phalcon\Cache\Backend\Libmemcached
  *
- * Allows to cache output fragments, PHP data or raw data to a libmemcached backend
- *
- * This adapter uses the special memcached key "_PHCM" to store all the keys internally used by the adapter
+ * Allows to cache output fragments, PHP data or raw data to a libmemcached backend.
+ * Per default persistent memcached connection pools are used.
  *
  *<code>
+ * use Phalcon\Cache\Backend\Libmemcached;
+ * use Phalcon\Cache\Frontend\Data as FrontData;
  *
  * // Cache data for 2 days
- * $frontCache = new \Phalcon\Cache\Frontend\Data(array(
- *    "lifetime" => 172800
- * ));
+ * $frontCache = new FrontData(
+ *     [
+ *         "lifetime" => 172800,
+ *     ]
+ * );
  *
- * //Create the Cache setting memcached connection options
- * $cache = new \Phalcon\Cache\Backend\Libmemcached($frontCache, array(
- *     "servers" => array(
- *         array('host' => 'localhost',
- *               'port' => 11211,
- *               'weight' => 1),
- *     ),
- *     "client" => array(
- *         Memcached::OPT_HASH => Memcached::HASH_MD5,
- *         Memcached::OPT_PREFIX_KEY => 'prefix.',
- *     )
- * ));
+ * // Create the Cache setting memcached connection options
+ * $cache = new Libmemcached(
+ *     $frontCache,
+ *     [
+ *         "servers" => [
+ *             [
+ *                 "host"   => "127.0.0.1",
+ *                 "port"   => 11211,
+ *                 "weight" => 1,
+ *             ],
+ *         ],
+ *         "client" => [
+ *             \Memcached::OPT_HASH       => \Memcached::HASH_MD5,
+ *             \Memcached::OPT_PREFIX_KEY => "prefix.",
+ *         ],
+ *     ]
+ * );
  *
- * //Cache arbitrary data
- * $cache->save('my-data', array(1, 2, 3, 4, 5));
+ * // Cache arbitrary data
+ * $cache->save("my-data", [1, 2, 3, 4, 5]);
  *
- * //Get data
- * $data = $cache->get('my-data');
- *
+ * // Get data
+ * $data = $cache->get("my-data");
  *</code>
  */
-class Libmemcached extends Backend implements BackendInterface
+class Libmemcached extends Backend
 {
 
 	protected _memcache = null;
@@ -84,7 +90,8 @@ class Libmemcached extends Backend implements BackendInterface
 		}
 
 		if !isset options["statsKey"] {
-			let options["statsKey"] = "_PHCM";
+			// Disable tracking of cached keys per default
+			let options["statsKey"] = "";
 		}
 
 		parent::__construct(frontend, options);
@@ -95,28 +102,43 @@ class Libmemcached extends Backend implements BackendInterface
 	 */
 	public function _connect()
 	{
-		var options, memcache, client, servers;
+		var options, memcache, client, servers, persistentId;
 
 		let options = this->_options;
-		let memcache = new \Memcached();
 
-		if !fetch servers, options["servers"] {
-			throw new Exception("Servers must be an array");
+		/* Enable persistent memcache connection per default */
+		if !fetch persistentId, options["persistent_id"] {
+			let persistentId = "phalcon_cache";
 		}
 
-		if typeof servers != "array" {
-			throw new Exception("Servers must be an array");
-		}
+		/* Get memcached pool connection */
+		let memcache = new \Memcached(persistentId);
 
-		if !memcache->addServers(servers) {
-			throw new Exception("Cannot connect to Memcached server");
-		}
+		/* Persistent memcached pools need to be reconnected if getServerList() is empty */
+		if empty memcache->getServerList() {
+			if !fetch servers, options["servers"] {
+				throw new Exception("Servers must be an array");
+			}
 
-		if fetch client, options["client"] {
+			if typeof servers != "array" {
+				throw new Exception("Servers must be an array");
+			}
+
+			if !fetch client, options["client"] {
+				let client = [];
+			}
+
 			if typeof client !== "array" {
 				throw new Exception("Client options must be instance of array");
 			}
-			memcache->setOptions(client);
+
+			if !memcache->setOptions(client) {
+				throw new Exception("Cannot set to Memcached options");
+			}
+
+			if !memcache->addServers(servers) {
+				throw new Exception("Cannot connect to Memcached server");
+			}
 		}
 
 		let this->_memcache = memcache;
@@ -124,12 +146,8 @@ class Libmemcached extends Backend implements BackendInterface
 
 	/**
 	 * Returns a cached content
-	 *
-	 * @param int|string keyName
-	 * @param   long lifetime
-	 * @return  mixed
 	 */
-	public function get(keyName, lifetime = null)
+	public function get(string keyName, int lifetime = null) -> var | null
 	{
 		var memcache, prefixedKey, cachedContent;
 
@@ -159,10 +177,10 @@ class Libmemcached extends Backend implements BackendInterface
 	 *
 	 * @param int|string keyName
 	 * @param string content
-	 * @param long lifetime
+	 * @param int lifetime
 	 * @param boolean stopBuffer
 	 */
-	public function save(keyName = null, content = null, lifetime = null, boolean stopBuffer = true)
+	public function save(keyName = null, content = null, lifetime = null, boolean stopBuffer = true) -> boolean
 	{
 		var lastKey, frontend, memcache, cachedContent, preparedContent, tmp, tt1, success, options,
 			specialKey, keys, isBuffering;
@@ -170,7 +188,8 @@ class Libmemcached extends Backend implements BackendInterface
 		if keyName === null {
 			let lastKey = this->_lastKey;
 		} else {
-			let lastKey = this->_prefix . keyName;
+			let lastKey = this->_prefix . keyName,
+				this->_lastKey = lastKey;
 		}
 
 		if !lastKey {
@@ -199,6 +218,8 @@ class Libmemcached extends Backend implements BackendInterface
 		 */
 		if !is_numeric(cachedContent) {
 			let preparedContent = frontend->beforeStore(cachedContent);
+		} else {
+			let preparedContent = cachedContent;
 		}
 
 		if lifetime === null {
@@ -213,11 +234,7 @@ class Libmemcached extends Backend implements BackendInterface
 			let tt1 = lifetime;
 		}
 
-		if is_numeric(cachedContent) {
-			let success = memcache->set(lastKey, cachedContent, tt1);
-		} else {
-			let success = memcache->set(lastKey, preparedContent, tt1);
-		}
+		let success = memcache->set(lastKey, preparedContent, tt1);
 
 		if !success {
 			throw new Exception("Failed storing data in memcached, error code: " . memcache->getResultCode());
@@ -255,6 +272,8 @@ class Libmemcached extends Backend implements BackendInterface
 		}
 
 		let this->_started = false;
+
+		return success;
 	}
 
 	/**
@@ -296,14 +315,18 @@ class Libmemcached extends Backend implements BackendInterface
 	}
 
 	/**
-	 * Query the existing cached keys
+	 * Query the existing cached keys.
 	 *
-	 * @param string prefix
-	 * @return array
+	 * <code>
+	 * $cache->save("users-ids", [1, 2, 3]);
+	 * $cache->save("projects-ids", [4, 5, 6]);
+	 *
+	 * var_dump($cache->queryKeys("users")); // ["users-ids"]
+	 * </code>
 	 */
-	public function queryKeys(prefix = null)
+	public function queryKeys(string prefix = null) -> array
 	{
-		var memcache, options, keys, specialKey, key;
+		var memcache, options, keys, specialKey, key, idx;
 
 		let memcache = this->_memcache;
 
@@ -319,19 +342,21 @@ class Libmemcached extends Backend implements BackendInterface
 		}
 
 		if specialKey == "" {
-			throw new Exception("Cached keys were disabled (options['statsKey'] == ''), you shouldn't use this function");
+			throw new Exception("Cached keys need to be enabled to use this function (options['statsKey'] == '_PHCM')!");
 		}
 
 		/**
 		 * Get the key from memcached
 		 */
 		let keys = memcache->get(specialKey);
-		if typeof keys == "array" {
-			let keys = array_keys(keys);
-			for key in keys {
-				if prefix && !starts_with(key, prefix) {
-					unset keys[key];
-				}
+		if unlikely typeof keys != "array" {
+			return [];
+		}
+
+		let keys = array_keys(keys);
+		for idx, key in keys {
+			if !empty prefix && !starts_with(key, prefix) {
+				unset keys[idx];
 			}
 		}
 
@@ -342,8 +367,7 @@ class Libmemcached extends Backend implements BackendInterface
 	 * Checks if cache exists and it isn't expired
 	 *
 	 * @param string keyName
-	 * @param   long lifetime
-	 * @return boolean
+	 * @param int lifetime
 	 */
 	public function exists(keyName = null, lifetime = null) -> boolean
 	{
@@ -374,11 +398,9 @@ class Libmemcached extends Backend implements BackendInterface
 	/**
 	 * Increment of given $keyName by $value
 	 *
-	 * @param  string keyName
-	 * @param  long lifetime
-	 * @return long
+	 * @param string keyName
 	 */
-	public function increment(keyName = null, value = null)
+	public function increment(keyName = null, int value = 1) -> int | boolean
 	{
 		var memcache, prefix, lastKey;
 
@@ -407,11 +429,9 @@ class Libmemcached extends Backend implements BackendInterface
 	/**
 	 * Decrement of $keyName by given $value
 	 *
-	 * @param  string keyName
-	 * @param  long value
-	 * @return long
+	 * @param string keyName
 	 */
-	public function decrement(keyName = null, value = null)
+	public function decrement(keyName = null, int value = 1) -> int | boolean
 	{
 		var memcache, prefix, lastKey;
 
@@ -430,15 +450,28 @@ class Libmemcached extends Backend implements BackendInterface
 			let this->_lastKey = lastKey;
 		}
 
-		if !value {
-			let value = 1;
-		}
-
 		return memcache->decrement(lastKey, value);
 	}
 
 	/**
 	 * Immediately invalidates all existing items.
+	 *
+	 * Memcached does not support flush() per default. If you require flush() support, set $config["statsKey"].
+     * All modified keys are stored in "statsKey". Note: statsKey has a negative performance impact.
+     *
+     *<code>
+     * $cache = new \Phalcon\Cache\Backend\Libmemcached(
+     *     $frontCache,
+     *     [
+     *         "statsKey" => "_PHCM",
+     *     ]
+     * );
+     *
+     * $cache->save("my-data", [1, 2, 3, 4, 5]);
+     *
+     * // 'my-data' and all other used keys are deleted
+     * $cache->flush();
+     *</code>
 	 */
 	public function flush() -> boolean
 	{
@@ -458,19 +491,22 @@ class Libmemcached extends Backend implements BackendInterface
 		}
 
 		if specialKey == "" {
-			throw new Exception("Cached keys were disabled (options['statsKey'] == ''), flush of memcached phalcon-related keys isn't implemented for now");
+			throw new Exception("Cached keys need to be enabled to use this function (options['statsKey'] == '_PHCM')!");
 		}
 
 		/**
 		 * Get the key from memcached
 		 */
 		let keys = memcache->get(specialKey);
-		if typeof keys == "array" {
-			for key in array_keys(keys) {
-				memcache->delete(key);
-			}
-			memcache->set(specialKey, keys);
+		if unlikely typeof keys != "array" {
+			return true;
 		}
+
+		for key, _ in keys {
+			memcache->delete(key);
+		}
+
+		memcache->delete(specialKey);
 
 		return true;
 	}

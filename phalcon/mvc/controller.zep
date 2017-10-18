@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,30 +31,32 @@ use Phalcon\Di\Injectable;
  * and passing that data on to the views for presentation.
  *
  *<code>
- *<?php
+ * <?php
  *
- *class PeopleController extends \Phalcon\Mvc\Controller
- *{
+ * class PeopleController extends \Phalcon\Mvc\Controller
+ * {
+ *     // This action will be executed by default
+ *     public function indexAction()
+ *     {
  *
- *  //This action will be executed by default
- *  public function indexAction()
- *  {
+ *     }
  *
- *  }
+ *     public function findAction()
+ *     {
  *
- *  public function findAction()
- *  {
+ *     }
  *
- *  }
- *
- *  public function saveAction()
- *  {
- *   //Forwards flow to the index action
- *   return $this->dispatcher->forward(array('controller' => 'people', 'action' => 'index'));
- *  }
- *
- *}
- *
+ *     public function saveAction()
+ *     {
+ *         // Forwards flow to the index action
+ *         return $this->dispatcher->forward(
+ *             [
+ *                 "controller" => "people",
+ *                 "action"     => "index",
+ *             ]
+ *         );
+ *     }
+ * }
  *</code>
  */
 abstract class Controller extends Injectable implements ControllerInterface

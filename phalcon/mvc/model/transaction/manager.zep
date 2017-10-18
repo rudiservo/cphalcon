@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -33,41 +33,43 @@ use Phalcon\Mvc\Model\TransactionInterface;
  * databases, the transaction will not protect interaction among them.
  *
  * This class manages the objects that compose a transaction.
- * A trasaction produces a unique connection that is passed to every
+ * A transaction produces a unique connection that is passed to every
  * object part of the transaction.
  *
  *<code>
- *try {
+ * try {
+ *    use Phalcon\Mvc\Model\Transaction\Manager as TransactionManager;
  *
- *  use Phalcon\Mvc\Model\Transaction\Manager as TransactionManager;
+ *    $transactionManager = new TransactionManager();
  *
- *  $transactionManager = new TransactionManager();
+ *    $transaction = $transactionManager->get();
  *
- *  $transaction = $transactionManager->get();
+ *    $robot = new Robots();
  *
- *  $robot = new Robots();
- *  $robot->setTransaction($transaction);
- *  $robot->name = 'WALL·E';
- *  $robot->created_at = date('Y-m-d');
- *  if($robot->save()==false){
- *    $transaction->rollback("Can't save robot");
- *  }
+ *    $robot->setTransaction($transaction);
  *
- *  $robotPart = new RobotParts();
- *  $robotPart->setTransaction($transaction);
- *  $robotPart->type = 'head';
- *  if($robotPart->save()==false){
- *    $transaction->rollback("Can't save robot part");
- *  }
+ *    $robot->name       = "WALL·E";
+ *    $robot->created_at = date("Y-m-d");
  *
- *  $transaction->commit();
+ *    if ($robot->save() === false){
+ *        $transaction->rollback("Can't save robot");
+ *    }
  *
+ *    $robotPart = new RobotParts();
+ *
+ *    $robotPart->setTransaction($transaction);
+ *
+ *    $robotPart->type = "head";
+ *
+ *    if ($robotPart->save() === false) {
+ *        $transaction->rollback("Can't save robot part");
+ *    }
+ *
+ *    $transaction->commit();
  *} catch (Phalcon\Mvc\Model\Transaction\Failed $e) {
- *  echo 'Failed, reason: ', $e->getMessage();
+ *    echo "Failed, reason: ", $e->getMessage();
  *}
- *
  *</code>
- *
  */
 class Manager implements ManagerInterface, InjectionAwareInterface
 {
@@ -89,12 +91,11 @@ class Manager implements ManagerInterface, InjectionAwareInterface
 	 */
 	public function __construct(<DiInterface> dependencyInjector = null)
 	{
-		if dependencyInjector {
-			let this->_dependencyInjector = dependencyInjector;
-		} else {
-			let dependencyInjector = \Phalcon\Di::getDefault(),
-				this->_dependencyInjector = dependencyInjector;
+		if !dependencyInjector {
+			let dependencyInjector = \Phalcon\Di::getDefault();
 		}
+
+		let this->_dependencyInjector = dependencyInjector;
 
 		if typeof dependencyInjector != "object" {
 			throw new Exception("A dependency injector container is required to obtain the services related to the ORM");
@@ -217,7 +218,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface
 	}
 
 	/**
-	 * Commmits active transactions within the manager
+	 * Commits active transactions within the manager
 	 */
 	public function commit()
 	{
@@ -267,7 +268,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface
 	}
 
 	/**
-	 * Notifies the manager about a commited transaction
+	 * Notifies the manager about a committed transaction
 	 */
 	public function notifyCommit(<TransactionInterface> transaction)
 	{
@@ -285,9 +286,11 @@ class Manager implements ManagerInterface, InjectionAwareInterface
 		if count(transactions) {
 			let newTransactions = [];
 			for managedTransaction in transactions {
-				if managedTransaction == transaction {
-					let newTransactions[] = transaction,
-						this->_number--;
+				if managedTransaction != transaction {
+					let newTransactions[] = transaction;
+				}
+				else {
+					let this->_number--;
 				}
 			}
 			let this->_transactions = newTransactions;

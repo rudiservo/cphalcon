@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -23,6 +23,7 @@ use Phalcon\Di\Injectable;
 use Phalcon\Mvc\View\Exception;
 use Phalcon\Mvc\ViewBaseInterface;
 use Phalcon\Cache\BackendInterface;
+use Phalcon\Mvc\View\EngineInterface;
 use Phalcon\Mvc\View\Engine\Php as PhpEngine;
 
 /**
@@ -31,10 +32,25 @@ use Phalcon\Mvc\View\Engine\Php as PhpEngine;
  * This component allows to render views without hierarchical levels
  *
  *<code>
- * $view = new \Phalcon\Mvc\View\Simple();
- * echo $view->render('templates/my-view', array('content' => $html));
- * //or with filename with extension
- * echo $view->render('templates/my-view.volt', array('content' => $html));
+ * use Phalcon\Mvc\View\Simple as View;
+ *
+ * $view = new View();
+ *
+ * // Render a view
+ * echo $view->render(
+ *     "templates/my-view",
+ *     [
+ *         "some" => $param,
+ *     ]
+ * );
+ *
+ * // Or with filename with extension
+ * echo $view->render(
+ *     "templates/my-view.volt",
+ *     [
+ *         "parameter" => $here,
+ *     ]
+ * );
  *</code>
  */
 class Simple extends Injectable implements ViewBaseInterface
@@ -48,8 +64,14 @@ class Simple extends Injectable implements ViewBaseInterface
 
 	protected _viewParams;
 
+	/**
+	 * @var \Phalcon\Mvc\View\EngineInterface[]|false
+	 */
 	protected _engines = false;
 
+	/**
+	 * @var array|null
+	 */
 	protected _registeredEngines { get };
 
 	protected _activeRenderPath;
@@ -62,14 +84,10 @@ class Simple extends Injectable implements ViewBaseInterface
 
 	/**
 	 * Phalcon\Mvc\View\Simple constructor
-	 *
-	 * @param array options
 	 */
-	public function __construct(options = null)
+	public function __construct(array options = [])
 	{
-		if typeof options == "array" {
-			let this->_options = options;
-		}
+		let this->_options = options;
 	}
 
 	/**
@@ -92,11 +110,13 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Register templating engines
 	 *
 	 *<code>
-	 *$this->view->registerEngines(array(
-	 *  ".phtml" => "Phalcon\Mvc\View\Engine\Php",
-	 *  ".volt" => "Phalcon\Mvc\View\Engine\Volt",
-	 *  ".mhtml" => "MyCustomEngine"
-	 *));
+	 * $this->view->registerEngines(
+	 *     [
+	 *         ".phtml" => "Phalcon\\Mvc\\View\\Engine\\Php",
+	 *         ".volt"  => "Phalcon\\Mvc\\View\\Engine\\Volt",
+	 *         ".mhtml" => "MyCustomEngine",
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function registerEngines(array! engines)
@@ -203,7 +223,8 @@ class Simple extends Injectable implements ViewBaseInterface
 			}
 		}
 
-		let notExists = true, mustClean = true;
+		let notExists = true,
+			mustClean = true;
 
 		let viewsDirPath =  this->_viewsDir . path;
 
@@ -234,7 +255,7 @@ class Simple extends Injectable implements ViewBaseInterface
 			if viewEnginePath {
 
 				/**
-				 * Call beforeRenderView if there is a events manager available
+				 * Call beforeRenderView if there is an events manager available
 				 */
 				if typeof eventsManager == "object" {
 					if eventsManager->fire("view:beforeRenderView", this, viewEnginePath) === false {
@@ -245,7 +266,7 @@ class Simple extends Injectable implements ViewBaseInterface
 				engine->render(viewEnginePath, params, mustClean);
 
 				/**
-				 * Call afterRenderView if there is a events manager available
+				 * Call afterRenderView if there is an events manager available
 				 */
 				let notExists = false;
 				if typeof eventsManager == "object" {
@@ -276,9 +297,8 @@ class Simple extends Injectable implements ViewBaseInterface
 	 *
 	 * @param  string path
 	 * @param  array  params
-	 * @return string
 	 */
-	public function render(string! path, params = null)
+	public function render(string! path, params = null) -> string
 	{
 		var cache, key, lifetime, cacheOptions, content, viewParams, mergedParams;
 
@@ -355,12 +375,8 @@ class Simple extends Injectable implements ViewBaseInterface
 		 * Store the data in output into the cache
 		 */
 		if typeof cache == "object" {
-			if cache->isStarted() === true {
-				if cache->isFresh() === true {
-					cache->save();
-				} else {
-					cache->stop();
-				}
+			if cache->isStarted() && cache->isFresh() {
+				cache->save();
 			} else {
 				cache->stop();
 			}
@@ -375,17 +391,19 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Renders a partial view
 	 *
 	 * <code>
-	 * 	//Show a partial inside another view
-	 * 	$this->partial('shared/footer');
+	 * // Show a partial inside another view
+	 * $this->partial("shared/footer");
 	 * </code>
 	 *
 	 * <code>
-	 * 	//Show a partial inside another view with parameters
-	 * 	$this->partial('shared/footer', array('content' => $html));
+	 * // Show a partial inside another view with parameters
+	 * $this->partial(
+	 *     "shared/footer",
+	 *     [
+	 *         "content" => $html,
+	 *     ]
+	 * );
 	 * </code>
-	 *
-	 * @param string partialPath
-	 * @param array  params
 	 */
 	public function partial(string! partialPath, var params = null)
 	{
@@ -446,11 +464,8 @@ class Simple extends Injectable implements ViewBaseInterface
 
 	/**
 	 * Sets the cache options
-	 *
-	 * @param  array options
-	 * @return \Phalcon\Mvc\View\Simple
 	 */
-	public function setCacheOptions(options) -> <Simple>
+	public function setCacheOptions(array options) -> <Simple>
 	{
 		let this->_cacheOptions = options;
 		return this;
@@ -503,28 +518,30 @@ class Simple extends Injectable implements ViewBaseInterface
 	 */
 	public function getCache() -> <BackendInterface>
 	{
-		var cache;
-
-		let cache = this->_cache;
-		if cache {
-			if typeof cache != "object" {
-				let cache = this->_createCache(), this->_cache = cache;
-			}
+		if this->_cache && typeof this->_cache != "object" {
+			let this->_cache = this->_createCache();
 		}
-		return cache;
+
+		return this->_cache;
 	}
 
 	/**
 	 * Cache the actual view render to certain level
 	 *
 	 *<code>
-	 *  $this->view->cache(array('key' => 'my-key', 'lifetime' => 86400));
+	 * $this->view->cache(
+	 *     [
+	 *         "key"      => "my-key",
+	 *         "lifetime" => 86400,
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function cache(var options = true) -> <Simple>
 	{
 		if typeof options == "array" {
-			let this->_cache = true, this->_cacheOptions = options;
+			let this->_cache = true,
+				this->_cacheOptions = options;
 		} else {
 			if options {
 				let this->_cache = true;
@@ -539,7 +556,7 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Adds parameters to views (alias of setVar)
 	 *
 	 *<code>
-	 *	$this->view->setParamToView('products', $products);
+	 * $this->view->setParamToView("products", $products);
 	 *</code>
 	 */
 	public function setParamToView(string! key, var value) -> <Simple>
@@ -552,21 +569,17 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Set all the render params
 	 *
 	 *<code>
-	 *	$this->view->setVars(array('products' => $products));
+	 * $this->view->setVars(
+	 *     [
+	 *         "products" => $products,
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function setVars(array! params, boolean merge = true) -> <Simple>
 	{
-		var viewParams, mergedParams;
-
-		if merge {
-			let viewParams = this->_viewParams;
-			if typeof viewParams == "array" {
-				let mergedParams = array_merge(viewParams, params);
-			} else {
-				let mergedParams = params;
-			}
-			let this->_viewParams = mergedParams;
+		if merge && typeof this->_viewParams == "array" {
+			let this->_viewParams = array_merge(this->_viewParams, params);
 		} else {
 			let this->_viewParams = params;
 		}
@@ -578,10 +591,10 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Set a single view parameter
 	 *
 	 *<code>
-	 *	$this->view->setVar('products', $products);
+	 * $this->view->setVar("products", $products);
 	 *</code>
 	 */
-	public function setVar(string! key, value) -> <Simple>
+	public function setVar(string! key, var value) -> <Simple>
 	{
 		let this->_viewParams[key] = value;
 		return this;
@@ -589,11 +602,8 @@ class Simple extends Injectable implements ViewBaseInterface
 
 	/**
 	 * Returns a parameter previously set in the view
-	 *
-	 * @param string key
-	 * @return mixed
 	 */
-	public function getVar(string! key)
+	public function getVar(string! key) -> var | null
 	{
 		var	value;
 		if fetch value, this->_viewParams[key] {
@@ -616,7 +626,7 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Externally sets the view content
 	 *
 	 *<code>
-	 *	$this->view->setContent("<h1>hello</h1>");
+	 * $this->view->setContent("<h1>hello</h1>");
 	 *</code>
 	 */
 	public function setContent(string! content) -> <Simple>
@@ -647,7 +657,7 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Magic method to pass variables to the views
 	 *
 	 *<code>
-	 *	$this->view->products = $products;
+	 * $this->view->products = $products;
 	 *</code>
 	 */
 	public function __set(string! key, var value)
@@ -659,18 +669,16 @@ class Simple extends Injectable implements ViewBaseInterface
 	 * Magic method to retrieve a variable passed to the view
 	 *
 	 *<code>
-	 *	echo $this->view->products;
+	 * echo $this->view->products;
 	 *</code>
-	 *
-	 * @param string key
-	 * @return mixed
 	 */
-	public function __get(string! key)
+	public function __get(string! key) -> var | null
 	{
 		var value;
 		if fetch value, this->_viewParams[key] {
 			return value;
 		}
+
 		return null;
 	}
 }

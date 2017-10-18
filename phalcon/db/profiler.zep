@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -26,33 +26,53 @@ use Phalcon\Db\Profiler\Item;
  *
  * Instances of Phalcon\Db can generate execution profiles
  * on SQL statements sent to the relational database. Profiled
- * information includes execution time in miliseconds.
+ * information includes execution time in milliseconds.
  * This helps you to identify bottlenecks in your applications.
  *
- *<code>
+ * <code>
+ * use Phalcon\Db\Profiler;
+ * use Phalcon\Events\Event;
+ * use Phalcon\Events\Manager;
  *
- *	$profiler = new \Phalcon\Db\Profiler();
+ * $profiler = new Profiler();
+ * $eventsManager = new Manager();
  *
- *	//Set the connection profiler
- *	$connection->setProfiler($profiler);
+ * $eventsManager->attach(
+ *     "db",
+ *     function (Event $event, $connection) use ($profiler) {
+ *         if ($event->getType() === "beforeQuery") {
+ *             $sql = $connection->getSQLStatement();
  *
- *	$sql = "SELECT buyer_name, quantity, product_name
- *	FROM buyers LEFT JOIN products ON
- *	buyers.pid=products.id";
+ *             // Start a profile with the active connection
+ *             $profiler->startProfile($sql);
+ *         }
  *
- *	//Execute a SQL statement
- *	$connection->query($sql);
+ *         if ($event->getType() === "afterQuery") {
+ *             // Stop the active profile
+ *             $profiler->stopProfile();
+ *         }
+ *     }
+ * );
  *
- *	//Get the last profile in the profiler
- *	$profile = $profiler->getLastProfile();
+ * // Set the event manager on the connection
+ * $connection->setEventsManager($eventsManager);
  *
- *	echo "SQL Statement: ", $profile->getSQLStatement(), "\n";
- *	echo "Start Time: ", $profile->getInitialTime(), "\n";
- *	echo "Final Time: ", $profile->getFinalTime(), "\n";
- *	echo "Total Elapsed Time: ", $profile->getTotalElapsedSeconds(), "\n";
  *
- *</code>
+ * $sql = "SELECT buyer_name, quantity, product_name
+ * FROM buyers LEFT JOIN products ON
+ * buyers.pid=products.id";
  *
+ * // Execute a SQL statement
+ * $connection->query($sql);
+ *
+ * // Get the last profile in the profiler
+ * $profile = $profiler->getLastProfile();
+ *
+ * echo "SQL Statement: ", $profile->getSQLStatement(), "\n";
+ * echo "Start Time: ", $profile->getInitialTime(), "\n";
+ * echo "Final Time: ", $profile->getFinalTime(), "\n";
+ * echo "Total Elapsed Time: ", $profile->getTotalElapsedSeconds(), "\n";
+ * </code>
  */
 class Profiler
 {

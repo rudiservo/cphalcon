@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -27,9 +27,9 @@ use Phalcon\Mvc\Model\MetaData;
 use Phalcon\Mvc\Model\MetaData\StrategyInterface;
 
 /**
- * Phalcon\Mvc\Model\MetaData\Strategy\Instrospection
+ * Phalcon\Mvc\Model\MetaData\Strategy\Introspection
  *
- * Queries the table meta-data in order to instrospect the model's metadata
+ * Queries the table meta-data in order to introspect the model's metadata
  */
 class Introspection implements StrategyInterface
 {
@@ -48,7 +48,7 @@ class Introspection implements StrategyInterface
 			table     = model->getSource();
 
 		/**
-		 * Check if the mapped table exists on the database</comment>
+		 * Check if the mapped table exists on the database
 		 */
 		let readConnection = model->getReadConnection();
 
@@ -63,7 +63,9 @@ class Introspection implements StrategyInterface
 			/**
 			 * The table not exists
 			 */
-			throw new Exception("Table '" . completeTable . "' doesn't exist in database when dumping meta-data for " . get_class(model));
+			throw new Exception(
+				"Table '" . completeTable . "' doesn't exist in database when dumping meta-data for " . get_class(model)
+			);
 		}
 
 		/**
@@ -81,7 +83,9 @@ class Introspection implements StrategyInterface
 			/**
 			 * The table not exists
 			 */
-			throw new Exception("Cannot obtain table columns for the mapped source '" . completeTable . "' used in model " . get_class(model));
+			throw new Exception(
+				"Cannot obtain table columns for the mapped source '" . completeTable . "' used in model " . get_class(model)
+			);
 		}
 
 		/**

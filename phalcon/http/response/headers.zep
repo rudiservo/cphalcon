@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -69,7 +69,7 @@ class Headers implements HeadersInterface
 		var headers;
 
 		let headers = this->_headers;
-		unset(headers[header]);
+		unset headers[header];
 		let this->_headers = headers;
 	}
 
@@ -81,10 +81,14 @@ class Headers implements HeadersInterface
 		var header, value;
 		if !headers_sent() {
 			for header, value in this->_headers {
-				if !empty value {
+				if value !== null {
 					header(header . ": " . value, true);
 				} else {
-					header(header, true);
+					if memstr(header, ":") || substr(header, 0, 5) == "HTTP/" {
+						header(header, true);
+					} else {
+						header(header . ": ", true);
+					}
 				}
 			}
 			return true;

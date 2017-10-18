@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,6 +20,7 @@
 namespace Phalcon\Mvc\Model\Query;
 
 use Phalcon\Mvc\ModelInterface;
+use Phalcon\Mvc\Model\MessageInterface;
 
 /**
  * Phalcon\Mvc\Model\Query\StatusInterface
@@ -28,25 +29,18 @@ use Phalcon\Mvc\ModelInterface;
  */
 interface StatusInterface
 {
-
-	/**
-	 * Phalcon\Mvc\Model\Query\Status
-	 */
-	public function __construct(boolean success, <ModelInterface> model);
-
 	/**
 	 * Returns the model which executed the action
 	 */
 	public function getModel() -> <ModelInterface>;
 
 	/**
-	 * Returns the messages produced by a operation failed
+	 * Returns the messages produced by an operation failed
 	 */
-	public function getMessages() -> <\Phalcon\Mvc\Model\MessageInterface[]>;
+	public function getMessages() -> <MessageInterface[]>;
 
 	/**
 	 * Allows to check if the executed operation was successful
 	 */
 	public function success() -> boolean;
-
 }

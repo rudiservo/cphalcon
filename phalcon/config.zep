@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -29,25 +29,30 @@ use Phalcon\Config\Exception;
  * application code.
  *
  *<code>
- *	$config = new \Phalcon\Config(array(
- *		"database" => array(
- *			"adapter" => "Mysql",
- *			"host" => "localhost",
- *			"username" => "scott",
- *			"password" => "cheetah",
- *			"dbname" => "test_db"
- *		),
- *		"phalcon" => array(
- *			"controllersDir" => "../app/controllers/",
- *			"modelsDir" => "../app/models/",
- *			"viewsDir" => "../app/views/"
- *		)
- * ));
+ * $config = new \Phalcon\Config(
+ *     [
+ *         "database" => [
+ *             "adapter"  => "Mysql",
+ *             "host"     => "localhost",
+ *             "username" => "scott",
+ *             "password" => "cheetah",
+ *             "dbname"   => "test_db",
+ *         ],
+ *         "phalcon" => [
+ *             "controllersDir" => "../app/controllers/",
+ *             "modelsDir"      => "../app/models/",
+ *             "viewsDir"       => "../app/views/",
+ *         ],
+ *     ]
+ * );
  *</code>
- *
  */
 class Config implements \ArrayAccess, \Countable
 {
+
+	protected static _pathDelimiter;
+
+	const DEFAULT_PATH_DELIMITER = ".";
 
 	/**
 	 * Phalcon\Config constructor
@@ -65,7 +70,9 @@ class Config implements \ArrayAccess, \Countable
 	 * Allows to check whether an attribute is defined using the array-syntax
 	 *
 	 *<code>
-	 * var_dump(isset($config['database']));
+	 * var_dump(
+	 *     isset($config["database"])
+	 * );
 	 *</code>
 	 */
 	public function offsetExists(var index) -> boolean
@@ -76,11 +83,54 @@ class Config implements \ArrayAccess, \Countable
 	}
 
 	/**
+	 * Returns a value from current config using a dot separated path.
+	 *
+	 *<code>
+	 * echo $config->path("unknown.path", "default", ".");
+	 *</code>
+	 */
+	public function path(string! path, var defaultValue = null, var delimiter = null) -> var
+	{
+		var key, keys, config;
+
+		if isset this->{path} {
+			return this->{path};
+		}
+
+		if empty delimiter {
+			let delimiter = self::getPathDelimiter();
+		}
+
+		let config = this,
+			keys = explode(delimiter, path);
+
+		while !empty keys {
+			let key = array_shift(keys);
+
+			if !isset config->{key} {
+				break;
+			}
+
+			if empty keys {
+				return config->{key};
+			}
+
+			let config = config->{key};
+
+			if empty config {
+				break;
+			}
+		}
+
+		return defaultValue;
+	}
+
+	/**
 	 * Gets an attribute from the configuration, if the attribute isn't defined returns null
 	 * If the value is exactly null or is not defined the default value will be used instead
 	 *
 	 *<code>
-	 * echo $config->get('controllersDir', '../app/controllers/');
+	 * echo $config->get("controllersDir", "../app/controllers/");
 	 *</code>
 	 */
 	public function get(var index, var defaultValue = null) -> var
@@ -98,7 +148,9 @@ class Config implements \ArrayAccess, \Countable
 	 * Gets an attribute using the array-syntax
 	 *
 	 *<code>
-	 * print_r($config['database']);
+	 * print_r(
+	 *     $config["database"]
+	 * );
 	 *</code>
 	 */
 	public function offsetGet(var index) -> string
@@ -112,7 +164,9 @@ class Config implements \ArrayAccess, \Countable
 	 * Sets an attribute using the array-syntax
 	 *
 	 *<code>
-	 * $config['database'] = array('type' => 'Sqlite');
+	 * $config["database"] = [
+	 *     "type" => "Sqlite",
+	 * ];
 	 *</code>
 	 */
 	public function offsetSet(var index, var value)
@@ -130,7 +184,7 @@ class Config implements \ArrayAccess, \Countable
 	 * Unsets an attribute using the array-syntax
 	 *
 	 *<code>
-	 * unset($config['database']);
+	 * unset($config["database"]);
 	 *</code>
 	 */
 	public function offsetUnset(var index)
@@ -145,8 +199,15 @@ class Config implements \ArrayAccess, \Countable
 	 * Merges a configuration into the current one
 	 *
 	 *<code>
-	 * $appConfig = new \Phalcon\Config(array('database' => array('host' => 'localhost')));
-	 * $globalConfig->merge($config2);
+	 * $appConfig = new \Phalcon\Config(
+	 *     [
+	 *         "database" => [
+	 *             "host" => "localhost",
+	 *         ],
+	 *     ]
+	 * );
+	 *
+	 * $globalConfig->merge($appConfig);
 	 *</code>
 	 */
 	public function merge(<Config> config) -> <Config>
@@ -158,7 +219,9 @@ class Config implements \ArrayAccess, \Countable
 	 * Converts recursively the object to an array
 	 *
 	 *<code>
-	 *	print_r($config->toArray());
+	 * print_r(
+	 *     $config->toArray()
+	 * );
 	 *</code>
 	 */
 	public function toArray() -> array
@@ -207,6 +270,29 @@ class Config implements \ArrayAccess, \Countable
 	}
 
 	/**
+	 * Sets the default path delimiter
+	 */
+	public static function setPathDelimiter(string! delimiter = null) -> void
+	{
+		let self::_pathDelimiter = delimiter;
+	}
+
+	/**
+	 * Gets the default path delimiter
+	 */
+	public static function getPathDelimiter() -> string
+	{
+		var delimiter;
+
+		let delimiter = self::_pathDelimiter;
+		if !delimiter {
+			let delimiter = self::DEFAULT_PATH_DELIMITER;
+		}
+
+		return delimiter;
+	}
+
+	/**
 	 * Helper method for merge configs (forwarding nested config instance)
 	 *
 	 * @param Config config
@@ -216,7 +302,7 @@ class Config implements \ArrayAccess, \Countable
 	 */
 	protected final function _merge(<Config> config, var instance = null) -> <Config>
 	{
-		var key, value, number, localObject;
+		var key, value, number, localObject, property;
 
 		if typeof instance !== "object" {
 			let instance = this;
@@ -226,7 +312,8 @@ class Config implements \ArrayAccess, \Countable
 
 		for key, value in get_object_vars(config) {
 
-			if fetch localObject, instance->{key} {
+			let property = strval(key);
+			if fetch localObject, instance->{property} {
 				if typeof localObject === "object" && typeof value === "object" {
 					if localObject instanceof Config && value instanceof Config {
 						this->_merge(value, localObject);
@@ -235,7 +322,7 @@ class Config implements \ArrayAccess, \Countable
 				}
 			}
 
-			if typeof key == "integer" {
+			if is_numeric(key) {
 				let key = strval(number),
 					number++;
 			}

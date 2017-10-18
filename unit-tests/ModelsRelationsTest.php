@@ -7,7 +7,7 @@
   | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
   +------------------------------------------------------------------------+
   | This source file is subject to the New BSD License that is bundled     |
-  | with this package in the file docs/LICENSE.txt.                        |
+  | with this package in the file LICENSE.txt.                             |
   |                                                                        |
   | If you did not receive a copy of the license and are unable to         |
   | obtain it through the world-wide-web, please send an email             |
@@ -150,6 +150,9 @@ class ModelsRelationsTest extends PHPUnit_Framework_TestCase
 		$parts = $robot->getRelationsParts();
 		$this->assertEquals(get_class($parts), 'Phalcon\Mvc\Model\Resultset\Simple');
 		$this->assertEquals(count($parts), 3);
+
+		$partsCount = $robot->countRelationsParts();
+		$this->assertEquals(3, $partsCount);
 
 		/** Passing parameters to magic methods **/
 		$robotsParts = $robot->getRelationsRobotsParts("parts_id = 1");
@@ -379,11 +382,13 @@ class ModelsRelationsTest extends PHPUnit_Framework_TestCase
 
 		$robotsParts = $robot->getRelationsRobotsParts();
 		$this->assertEquals($robot->getDirtyState(), $robot::DIRTY_STATE_PERSISTENT);
+		$this->assertInstanceOf('RelationsRobotsParts', $robotsParts->getFirst());
 
 		$robot = RelationsRobots::findFirst();
 		$this->assertNotEquals($robot, false);
 
 		$robotsParts = $robot->relationsRobotsParts;
 		$this->assertEquals($robot->getDirtyState(), $robot::DIRTY_STATE_PERSISTENT);
+		$this->assertInstanceOf('RelationsRobotsParts', $robotsParts->getFirst());
 	}
 }

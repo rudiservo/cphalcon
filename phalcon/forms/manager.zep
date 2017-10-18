@@ -2,10 +2,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,15 +31,10 @@ class Manager
 	 *
 	 * @param string name
 	 * @param object entity
-	 * @return \Phalcon\Forms\Form
 	 */
-	public function create(name = null, entity = null) -> <Form>
+	public function create(string name, entity = null) -> <Form>
 	{
 		var form;
-
-		if typeof name != "string" {
-			throw new Exception("The form name must be string");
-		}
 
 		let form = new Form(entity),
 			this->_forms[name] = form;

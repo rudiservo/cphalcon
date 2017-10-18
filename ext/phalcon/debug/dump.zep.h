@@ -14,6 +14,7 @@ PHP_METHOD(Phalcon_Debug_Dump, output);
 PHP_METHOD(Phalcon_Debug_Dump, variable);
 PHP_METHOD(Phalcon_Debug_Dump, variables);
 PHP_METHOD(Phalcon_Debug_Dump, toJson);
+zend_object_value zephir_init_properties_Phalcon_Debug_Dump(zend_class_entry *class_type TSRMLS_DC);
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_debug_dump_setdetailed, 0, 0, 1)
 	ZEND_ARG_INFO(0, detailed)
@@ -29,7 +30,7 @@ ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_debug_dump_getstyle, 0, 0, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_debug_dump_setstyles, 0, 0, 0)
-	ZEND_ARG_INFO(0, styles)
+	ZEND_ARG_ARRAY_INFO(0, styles, 1)
 ZEND_END_ARG_INFO()
 
 ZEND_BEGIN_ARG_INFO_EX(arginfo_phalcon_debug_dump_one, 0, 0, 1)

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -32,7 +32,7 @@ use Phalcon\Db\DialectInterface;
  *
  * Generates database specific SQL for the MySQL RDBMS
  */
-class MySQL extends Dialect
+class Mysql extends Dialect
 {
 
 	protected _escapeChar = "`";
@@ -348,7 +348,11 @@ class MySQL extends Dialect
 	{
 		var sql, onDelete, onUpdate;
 
-		let sql = "ALTER TABLE " . this->prepareTable(tableName, schemaName) . " ADD FOREIGN KEY `" . reference->getName() . "`(" . this->getColumnList(reference->getColumns()) . ") REFERENCES " . this->prepareTable(reference->getReferencedTable(), reference->getReferencedSchema()) . "(" . this->getColumnList(reference->getReferencedColumns()) . ")";
+		let sql = "ALTER TABLE " . this->prepareTable(tableName, schemaName) . " ADD";
+		if reference->getName() {
+			let sql .= " CONSTRAINT `" . $reference->getName() . "`";
+		}
+		let sql .= " FOREIGN KEY (" . this->getColumnList(reference->getColumns()) . ") REFERENCES " . this->prepareTable(reference->getReferencedTable(), reference->getReferencedSchema()) . "(" . this->getColumnList(reference->getReferencedColumns()) . ")";
 
 		let onDelete = reference->getOnDelete();
 		if !empty onDelete {
@@ -500,6 +504,24 @@ class MySQL extends Dialect
 	}
 
 	/**
+	 * Generates SQL to truncate a table
+	 */
+	public function truncateTable(string! tableName, string! schemaName) -> string
+	{
+		var sql, table;
+
+		if schemaName {
+			let table = "`" . schemaName . "`.`" . tableName . "`";
+		} else {
+			let table = "`" . tableName . "`";
+		}
+
+		let sql = "TRUNCATE TABLE " . table;
+
+		return sql;
+	}
+
+	/**
 	 * Generates SQL to drop a table
 	 */
 	public function dropTable(string! tableName, string schemaName = null, boolean! ifExists = true) -> string
@@ -553,8 +575,9 @@ class MySQL extends Dialect
 	 * Generates SQL checking for the existence of a schema.table
 	 *
 	 * <code>
-	 *    echo $dialect->tableExists("posts", "blog");
-	 *    echo $dialect->tableExists("posts");
+	 * echo $dialect->tableExists("posts", "blog");
+	 *
+	 * echo $dialect->tableExists("posts");
 	 * </code>
 	 */
 	public function tableExists(string! tableName, string schemaName = null) -> string
@@ -573,14 +596,16 @@ class MySQL extends Dialect
 		if schemaName {
 			return "SELECT IF(COUNT(*) > 0, 1, 0) FROM `INFORMATION_SCHEMA`.`VIEWS` WHERE `TABLE_NAME`= '" . viewName . "' AND `TABLE_SCHEMA`='" . schemaName . "'";
 		}
-		return "SELECT IF(COUNT(*) > 0, 1, 0) FROM `INFORMATION_SCHEMA`.`VIEWS` WHERE `TABLE_NAME`='" . viewName . "'";
+		return "SELECT IF(COUNT(*) > 0, 1, 0) FROM `INFORMATION_SCHEMA`.`VIEWS` WHERE `TABLE_NAME`='" . viewName . "' AND `TABLE_SCHEMA` = DATABASE()";
 	}
 
 	/**
 	 * Generates SQL describing a table
 	 *
 	 * <code>
-	 *    print_r($dialect->describeColumns("posts"));
+	 * print_r(
+	 *     $dialect->describeColumns("posts")
+	 * );
 	 * </code>
 	 */
 	public function describeColumns(string! table, string schema = null) -> string
@@ -592,7 +617,9 @@ class MySQL extends Dialect
 	 * List all tables in database
 	 *
 	 * <code>
-	 *     print_r($dialect->listTables("blog"))
+	 * print_r(
+	 *     $dialect->listTables("blog")
+	 * );
 	 * </code>
 	 */
 	public function listTables(string schemaName = null) -> string
@@ -611,7 +638,7 @@ class MySQL extends Dialect
 		if schemaName {
 			return "SELECT `TABLE_NAME` AS view_name FROM `INFORMATION_SCHEMA`.`VIEWS` WHERE `TABLE_SCHEMA` = '" . schemaName . "' ORDER BY view_name";
 		}
-		return "SELECT `TABLE_NAME` AS view_name FROM `INFORMATION_SCHEMA`.`VIEWS` ORDER BY view_name";
+		return "SELECT `TABLE_NAME` AS view_name FROM `INFORMATION_SCHEMA`.`VIEWS` WHERE `TABLE_SCHEMA` = DATABASE() ORDER BY view_name";
 	}
 
 	/**
@@ -627,11 +654,11 @@ class MySQL extends Dialect
 	 */
 	public function describeReferences(string! table, string schema = null) -> string
 	{
-		var sql = "SELECT TABLE_NAME,COLUMN_NAME,CONSTRAINT_NAME,REFERENCED_TABLE_SCHEMA,REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE REFERENCED_TABLE_NAME IS NOT NULL AND ";
+		var sql = "SELECT DISTINCT KCU.TABLE_NAME, KCU.COLUMN_NAME, KCU.CONSTRAINT_NAME, KCU.REFERENCED_TABLE_SCHEMA, KCU.REFERENCED_TABLE_NAME, KCU.REFERENCED_COLUMN_NAME, RC.UPDATE_RULE, RC.DELETE_RULE FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE AS KCU LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS AS RC ON RC.CONSTRAINT_NAME = KCU.CONSTRAINT_NAME AND RC.CONSTRAINT_SCHEMA = KCU.CONSTRAINT_SCHEMA WHERE KCU.REFERENCED_TABLE_NAME IS NOT NULL AND ";
 		if schema {
-			let sql .= "CONSTRAINT_SCHEMA = '" . schema . "' AND TABLE_NAME = '" . table . "'";
+			let sql .= "KCU.CONSTRAINT_SCHEMA = '" . schema . "' AND KCU.TABLE_NAME = '" . table . "'";
 		} else {
-			let sql .= "TABLE_NAME = '" . table . "'";
+			let sql .= "KCU.CONSTRAINT_SCHEMA = DATABASE() AND KCU.TABLE_NAME = '" . table . "'";
 		}
 		return sql;
 	}
@@ -645,7 +672,7 @@ class MySQL extends Dialect
 		if schema {
 			return sql . "TABLES.TABLE_SCHEMA = '" . schema . "' AND TABLES.TABLE_NAME = '" . table . "'";
 		}
-		return sql . "TABLES.TABLE_NAME = '" . table . "'";
+		return sql . "TABLES.TABLE_SCHEMA = DATABASE() AND TABLES.TABLE_NAME = '" . table . "'";
 	}
 
 	/**
@@ -695,5 +722,17 @@ class MySQL extends Dialect
 		}
 
 		return "";
+	}
+
+	/**
+	 * Generates SQL to check DB parameter FOREIGN_KEY_CHECKS.
+	 */
+	public function getForeignKeyChecks() -> string
+	{
+		var sql;
+
+		let sql = "SELECT @@foreign_key_checks";
+
+		return sql;
 	}
 }

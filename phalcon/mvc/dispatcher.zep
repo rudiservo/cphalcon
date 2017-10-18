@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -34,18 +34,17 @@ use Phalcon\Dispatcher as BaseDispatcher;
  * instantiating a controller and calling an action of that controller.
  *
  *<code>
+ * $di = new \Phalcon\Di();
  *
- *	$di = new \Phalcon\Di();
+ * $dispatcher = new \Phalcon\Mvc\Dispatcher();
  *
- *	$dispatcher = new \Phalcon\Mvc\Dispatcher();
+ * $dispatcher->setDI($di);
  *
- *  $dispatcher->setDI($di);
+ * $dispatcher->setControllerName("posts");
+ * $dispatcher->setActionName("index");
+ * $dispatcher->setParams([]);
  *
- *	$dispatcher->setControllerName('posts');
- *	$dispatcher->setActionName('index');
- *	$dispatcher->setParams(array());
- *
- *	$controller = $dispatcher->dispatch();
+ * $controller = $dispatcher->dispatch();
  *</code>
  */
 class Dispatcher extends BaseDispatcher implements DispatcherInterface
@@ -87,6 +86,14 @@ class Dispatcher extends BaseDispatcher implements DispatcherInterface
 	public function getControllerName() -> string
 	{
 		return this->_handlerName;
+	}
+
+	/**
+	 * Gets previous dispatched namespace name
+	 */
+	public function getPreviousNamespaceName() -> string
+	{
+		return this->_previousNamespaceName;
 	}
 
 	/**
@@ -157,6 +164,72 @@ class Dispatcher extends BaseDispatcher implements DispatcherInterface
 	}
 
 	/**
+	 * Forwards the execution flow to another controller/action.
+	 *
+	 * <code>
+	 * use Phalcon\Events\Event;
+	 * use Phalcon\Mvc\Dispatcher;
+	 * use App\Backend\Bootstrap as Backend;
+	 * use App\Frontend\Bootstrap as Frontend;
+	 *
+	 * // Registering modules
+	 * $modules = [
+	 *     "frontend" => [
+	 *         "className" => Frontend::class,
+	 *         "path"      => __DIR__ . "/app/Modules/Frontend/Bootstrap.php",
+	 *         "metadata"  => [
+	 *             "controllersNamespace" => "App\Frontend\Controllers",
+	 *         ],
+	 *     ],
+	 *     "backend" => [
+	 *         "className" => Backend::class,
+	 *         "path"      => __DIR__ . "/app/Modules/Backend/Bootstrap.php",
+	 *         "metadata"  => [
+	 *             "controllersNamespace" => "App\Backend\Controllers",
+	 *         ],
+	 *     ],
+	 * ];
+	 *
+	 * $application->registerModules($modules);
+	 *
+	 * // Setting beforeForward listener
+	 * $eventsManager  = $di->getShared("eventsManager");
+	 *
+	 * $eventsManager->attach(
+	 *     "dispatch:beforeForward",
+	 *     function(Event $event, Dispatcher $dispatcher, array $forward) use ($modules) {
+	 *         $metadata = $modules[$forward["module"]]["metadata"];
+	 *
+	 *         $dispatcher->setModuleName($forward["module"]);
+	 *         $dispatcher->setNamespaceName($metadata["controllersNamespace"]);
+	 *     }
+	 * );
+	 *
+	 * // Forward
+	 * $this->dispatcher->forward(
+	 *     [
+	 *         "module"     => "backend",
+	 *         "controller" => "posts",
+	 *         "action"     => "index",
+	 *     ]
+	 * );
+	 * </code>
+	 *
+	 * @param array forward
+	 */
+	public function forward(var forward)
+	{
+		var eventsManager;
+
+		let eventsManager = <ManagerInterface> this->_eventsManager;
+		if typeof eventsManager == "object" {
+			eventsManager->fire("dispatch:beforeForward", this, forward);
+		}
+
+		parent::forward(forward);
+	}
+
+	/**
 	 * Possible controller class name that will be located to dispatch the request
 	 */
 	public function getControllerClass() -> string
@@ -165,7 +238,7 @@ class Dispatcher extends BaseDispatcher implements DispatcherInterface
 	}
 
 	/**
-	 * Returns the lastest dispatched controller
+	 * Returns the latest dispatched controller
 	 */
 	public function getLastController() -> <ControllerInterface>
 	{

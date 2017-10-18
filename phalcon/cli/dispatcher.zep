@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,9 +20,10 @@
 
 namespace Phalcon\Cli;
 
-use Phalcon\Cli\Task;
+use Phalcon\FilterInterface;
 use Phalcon\Events\ManagerInterface;
 use Phalcon\Cli\Dispatcher\Exception;
+use Phalcon\Dispatcher as CliDispatcher;
 
 /**
  * Phalcon\Cli\Dispatcher
@@ -31,23 +32,22 @@ use Phalcon\Cli\Dispatcher\Exception;
  * task name, action name, and optional parameters contained in it, and then
  * instantiating a task and calling an action on it.
  *
- *<code>
+ * <code>
+ * use Phalcon\Di;
+ * use Phalcon\Cli\Dispatcher;
  *
- *	$di = new \Phalcon\Di();
+ * $di = new Di();
+ * $dispatcher = new Dispatcher();
+ * $dispatcher->setDi($di);
  *
- *	$dispatcher = new \Phalcon\Cli\Dispatcher();
+ * $dispatcher->setTaskName("posts");
+ * $dispatcher->setActionName("index");
+ * $dispatcher->setParams([]);
  *
- *  $dispatcher->setDi(di);
- *
- *	$dispatcher->setTaskName('posts');
- *	$dispatcher->setActionName('index');
- *	$dispatcher->setParams(array());
- *
- *	$handle = dispatcher->dispatch();
- *
- *</code>
+ * $handle = $dispatcher->dispatch();
+ * </code>
  */
-class Dispatcher extends \Phalcon\Dispatcher
+class Dispatcher extends CliDispatcher implements DispatcherInterface
 {
 
 	protected _handlerSuffix = "Task";
@@ -56,17 +56,7 @@ class Dispatcher extends \Phalcon\Dispatcher
 
 	protected _defaultAction = "main";
 
-	protected _options;
-
-	/**
-	 * Phalcon\Cli\Dispatcher constructor
-	 */
-	public function __construct()
-	{
-		let this->_options = [];
-
-		parent::__construct();
-	}
+	protected _options = [];
 
 	/**
 	 * Sets the default task suffix
@@ -131,9 +121,9 @@ class Dispatcher extends \Phalcon\Dispatcher
 	}
 
 	/**
-	 * Returns the lastest dispatched controller
+	 * Returns the latest dispatched controller
 	 */
-	public function getLastTask() -> <Task>
+	public function getLastTask() -> <TaskInterface>
 	{
 		return this->_lastHandler;
 	}
@@ -141,7 +131,7 @@ class Dispatcher extends \Phalcon\Dispatcher
 	/**
 	 * Returns the active task in the dispatcher
 	 */
-	public function getActiveTask() -> <Task>
+	public function getActiveTask() -> <TaskInterface>
 	{
 		return this->_activeHandler;
 	}
@@ -160,5 +150,57 @@ class Dispatcher extends \Phalcon\Dispatcher
 	public function getOptions() -> array
 	{
 		return this->_options;
+	}
+
+	/**
+	 * Gets an option by its name or numeric index
+	 *
+	 * @param  mixed $option
+	 * @param  string|array $filters
+	 * @param  mixed $defaultValue
+	 */
+	public function getOption(option, filters = null, defaultValue = null) -> var
+	{
+		var options, filter, optionValue, dependencyInjector;
+
+		let options = this->_options;
+		if !fetch optionValue, options[option] {
+			return defaultValue;
+		}
+
+		if filters === null {
+			return optionValue;
+		}
+
+		let dependencyInjector = this->_dependencyInjector;
+		if typeof dependencyInjector != "object" {
+			this->{"_throwDispatchException"}(
+				"A dependency injection object is required to access the 'filter' service",
+				CliDispatcher::EXCEPTION_NO_DI
+			);
+		}
+		let filter = <FilterInterface> dependencyInjector->getShared("filter");
+
+		return filter->sanitize(optionValue, filters);
+	}
+
+	/**
+	 * Check if an option exists
+	 */
+	public function hasOption(var option) -> boolean
+	{
+		return isset this->_options[option];
+	}
+
+	/**
+	 * Calls the action method.
+	 */
+	public function callActionMethod(handler, string actionMethod, array! params = []) -> var
+	{
+		var options;
+
+		let options = this->_options;
+		
+		return call_user_func_array([handler, actionMethod], [params, options]);
 	}
 }

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,25 +22,27 @@ namespace Phalcon\Paginator\Adapter;
 
 use Phalcon\Paginator\Exception;
 use Phalcon\Paginator\Adapter;
-use Phalcon\Paginator\AdapterInterface;
 
 /**
  * Phalcon\Paginator\Adapter\Model
  *
- * This adapter allows to paginate data using a Phalcon\Mvc\Model resultset as a base
- *<code>
- *	$paginator = new \Phalcon\Paginator\Adapter\Model(
- *		array(
- *			"data"  => Robots::find(),
- *			"limit" => 25,
- *			"page"  => $currentPage
- *		)
- *	);
+ * This adapter allows to paginate data using a Phalcon\Mvc\Model resultset as a base.
  *
- *  $paginate = $paginator->getPaginate();
+ * <code>
+ * use Phalcon\Paginator\Adapter\Model;
+ *
+ * $paginator = new Model(
+ *     [
+ *         "data"  => Robots::find(),
+ *         "limit" => 25,
+ *         "page"  => $currentPage,
+ *     ]
+ * );
+ *
+ * $paginate = $paginator->getPaginate();
  *</code>
  */
-class Model extends Adapter implements AdapterInterface
+class Model extends Adapter
 {
 
 	/**
@@ -69,7 +71,7 @@ class Model extends Adapter implements AdapterInterface
 	/**
 	 * Returns a slice of the resultset to show in the pagination
 	 */
-	public function getPaginate() -> <\stdclass>
+	public function getPaginate() -> <\stdClass>
 	{
 		var config, items, pageItems, page;
 		int pageNumber, show, n, start, lastShowPage,

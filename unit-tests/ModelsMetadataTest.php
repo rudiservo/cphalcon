@@ -7,7 +7,7 @@
   | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
   +------------------------------------------------------------------------+
   | This source file is subject to the New BSD License that is bundled     |
-  | with this package in the file docs/LICENSE.txt.                        |
+  | with this package in the file LICENSE.txt.                             |
   |                                                                        |
   | If you did not receive a copy of the license and are unable to         |
   | obtain it through the world-wide-web, please send an email             |
@@ -231,7 +231,8 @@ class ModelsMetadataTest extends PHPUnit_Framework_TestCase
 			2 => 'type',
 			3 => 'year',
 			4 => 'datetime',
-			5 => 'text'
+			5 => 'deleted',
+			6 => 'text'
 		);
 
 		$attributes = $metaData->getAttributes($robots);
@@ -249,7 +250,8 @@ class ModelsMetadataTest extends PHPUnit_Framework_TestCase
 			1 => 'type',
 			2 => 'year',
 			3 => 'datetime',
-			4 => 'text'
+			4 => 'deleted',
+			5 => 'text'
 		);
 
 		$npkAttributes = $metaData->getNonPrimaryKeyAttributes($robots);
@@ -258,8 +260,9 @@ class ModelsMetadataTest extends PHPUnit_Framework_TestCase
 		$this->assertEquals($metaData->getIdentityField($robots), 'id');
 
 		$defValues = array(
-			'type' => 'mechanical',
-			'year' => 1900
+			'type'    => 'mechanical',
+			'year'    => 1900,
+			'deleted' => null
 		);
 
 		$modelDefValues = $metaData->getDefaultValues($robots);

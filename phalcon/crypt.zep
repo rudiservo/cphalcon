@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,14 +28,14 @@ use Phalcon\Crypt\Exception;
  * Provides encryption facilities to phalcon applications
  *
  *<code>
- *	$crypt = new \Phalcon\Crypt();
+ * $crypt = new \Phalcon\Crypt();
  *
- *	$key = 'le password';
- *	$text = 'This is a secret text';
+ * $key  = "le password";
+ * $text = "This is a secret text";
  *
- *	$encrypted = $crypt->encrypt($text, $key);
+ * $encrypted = $crypt->encrypt($text, $key);
  *
- *	echo $crypt->decrypt($encrypted, $key);
+ * echo $crypt->decrypt($encrypted, $key);
  *</code>
  */
 class Crypt implements CryptInterface
@@ -45,9 +45,7 @@ class Crypt implements CryptInterface
 
 	protected _padding = 0;
 
-	protected _mode = "cbc";
-
-	protected _cipher = "rijndael-256";
+	protected _cipher = "aes-256-cfb";
 
 	const PADDING_DEFAULT = 0;
 
@@ -65,8 +63,6 @@ class Crypt implements CryptInterface
 
 	/**
 	 * Changes the padding scheme used
-	 *
-	 * @param int scheme
 	 */
 	public function setPadding(int! scheme) -> <CryptInterface>
 	{
@@ -89,23 +85,6 @@ class Crypt implements CryptInterface
 	public function getCipher() -> string
 	{
 		return this->_cipher;
-	}
-
-	/**
-	 * Sets the encrypt/decrypt mode
-	 */
-	public function setMode(string! mode) -> <Crypt>
-	{
-		let this->_mode = mode;
-		return this;
-	}
-
-	/**
-	 * Returns the current encryption mode
-	 */
-	public function getMode() -> string
-	{
-		return this->_mode;
 	}
 
 	/**
@@ -290,15 +269,15 @@ class Crypt implements CryptInterface
 	 * Encrypts a text
 	 *
 	 *<code>
-	 *	$encrypted = $crypt->encrypt("Ultra-secret text", "encrypt password");
+	 * $encrypted = $crypt->encrypt("Ultra-secret text", "encrypt password");
 	 *</code>
 	 */
 	public function encrypt(string! text, string! key = null) -> string
 	{
 		var encryptKey, ivSize, iv, cipher, mode, blockSize, paddingType, padded;
 
-		if !function_exists("mcrypt_get_iv_size") {
-			throw new Exception("mcrypt extension is required");
+		if !function_exists("openssl_cipher_iv_length") {
+			throw new Exception("openssl extension is required");
 		}
 
 		if key === null {
@@ -311,24 +290,21 @@ class Crypt implements CryptInterface
 			throw new Exception("Encryption key cannot be empty");
 		}
 
-		let cipher = this->_cipher, mode = this->_mode;
+		let cipher = this->_cipher;
+		let mode = strtolower(substr(cipher, strrpos(cipher, "-") - strlen(cipher)));
 
-		let ivSize = mcrypt_get_iv_size(cipher, mode);
-
-		if strlen(encryptKey) > ivSize {
-			throw new Exception("Size of key is too large for this algorithm");
+		if !in_array(cipher, openssl_get_cipher_methods(true)) {
+			throw new Exception("Cipher algorithm is unknown");
 		}
 
-		let iv = mcrypt_create_iv(ivSize, MCRYPT_RAND);
-		if typeof iv != "string" {
-			let iv = strval(iv);
+		let ivSize = openssl_cipher_iv_length(cipher);
+		if ivSize > 0 {
+			let blockSize = ivSize;
+		} else {
+			let blockSize = openssl_cipher_iv_length(str_ireplace("-" . mode, "", cipher));
 		}
 
-		let blockSize = mcrypt_get_block_size(cipher, mode);
-		if typeof blockSize != "integer" {
-			let blockSize = intval(blockSize);
-		}
-
+		let iv = openssl_random_pseudo_bytes(ivSize);
 		let paddingType = this->_padding;
 
 		if paddingType != 0 && (mode == "cbc" || mode == "ecb") {
@@ -337,22 +313,22 @@ class Crypt implements CryptInterface
 			let padded = text;
 		}
 
-		return iv . mcrypt_encrypt(cipher, encryptKey, padded, mode, iv);
+		return iv . openssl_encrypt(padded, cipher, encryptKey, OPENSSL_RAW_DATA, iv);
 	}
 
 	/**
 	 * Decrypts an encrypted text
 	 *
 	 *<code>
-	 *	echo $crypt->decrypt($encrypted, "decrypt password");
+	 * echo $crypt->decrypt($encrypted, "decrypt password");
 	 *</code>
 	 */
 	public function decrypt(string! text, key = null) -> string
 	{
-		var decryptKey, ivSize, cipher, mode, keySize, length, blockSize, paddingType, decrypted;
+		var decryptKey, ivSize, cipher, mode, blockSize, paddingType, decrypted;
 
-		if !function_exists("mcrypt_get_iv_size") {
-			throw new Exception("mcrypt extension is required");
+		if !function_exists("openssl_cipher_iv_length") {
+			throw new Exception("openssl extension is required");
 		}
 
 		if key === null {
@@ -365,23 +341,22 @@ class Crypt implements CryptInterface
 			throw new Exception("Decryption key cannot be empty");
 		}
 
-		let cipher = this->_cipher, mode = this->_mode;
+		let cipher = this->_cipher;
+		let mode = strtolower(substr(cipher, strrpos(cipher, "-") - strlen(cipher)));
 
-		let ivSize = mcrypt_get_iv_size(cipher, mode);
-
-		let keySize = strlen(decryptKey);
-		if keySize > ivSize {
-			throw new Exception("Size of key is too large for this algorithm");
+		if !in_array(cipher, openssl_get_cipher_methods(true)) {
+			throw new Exception("Cipher algorithm is unknown");
 		}
 
-		let length = strlen(text);
-		if keySize > length {
-			throw new Exception("Size of IV is larger than text to decrypt");
+		let ivSize = openssl_cipher_iv_length(cipher);
+		if ivSize > 0 {
+			let blockSize = ivSize;
+		} else {
+			let blockSize = openssl_cipher_iv_length(str_ireplace("-" . mode, "", cipher));
 		}
 
-		let decrypted = mcrypt_decrypt(cipher, decryptKey, substr(text, ivSize), mode, substr(text, 0, ivSize));
+		let decrypted = openssl_decrypt(substr(text, ivSize), cipher, decryptKey, OPENSSL_RAW_DATA, substr(text, 0, ivSize));
 
-		let blockSize = mcrypt_get_block_size(cipher, mode);
 		let paddingType = this->_padding;
 
 		if mode == "cbc" || mode == "ecb" {
@@ -397,7 +372,7 @@ class Crypt implements CryptInterface
 	public function encryptBase64(string! text, key = null, boolean! safe = false) -> string
 	{
 		if safe == true {
-			return strtr(base64_encode(this->encrypt(text, key)), "+/", "-_");
+			return rtrim(strtr(base64_encode(this->encrypt(text, key)), "+/", "-_"), "=");
 		}
 		return base64_encode(this->encrypt(text, key));
 	}
@@ -408,24 +383,16 @@ class Crypt implements CryptInterface
 	public function decryptBase64(string! text, key = null, boolean! safe = false) -> string
 	{
 		if safe == true {
-			return this->decrypt(base64_decode(strtr(text, "-_", "+/")), key);
+			return this->decrypt(base64_decode(strtr(text, "-_", "+/") . substr("===", (strlen(text) + 3) % 4)), key);
 		}
 		return this->decrypt(base64_decode(text), key);
 	}
 
 	/**
-	 * Returns a list of available cyphers
+	 * Returns a list of available ciphers
 	 */
 	public function getAvailableCiphers() -> array
 	{
-		return mcrypt_list_algorithms();
-	}
-
-	/**
-	 * Returns a list of available modes
-	 */
-	public function getAvailableModes() -> array
-	{
-		return mcrypt_list_modes();
+		return openssl_get_cipher_methods(true);
 	}
 }

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,7 +21,6 @@ namespace Phalcon\Cache\Backend;
 
 use Phalcon\Cache\Exception;
 use Phalcon\Cache\Backend;
-use Phalcon\Cache\BackendInterface;
 
 /**
  * Phalcon\Cache\Backend\Apc
@@ -29,34 +28,40 @@ use Phalcon\Cache\BackendInterface;
  * Allows to cache output fragments, PHP data and raw data using an APC backend
  *
  *<code>
- *	//Cache data for 2 days
- *	$frontCache = new \Phalcon\Cache\Frontend\Data(array(
- *		'lifetime' => 172800
- *	));
+ * use Phalcon\Cache\Backend\Apc;
+ * use Phalcon\Cache\Frontend\Data as FrontData;
  *
- *  $cache = new \Phalcon\Cache\Backend\Apc($frontCache, array(
- *      'prefix' => 'app-data'
- *  ));
+ * // Cache data for 2 days
+ * $frontCache = new FrontData(
+ *     [
+ *         "lifetime" => 172800,
+ *     ]
+ * );
  *
- *	//Cache arbitrary data
- *	$cache->save('my-data', array(1, 2, 3, 4, 5));
+ * $cache = new Apc(
+ *     $frontCache,
+ *     [
+ *         "prefix" => "app-data",
+ *     ]
+ * );
  *
- *	//Get data
- *	$data = $cache->get('my-data');
+ * // Cache arbitrary data
+ * $cache->save("my-data", [1, 2, 3, 4, 5]);
  *
+ * // Get data
+ * $data = $cache->get("my-data");
  *</code>
+ *
+ * @see \Phalcon\Cache\Backend\Apcu
+ * @deprecated
  */
-class Apc extends Backend implements BackendInterface
+class Apc extends Backend
 {
 
 	/**
 	 * Returns a cached content
-	 *
-	 * @param 	string|long keyName
-	 * @param   long lifetime
-	 * @return  mixed
 	 */
-	public function get(string! keyName, var lifetime = null)
+	public function get(string keyName, int lifetime = null) -> var | null
 	{
 		var prefixedKey, cachedContent;
 
@@ -74,14 +79,14 @@ class Apc extends Backend implements BackendInterface
 	/**
 	 * Stores cached content into the APC backend and stops the frontend
 	 *
-	 * @param string|long keyName
+	 * @param string|int keyName
 	 * @param string content
-	 * @param long lifetime
+	 * @param int lifetime
 	 * @param boolean stopBuffer
 	 */
-	public function save(var keyName = null, var content = null, var lifetime = null, boolean stopBuffer = true)
+	public function save(var keyName = null, var content = null, var lifetime = null, boolean stopBuffer = true) -> boolean
 	{
-		var lastKey, frontend, cachedContent, preparedContent, ttl, isBuffering;
+		var lastKey, frontend, cachedContent, preparedContent, ttl, isBuffering, success;
 
 		if keyName === null {
 			let lastKey = this->_lastKey;
@@ -100,7 +105,11 @@ class Apc extends Backend implements BackendInterface
 			let cachedContent = content;
 		}
 
-		let preparedContent = frontend->beforeStore(cachedContent);
+		if !is_numeric(cachedContent) {
+			let preparedContent = frontend->beforeStore(cachedContent);
+		} else {
+			let preparedContent = cachedContent;
+		}
 
 		/**
 		 * Take the lifetime from the frontend or read it from the set in start()
@@ -110,7 +119,8 @@ class Apc extends Backend implements BackendInterface
 			if lifetime === null {
 				let ttl = frontend->getLifetime();
 			} else {
-				let ttl = lifetime;
+				let ttl = lifetime,
+					this->_lastKey = lastKey;
 			}
 		} else {
 			let ttl = lifetime;
@@ -119,7 +129,11 @@ class Apc extends Backend implements BackendInterface
 		/**
 		 * Call apc_store in the PHP userland since most of the time it isn't available at compile time
 		 */
-		apc_store(lastKey, preparedContent, ttl);
+		let success = apc_store(lastKey, preparedContent, ttl);
+
+		if !success {
+			throw new Exception("Failed storing data in apc");
+		}
 
 		let isBuffering = frontend->isBuffering();
 
@@ -132,16 +146,16 @@ class Apc extends Backend implements BackendInterface
 		}
 
 		let this->_started = false;
+
+		return success;
 	}
 
 	/**
 	 * Increment of a given key, by number $value
 	 *
-	 * @param  string keyName
-	 * @param  long value
-	 * @return mixed
+	 * @param string keyName
 	 */
-	public function increment(keyName = null, int value = 1)
+	public function increment(keyName = null, int value = 1) -> int | boolean
 	{
 		var prefixedKey, cachedContent, result;
 
@@ -158,20 +172,18 @@ class Apc extends Backend implements BackendInterface
 				let result = cachedContent + value;
 				this->save(keyName, result);
 				return result;
-			} else {
-				return false;
 			}
 		}
+
+		return false;
 	}
 
 	/**
 	 * Decrement of a given key, by number $value
 	 *
-	 * @param  string keyName
-	 * @param  long value
-	 * @return mixed
+	 * @param string keyName
 	 */
-	public function decrement(keyName = null, int value = 1)
+	public function decrement(keyName = null, int value = 1) -> int | boolean
 	{
 		var lastKey, cachedContent, result;
 
@@ -187,10 +199,10 @@ class Apc extends Backend implements BackendInterface
 				let result = cachedContent - value;
 				this->save(keyName, result);
 				return result;
-			} else {
-				return false;
 			}
 		}
+
+		return false;
 	}
 
 	/**
@@ -202,16 +214,20 @@ class Apc extends Backend implements BackendInterface
 	}
 
 	/**
-	 * Query the existing cached keys
+	 * Query the existing cached keys.
 	 *
-	 * @param string prefix
-	 * @return array
+	 * <code>
+	 * $cache->save("users-ids", [1, 2, 3]);
+	 * $cache->save("projects-ids", [4, 5, 6]);
+	 *
+	 * var_dump($cache->queryKeys("users")); // ["users-ids"]
+	 * </code>
 	 */
 	public function queryKeys(string prefix = null) -> array
 	{
 		var prefixPattern, apc, keys, key;
 
-		if !prefix {
+		if empty prefix {
 			let prefixPattern = "/^_PHCA/";
 		} else {
 			let prefixPattern = "/^_PHCA" . prefix . "/";
@@ -230,9 +246,8 @@ class Apc extends Backend implements BackendInterface
 	/**
 	 * Checks if cache exists and it hasn't expired
 	 *
-	 * @param  string|long keyName
-	 * @param  long lifetime
-	 * @return boolean
+	 * @param  string|int keyName
+	 * @param  int lifetime
 	 */
 	public function exists(keyName = null, lifetime = null) -> boolean
 	{
@@ -254,13 +269,26 @@ class Apc extends Backend implements BackendInterface
 	}
 
 	/**
- 	 * Immediately invalidates all existing items.
+	 * Immediately invalidates all existing items.
+	 *
+	 * <code>
+	 * use Phalcon\Cache\Backend\Apc;
+	 *
+	 * $cache = new Apc($frontCache, ["prefix" => "app-data"]);
+	 *
+	 * $cache->save("my-data", [1, 2, 3, 4, 5]);
+	 *
+	 * // 'my-data' and all other used keys are deleted
+	 * $cache->flush();
+	 * </code>
 	 */
 	public function flush() -> boolean
 	{
-		var item;
+		var item, prefixPattern;
 
-		for item in iterator(new \APCIterator("user")) {
+		let prefixPattern = "/^_PHCA" . this->_prefix . "/";
+
+		for item in iterator(new \APCIterator("user", prefixPattern)) {
 			apc_delete(item["key"]);
 		}
 

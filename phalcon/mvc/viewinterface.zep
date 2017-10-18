@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -27,7 +27,8 @@ namespace Phalcon\Mvc;
 interface ViewInterface extends ViewBaseInterface
 {
 	/**
-	 * Sets the layouts sub-directory. Must be a directory under the views directory. Depending of your platform, always add a trailing slash or backslash
+	 * Sets the layouts sub-directory. Must be a directory under the views
+	 * directory. Depending of your platform, always add a trailing slash or backslash
 	 */
 	public function setLayoutsDir(string! layoutsDir);
 
@@ -37,7 +38,8 @@ interface ViewInterface extends ViewBaseInterface
 	public function getLayoutsDir() -> string;
 
 	/**
-	 * Sets a partials sub-directory. Must be a directory under the views directory. Depending of your platform, always add a trailing slash or backslash
+	 * Sets a partials sub-directory. Must be a directory under the views
+	 * directory. Depending of your platform, always add a trailing slash or backslash
 	 */
 	public function setPartialsDir(string! partialsDir);
 
@@ -117,8 +119,10 @@ interface ViewInterface extends ViewBaseInterface
 
 	/**
 	 * Gets extra parameters of the action rendered
+	 *
+	 * @deprecated Will be removed in 4.0.0
 	 */
-	public function getParams() -> array;
+	deprecated public function getParams() -> array;
 
 	/**
 	 * Starts rendering process enabling the output buffering

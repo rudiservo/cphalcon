@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,7 +21,6 @@ namespace Phalcon\Cache\Backend;
 
 use Phalcon\Cache\Backend;
 use Phalcon\Cache\Exception;
-use Phalcon\Cache\BackendInterface;
 use Phalcon\Cache\FrontendInterface;
 
 /**
@@ -30,39 +29,47 @@ use Phalcon\Cache\FrontendInterface;
  * Allows to cache output fragments, PHP data or raw data to a MongoDb backend
  *
  *<code>
+ * use Phalcon\Cache\Backend\Mongo;
+ * use Phalcon\Cache\Frontend\Base64;
  *
  * // Cache data for 2 days
- * $frontCache = new \Phalcon\Cache\Frontend\Base64(array(
- *		"lifetime" => 172800
- * ));
+ * $frontCache = new Base64(
+ *     [
+ *         "lifetime" => 172800,
+ *     ]
+ * );
  *
- * //Create a MongoDB cache
- * $cache = new \Phalcon\Cache\Backend\Mongo($frontCache, array(
- *		'server' => "mongodb://localhost",
- *      'db' => 'caches',
- *		'collection' => 'images'
- * ));
+ * // Create a MongoDB cache
+ * $cache = new Mongo(
+ *     $frontCache,
+ *     [
+ *         "server"     => "mongodb://localhost",
+ *         "db"         => "caches",
+ *         "collection" => "images",
+ *     ]
+ * );
  *
- * //Cache arbitrary data
- * $cache->save('my-data', file_get_contents('some-image.jpg'));
+ * // Cache arbitrary data
+ * $cache->save(
+ *     "my-data",
+ *     file_get_contents("some-image.jpg")
+ * );
  *
- * //Get data
- * $data = $cache->get('my-data');
- *
+ * // Get data
+ * $data = $cache->get("my-data");
  *</code>
  */
-class Mongo extends Backend implements BackendInterface
+class Mongo extends Backend
 {
 
 	protected _collection = null;
 
-
 	/**
-	* Phalcon\Cache\Backend\Mongo constructor
-	*
-	* @param \Phalcon\Cache\FrontendInterface frontend
-	* @param array options
-	*/
+	 * Phalcon\Cache\Backend\Mongo constructor
+	 *
+	 * @param \Phalcon\Cache\FrontendInterface frontend
+	 * @param array options
+	 */
 	public function __construct(<FrontendInterface> frontend, options = null)
 	{
 		if !isset options["mongo"] {
@@ -83,10 +90,10 @@ class Mongo extends Backend implements BackendInterface
 	}
 
 	/**
-	* Returns a MongoDb collection based on the backend parameters
-	*
-	* @return MongoCollection
-	*/
+	 * Returns a MongoDb collection based on the backend parameters
+	 *
+	 * @return MongoCollection
+	 */
 	protected final function _getCollection()
 	{
 		var options, mongo, server, database, collection, mongoCollection;
@@ -126,16 +133,16 @@ class Mongo extends Backend implements BackendInterface
 			}
 
 			/**
-			* Retrieve the connection name
-			*/
+			 * Retrieve the connection name
+			 */
 			let collection = options["collection"];
 			if !collection || typeof collection != "string" {
 				throw new Exception("The backend requires a valid MongoDB collection");
 			}
 
 			/**
-			* Make the connection and get the collection
-			*/
+			 * Make the connection and get the collection
+			 */
 			let mongoCollection = mongo->selectDb(database)->selectCollection(collection),
 				this->_collection = mongoCollection;
 		}
@@ -145,12 +152,8 @@ class Mongo extends Backend implements BackendInterface
 
 	/**
 	 * Returns a cached content
-	 *
-	 * @param int|string keyName
-	 * @param   long lifetime
-	 * @return  mixed
 	 */
-	public function get(keyName, lifetime = null)
+	public function get(string keyName, int lifetime = null) -> var | null
 	{
 		var frontend, prefixedKey, conditions,  document, cachedContent;
 
@@ -182,14 +185,14 @@ class Mongo extends Backend implements BackendInterface
 	 *
 	 * @param int|string keyName
 	 * @param string content
-	 * @param long lifetime
+	 * @param int lifetime
 	 * @param boolean stopBuffer
 	 */
-	public function save(keyName = null, content = null, lifetime = null, boolean stopBuffer = true)
+	public function save(keyName = null, content = null, lifetime = null, boolean stopBuffer = true) -> boolean
 	{
-		var lastkey, prefix, frontend, cachedContent, tmp, ttl,
+		var lastkey, frontend, cachedContent, tmp, ttl,
 			collection, timestamp, conditions, document, preparedContent,
-			isBuffering, data;
+			isBuffering, data, success;
 
 		let conditions = [];
 		let data = [];
@@ -197,8 +200,8 @@ class Mongo extends Backend implements BackendInterface
 		if keyName === null {
 			let lastkey = this->_lastKey;
 		} else {
-			let prefix = this->_prefix;
-			let lastkey = prefix . keyName;
+			let lastkey = this->_prefix . keyName,
+				this->_lastKey = lastkey;
 		}
 
 		if !lastkey {
@@ -214,6 +217,8 @@ class Mongo extends Backend implements BackendInterface
 
 		if !is_numeric(cachedContent) {
 			let preparedContent = frontend->beforeStore(cachedContent);
+		} else {
+			let preparedContent = cachedContent;
 		}
 
 		if lifetime === null {
@@ -233,29 +238,18 @@ class Mongo extends Backend implements BackendInterface
 			document = collection->findOne(conditions);
 
 		if typeof document == "array" {
-
-			let document["time"] = timestamp;
-
-			if !is_numeric(cachedContent) {
-				let document["data"] = preparedContent;
-			} else {
-				let document["data"] = cachedContent;
-			}
-
-			collection->update(["_id": document["_id"]], document);
-
+			let document["time"] = timestamp,
+				document["data"] = preparedContent,
+				success = collection->update(["_id": document["_id"]], document);
 		} else {
-
 			let data["key"] = lastkey,
-				data["time"] = timestamp;
+				data["time"] = timestamp,
+				data["data"] = preparedContent,
+				success = collection->insert(data);
+		}
 
-			if !is_numeric(cachedContent) {
-				let data["data"] = preparedContent;
-			} else {
-				let data["data"] = cachedContent;
-			}
-
-			collection->insert(data);
+		if !success {
+			throw new Exception("Failed storing data in mongodb");
 		}
 
 		let isBuffering = frontend->isBuffering();
@@ -269,6 +263,8 @@ class Mongo extends Backend implements BackendInterface
 		}
 
 		let this->_started = false;
+
+		return success;
 	}
 
 	/**
@@ -289,17 +285,21 @@ class Mongo extends Backend implements BackendInterface
 	}
 
 	/**
-	 * Query the existing cached keys
+	 * Query the existing cached keys.
 	 *
-	 * @param string prefix
-	 * @return array
+	 * <code>
+	 * $cache->save("users-ids", [1, 2, 3]);
+	 * $cache->save("projects-ids", [4, 5, 6]);
+	 *
+	 * var_dump($cache->queryKeys("users")); // ["users-ids"]
+	 * </code>
 	 */
-	public function queryKeys(prefix = null) -> array
+	public function queryKeys(string prefix = null) -> array
 	{
 		var collection, key, item, items, value;
 		array keys = [], conditions = [];
 
-		if prefix {
+		if !empty prefix {
 			let conditions["key"] = new \MongoRegex("/^" . prefix . "/");
 		}
 
@@ -323,8 +323,7 @@ class Mongo extends Backend implements BackendInterface
 	 * Checks if cache exists and it isn't expired
 	 *
 	 * @param string keyName
-	 * @param   long lifetime
-	 * @return boolean
+	 * @param int lifetime
 	 */
 	public function exists(keyName = null, lifetime = null) -> boolean
 	{
@@ -356,10 +355,8 @@ class Mongo extends Backend implements BackendInterface
 	 * Increment of a given key by $value
 	 *
 	 * @param int|string keyName
-	 * @param   long value
-	 * @return  mixed
 	 */
-	public function increment(keyName, value = 1)
+	public function increment(keyName, int value = 1) -> int | null
 	{
 		var prefixedKey, document,
 			modifiedTime,  cachedContent, incremented;
@@ -370,7 +367,7 @@ class Mongo extends Backend implements BackendInterface
 		let document = this->_getCollection()->findOne(["key": prefixedKey]);
 
 		if !fetch modifiedTime, document["time"] {
-			throw new Exception("The cache is currupted");
+			throw new Exception("The cache is corrupted");
 		}
 
 		/**
@@ -379,7 +376,7 @@ class Mongo extends Backend implements BackendInterface
 		if time() < modifiedTime {
 
 			if !fetch cachedContent, document["data"] {
-				throw new Exception("The cache is currupted");
+				throw new Exception("The cache is corrupted");
 			}
 
 			if is_numeric(cachedContent) {
@@ -396,10 +393,8 @@ class Mongo extends Backend implements BackendInterface
 	 * Decrement of a given key by $value
 	 *
 	 * @param int|string $keyName
-	 * @param   long $value
-	 * @return  mixed
 	 */
-	public function decrement(keyName, value = 1)
+	public function decrement(keyName, int value = 1) -> int | null
 	{
 		var prefixedKey, document, modifiedTime,  cachedContent, decremented;
 
@@ -409,7 +404,7 @@ class Mongo extends Backend implements BackendInterface
 		let document = this->_getCollection()->findOne(["key": prefixedKey]);
 
 		if !fetch modifiedTime, document["time"] {
-			throw new Exception("The cache is currupted");
+			throw new Exception("The cache is corrupted");
 		}
 
 		/**
@@ -418,7 +413,7 @@ class Mongo extends Backend implements BackendInterface
 		if time() < modifiedTime {
 
 			if !fetch cachedContent, document["data"] {
-				throw new Exception("The cache is currupted");
+				throw new Exception("The cache is corrupted");
 			}
 
 			if is_numeric(cachedContent) {
@@ -437,10 +432,6 @@ class Mongo extends Backend implements BackendInterface
 	public function flush() -> boolean
 	{
 		this->_getCollection()->remove();
-
-		if (int) rand() % 100 == 0 {
-			this->gc();
-		}
 
 		return true;
 	}

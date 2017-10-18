@@ -3,29 +3,29 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
  | to license@phalconphp.com so we can send you a copy immediately.       |
  +------------------------------------------------------------------------+
- | Authors: Andres Gutierrez <andres@phalconphp.com>                      |
- |          Eduar Carvajal <eduar@phalconphp.com>                         |
- |          Nikolaos Dimopoulos <nikos@niden.net>                         |
- +------------------------------------------------------------------------+
  */
 
 namespace Phalcon;
 
-use Phalcon\DiInterface;
+use Phalcon\Config;
 use Phalcon\Di\Service;
-use Phalcon\Di\ServiceInterface;
+use Phalcon\DiInterface;
 use Phalcon\Di\Exception;
+use Phalcon\Config\Adapter\Php;
+use Phalcon\Config\Adapter\Yaml;
+use Phalcon\Di\ServiceInterface;
 use Phalcon\Events\ManagerInterface;
 use Phalcon\Di\InjectionAwareInterface;
+use Phalcon\Di\ServiceProviderInterface;
 
 /**
  * Phalcon\Di
@@ -45,22 +45,27 @@ use Phalcon\Di\InjectionAwareInterface;
  * Additionally, this pattern increases testability in the code, thus making it less prone to errors.
  *
  *<code>
- * $di = new \Phalcon\Di();
+ * use Phalcon\Di;
+ * use Phalcon\Http\Request;
  *
- * //Using a string definition
- * $di->set("request", "Phalcon\Http\Request", true);
+ * $di = new Di();
  *
- * //Using an anonymous function
- * $di->set("request", function(){
- *	  return new \Phalcon\Http\Request();
- * }, true);
+ * // Using a string definition
+ * $di->set("request", Request::class, true);
+ *
+ * // Using an anonymous function
+ * $di->setShared(
+ *     "request",
+ *     function () {
+ *         return new Request();
+ *     }
+ * );
  *
  * $request = $di->getRequest();
  *</code>
  */
 class Di implements DiInterface
 {
-
 	/**
 	 * List of registered services
 	 */
@@ -132,10 +137,7 @@ class Di implements DiInterface
 	 */
 	public function setShared(string! name, var definition) -> <ServiceInterface>
 	{
-		var service;
-		let service = new Service(name, definition, true),
-			this->_services[name] = service;
-		return service;
+		return this->set(name, definition, true);
 	}
 
 	/**
@@ -208,47 +210,34 @@ class Di implements DiInterface
 	 */
 	public function get(string! name, parameters = null) -> var
 	{
-		var service, instance, reflection, eventsManager;
+		var service, eventsManager, instance = null;
 
 		let eventsManager = <ManagerInterface> this->_eventsManager;
 
 		if typeof eventsManager == "object" {
-			eventsManager->fire("di:beforeServiceResolve", this, ["name": name, "parameters": parameters]);
+			let instance = eventsManager->fire(
+				"di:beforeServiceResolve",
+				this,
+				["name": name, "parameters": parameters]
+			);
 		}
 
-		if fetch service, this->_services[name] {
-			/**
-			 * The service is registered in the DI
-			 */
-			let instance = service->resolve(parameters, this);
-		} else {
-			/**
-			 * The DI also acts as builder for any class even if it isn't defined in the DI
-			 */
-			if !class_exists(name) {
-				throw new Exception("Service '" . name . "' wasn't found in the dependency injection container");
-			}
-
-			if typeof parameters == "array" {
-				if count(parameters) {
-					if is_php_version("5.6") {
-						let reflection = new \ReflectionClass(name),
-							instance = reflection->newInstanceArgs(parameters);
-					} else {
-						let instance = create_instance_params(name, parameters);
-					}
-				} else {
-					if is_php_version("5.6") {
-						let reflection = new \ReflectionClass(name),
-							instance = reflection->newInstance();
-					} else {
-						let instance = create_instance(name);
-					}
-				}
+		if typeof instance != "object" {
+			if fetch service, this->_services[name] {
+				/**
+				 * The service is registered in the DI
+				 */
+				let instance = service->resolve(parameters, this);
 			} else {
-				if is_php_version("5.6") {
-					let reflection = new \ReflectionClass(name),
-						instance = reflection->newInstance();
+				/**
+				 * The DI also acts as builder for any class even if it isn't defined in the DI
+				 */
+				if !class_exists(name) {
+					throw new Exception("Service '" . name . "' wasn't found in the dependency injection container");
+				}
+
+				if typeof parameters == "array" && count(parameters) {
+					let instance = create_instance_params(name, parameters);
 				} else {
 					let instance = create_instance(name);
 				}
@@ -280,7 +269,8 @@ class Di implements DiInterface
 	}
 
 	/**
-	 * Resolves a service, the resolved service is stored in the DI, subsequent requests for this service will return the same instance
+	 * Resolves a service, the resolved service is stored in the DI, subsequent
+	 * requests for this service will return the same instance
 	 *
 	 * @param string name
 	 * @param array parameters
@@ -348,12 +338,8 @@ class Di implements DiInterface
 	 * Allows to register a shared service using the array syntax
 	 *
 	 *<code>
-	 *	$di["request"] = new \Phalcon\Http\Request();
+	 * $di["request"] = new \Phalcon\Http\Request();
 	 *</code>
-	 *
-	 * @param string name
-	 * @param mixed definition
-	 * @return boolean
 	 */
 	public function offsetSet(string! name, var definition) -> boolean
 	{
@@ -365,7 +351,7 @@ class Di implements DiInterface
 	 * Allows to obtain a shared service using the array syntax
 	 *
 	 *<code>
-	 *	var_dump($di["request"]);
+	 * var_dump($di["request"]);
 	 *</code>
 	 */
 	public function offsetGet(string! name) -> var
@@ -383,9 +369,6 @@ class Di implements DiInterface
 
 	/**
 	 * Magic method to get or set services using setters/getters
-	 *
-	 * @param string method
-	 * @param array arguments
 	 */
 	public function __call(string! method, arguments = null) -> var|null
 	{
@@ -424,6 +407,29 @@ class Di implements DiInterface
 	}
 
 	/**
+	 * Registers a service provider.
+	 *
+	 * <code>
+	 * use Phalcon\DiInterface;
+	 * use Phalcon\Di\ServiceProviderInterface;
+	 *
+	 * class SomeServiceProvider implements ServiceProviderInterface
+	 * {
+	 *     public function register(DiInterface $di)
+	 *     {
+	 *         $di->setShared('service', function () {
+	 *             // ...
+	 *         });
+	 *     }
+	 * }
+	 * </code>
+	 */
+	public function register(<ServiceProviderInterface> provider) -> void
+	{
+		provider->register(this);
+	}
+
+	/**
 	 * Set a default dependency injection container to be obtained into static methods
 	 */
 	public static function setDefault(<DiInterface> dependencyInjector)
@@ -445,5 +451,102 @@ class Di implements DiInterface
 	public static function reset()
 	{
 		let self::_default = null;
+	}
+
+	/**
+	 * Loads services from a yaml file.
+	 *
+	 * <code>
+	 * $di->loadFromYaml(
+	 *     "path/services.yaml",
+	 *     [
+	 *         "!approot" => function ($value) {
+	 *             return dirname(__DIR__) . $value;
+	 *         }
+	 *     ]
+	 * );
+	 * </code>
+	 *
+	 * And the services can be specified in the file as:
+	 *
+	 * <code>
+	 * myComponent:
+	 *     className: \Acme\Components\MyComponent
+	 *     shared: true
+	 *
+	 * group:
+	 *     className: \Acme\Group
+	 *     arguments:
+	 *         - type: service
+	 *           name: myComponent
+	 *
+	 * user:
+	 *    className: \Acme\User
+	 * </code>
+	 *
+	 * @link https://docs.phalconphp.com/en/latest/reference/di.html
+	 */
+	public function loadFromYaml(string! filePath, array! callbacks = null) -> void
+	{
+		var services;
+
+		let services = new Yaml(filePath, callbacks);
+
+		this->loadFromConfig(services);
+	}
+
+	/**
+	 * Loads services from a php config file.
+	 *
+	 * <code>
+	 * $di->loadFromPhp("path/services.php");
+	 * </code>
+	 *
+	 * And the services can be specified in the file as:
+	 *
+	 * <code>
+	 * return [
+	 *      'myComponent' => [
+	 *          'className' => '\Acme\Components\MyComponent',
+	 *          'shared' => true,
+	 *      ],
+	 *      'group' => [
+	 *          'className' => '\Acme\Group',
+	 *          'arguments' => [
+	 *              [
+	 *                  'type' => 'service',
+	 *                  'service' => 'myComponent',
+	 *              ],
+	 *          ],
+	 *      ],
+	 *      'user' => [
+	 *          'className' => '\Acme\User',
+	 *      ],
+	 * ];
+	 * </code>
+	 *
+	 * @link https://docs.phalconphp.com/en/latest/reference/di.html
+	 */
+	public function loadFromPhp(string! filePath) -> void
+	{
+		var services;
+
+		let services = new Php(filePath);
+
+		this->loadFromConfig(services);
+	}
+
+	/**
+	 * Loads services from a Config object.
+	 */
+	protected function loadFromConfig(<Config> config) -> void
+	{
+		var services, name, service;
+
+		let services = config->toArray();
+
+		for name, service in services {
+			this->set(name, service, isset service["shared"] && service["shared"]);
+		}
 	}
 }

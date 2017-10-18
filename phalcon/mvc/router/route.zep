@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -46,6 +46,8 @@ class Route implements RouteInterface
 	protected _name;
 
 	protected _beforeMatch;
+
+	protected _match;
 
 	protected _group;
 
@@ -87,7 +89,7 @@ class Route implements RouteInterface
 		if memstr(pattern, ":") {
 
 			// This is a pattern for valid identifiers
-			let idPattern = "/([a-zA-Z0-9\\_\\-]+)";
+			let idPattern = "/([\\w0-9\\_\\-]+)";
 
 			// Replace the module part
 			if memstr(pattern, "/:module") {
@@ -122,12 +124,12 @@ class Route implements RouteInterface
 
 		// Check if the pattern has parentheses in order to add the regex delimiters
 		if memstr(pattern, "(") {
-			return "#^" . pattern . "$#";
+			return "#^" . pattern . "$#u";
 		}
 
 		// Square brackets are also checked
 		if memstr(pattern, "[") {
-			return "#^" . pattern . "$#";
+			return "#^" . pattern . "$#u";
 		}
 
 		return pattern;
@@ -137,8 +139,14 @@ class Route implements RouteInterface
 	 * Set one or more HTTP methods that constraint the matching of the route
 	 *
 	 *<code>
-	 * $route->via('GET');
-	 * $route->via(array('GET', 'POST'));
+	 * $route->via("GET");
+	 *
+	 * $route->via(
+	 *     [
+	 *         "GET",
+	 *         "POST",
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function via(var httpMethods) -> <Route>
@@ -152,7 +160,7 @@ class Route implements RouteInterface
 	 */
 	public function extractNamedParams(string! pattern) -> array | boolean
 	{
-		char ch;
+		char ch, prevCh = '\0';
 		var tmp, matches;
 		boolean notValid;
 		int cursor, cursorVar, marker, bracketCount = 0, parenthesesCount = 0, foundPattern = 0;
@@ -270,7 +278,13 @@ class Route implements RouteInterface
 			if bracketCount > 0 {
 				let intermediate++;
 			} else {
-				let route .= ch;
+				if parenthesesCount == 0 && prevCh != '\\' {
+					if ch == '.' || ch == '+' || ch == '|' || ch == '#' {
+						let route .= '\\';
+					}
+				}
+				let route .= ch,
+					prevCh = ch;
 			}
 		}
 
@@ -426,9 +440,12 @@ class Route implements RouteInterface
 	 * Sets the route's name
 	 *
 	 *<code>
-	 * $router->add('/about', array(
-	 *     'controller' => 'about'
-	 * ))->setName('about');
+	 * $router->add(
+	 *     "/about",
+	 *     [
+	 *         "controller" => "about",
+	 *     ]
+	 * )->setName("about");
 	 *</code>
 	 */
 	public function setName(string name) -> <Route>
@@ -441,8 +458,27 @@ class Route implements RouteInterface
 	 * Sets a callback that is called if the route is matched.
 	 * The developer can implement any arbitrary conditions here
 	 * If the callback returns false the route is treated as not matched
+	 *
+	 *<code>
+	 * $router->add(
+	 *     "/login",
+	 *     [
+     *         "module"     => "admin",
+     *         "controller" => "session",
+     *     ]
+     * )->beforeMatch(
+     *     function ($uri, $route) {
+     *         // Check if the request was made with Ajax
+     *         if ($_SERVER["HTTP_X_REQUESTED_WITH"] === "xmlhttprequest") {
+     *             return false;
+     *         }
+     *
+     *         return true;
+     *     }
+     * );
+	 *</code>
 	 */
-	public function beforeMatch(callable callback) -> <Route>
+	public function beforeMatch(var callback) -> <Route>
 	{
 		let this->_beforeMatch = callback;
 		return this;
@@ -454,6 +490,34 @@ class Route implements RouteInterface
 	public function getBeforeMatch() -> callable
 	{
 		return this->_beforeMatch;
+	}
+
+	/**
+	 * Allows to set a callback to handle the request directly in the route
+	 *
+	 *<code>
+	 * $router->add(
+	 *     "/help",
+	 *     []
+	 * )->match(
+	 *     function () {
+	 *         return $this->getResponse()->redirect("https://support.google.com/", true);
+	 *     }
+	 * );
+	 *</code>
+	 */
+	public function match(var callback) -> <Route>
+	{
+		let this->_match = callback;
+		return this;
+	}
+
+	/**
+	 * Returns the 'match' callback if any
+	 */
+	public function getMatch() -> callable
+	{
+		return this->_match;
 	}
 
 	/**
@@ -506,8 +570,8 @@ class Route implements RouteInterface
 	 * Sets a set of HTTP methods that constraint the matching of the route (alias of via)
 	 *
 	 *<code>
-	 * $route->setHttpMethods('GET');
-	 * $route->setHttpMethods(array('GET', 'POST'));
+	 * $route->setHttpMethods("GET");
+	 * $route->setHttpMethods(["GET", "POST"]);
 	 *</code>
 	 */
 	public function setHttpMethods(var httpMethods) -> <Route>
@@ -528,7 +592,7 @@ class Route implements RouteInterface
 	 * Sets a hostname restriction to the route
 	 *
 	 *<code>
-	 * $route->setHostname('localhost');
+	 * $route->setHostname("localhost");
 	 *</code>
 	 */
 	public function setHostname(string! hostname) -> <Route>

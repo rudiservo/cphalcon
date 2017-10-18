@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -25,8 +25,14 @@ use Phalcon\Mvc\Model\Message;
  * Phalcon\Mvc\Model\Validator
  *
  * This is a base class for Phalcon\Mvc\Model validators
+ *
+ * This class is only for backward compatibility reasons to use with Phalcon\Mvc\Collection.
+ * Otherwise please use the validators provided by Phalcon\Validation.
+ *
+ * @deprecated 3.1.0
+ * @see Phalcon\Validation\Validator
  */
-abstract class Validator
+abstract class Validator implements ValidatorInterface
 {
 
 	protected _options;
@@ -36,7 +42,7 @@ abstract class Validator
 	/**
 	 * Phalcon\Mvc\Model\Validator constructor
 	 */
-	public function __construct(array! options)
+	deprecated public function __construct(array! options)
 	{
 		let this->_options = options;
 	}
@@ -88,7 +94,7 @@ abstract class Validator
 	}
 
 	/**
-	 * Check whether a option has been defined in the validator options
+	 * Check whether an option has been defined in the validator options
 	 */
 	public function isSetOption(string! option) -> boolean
 	{

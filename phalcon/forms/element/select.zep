@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,14 +21,13 @@ namespace Phalcon\Forms\Element;
 
 use Phalcon\Tag\Select;
 use Phalcon\Forms\Element;
-use Phalcon\Forms\ElementInterface;
 
 /**
  * Phalcon\Forms\Element\Select
  *
  * Component SELECT (choice) for forms
  */
-class Select extends Element implements ElementInterface
+class Select extends Element
 {
 
 	protected _optionsValues;
@@ -93,7 +92,6 @@ class Select extends Element implements ElementInterface
 	 * Renders the element widget returning html
 	 *
 	 * @param array attributes
-	 * @return string
 	 */
 	public function render(attributes = null) -> string
 	{

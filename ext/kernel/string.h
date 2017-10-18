@@ -3,7 +3,7 @@
   +------------------------------------------------------------------------+
   | Zephir Language                                                        |
   +------------------------------------------------------------------------+
-  | Copyright (c) 2011-2016 Zephir Team (http://www.zephir-lang.com)       |
+  | Copyright (c) 2011-2017 Zephir Team (http://www.zephir-lang.com)       |
   +------------------------------------------------------------------------+
   | This source file is subject to the New BSD License that is bundled     |
   | with this package in the file docs/LICENSE.txt.                        |
@@ -52,8 +52,8 @@ void zephir_fast_strip_tags(zval *return_value, zval *str);
 void zephir_fast_strtoupper(zval *return_value, zval *str);
 
 /** Camelize/Uncamelize */
-void zephir_camelize(zval *return_value, const zval *str);
-void zephir_uncamelize(zval *return_value, const zval *str);
+void zephir_camelize(zval *return_value, const zval *str, const zval *delimiter);
+void zephir_uncamelize(zval *return_value, const zval *str, const zval *delimiter);
 
 /** Starts/Ends with */
 int zephir_start_with(const zval *str, const zval *compared, zval *case_sensitive);
@@ -116,5 +116,9 @@ void zephir_stripcslashes(zval *return_value, zval *str TSRMLS_DC);
 			ZVAL_STRING(pz, string, 1); \
 		} \
 	} while (0)
+
+int zephir_hash_equals(const zval *known_zval, const zval *user_zval);
+
+void zephir_string_to_hex(zval *return_value, zval *var);
 
 #endif /* ZEPHIR_KERNEL_STRING_H */

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -35,16 +35,20 @@ use Phalcon\Mvc\View\Engine\Php as PhpEngine;
  * It provides a system of helpers, output filters, and variable escaping.
  *
  * <code>
- * //Setting views directory
- * $view = new \Phalcon\Mvc\View();
- * $view->setViewsDir('app/views/');
+ * use Phalcon\Mvc\View;
+ *
+ * $view = new View();
+ *
+ * // Setting views directory
+ * $view->setViewsDir("app/views/");
  *
  * $view->start();
- * //Shows recent posts view (app/views/posts/recent.phtml)
- * $view->render('posts', 'recent');
+ *
+ * // Shows recent posts view (app/views/posts/recent.phtml)
+ * $view->render("posts", "recent");
  * $view->finish();
  *
- * //Printing views output
+ * // Printing views output
  * echo $view->getContent();
  * </code>
  */
@@ -104,7 +108,7 @@ class View extends Injectable implements ViewInterface
 
 	protected _disabledLevels;
 
-	protected _viewParams;
+	protected _viewParams = [];
 
 	protected _layout;
 
@@ -112,11 +116,11 @@ class View extends Injectable implements ViewInterface
 
 	protected _partialsDir = "";
 
-	protected _viewsDir;
+	protected _viewsDirs = [];
 
-	protected _templatesBefore;
+	protected _templatesBefore = [];
 
-	protected _templatesAfter;
+	protected _templatesAfter = [];
 
 	protected _engines = false;
 
@@ -139,47 +143,86 @@ class View extends Injectable implements ViewInterface
 
 	protected _cacheLevel = 0;
 
-	protected _activeRenderPath;
+	protected _activeRenderPaths;
 
 	protected _disabled = false;
 
 	/**
 	 * Phalcon\Mvc\View constructor
-	 *
-	 * @param array options
 	 */
-	public function __construct(options = null)
+	public function __construct(array options = [])
 	{
-		if typeof options == "array" {
-			let this->_options = options;
-		}
+		let this->_options = options;
 	}
 
 	/**
-	 * Sets the views directory. Depending of your platform, always add a trailing slash or backslash
+	 * Checks if a path is absolute or not
 	 */
-	public function setViewsDir(string viewsDir) -> <View>
+	protected final function _isAbsolutePath(string path)
 	{
-		if (substr(viewsDir, -1) != DIRECTORY_SEPARATOR) {
-			let viewsDir = viewsDir . DIRECTORY_SEPARATOR;
+		if PHP_OS == "WINNT" {
+			return strlen(path) >= 3 && path[1] == ':' && path[2] == '\\';
 		}
-		let this->_viewsDir = viewsDir;
+
+		return strlen(path) >= 1 && path[0] == '/';
+	}
+
+	/**
+	 * Sets the views directory. Depending of your platform,
+	 * always add a trailing slash or backslash
+	 */
+	public function setViewsDir(var viewsDir) -> <View>
+	{
+		var position, directory, directorySeparator, newViewsDir;
+
+		if typeof viewsDir != "string" && typeof viewsDir != "array" {
+			throw new Exception("Views directory must be a string or an array");
+		}
+
+		let directorySeparator = DIRECTORY_SEPARATOR;
+		if typeof viewsDir == "string" {
+
+			if substr(viewsDir, -1) != directorySeparator {
+				let viewsDir = viewsDir . directorySeparator;
+			}
+
+			let this->_viewsDirs = viewsDir;
+		} else {
+
+			let newViewsDir = [];
+			for position, directory in viewsDir {
+
+				if typeof directory != "string" {
+					throw new Exception("Views directory item must be a string");
+				}
+
+				if substr(directory, -1) != directorySeparator {
+					let newViewsDir[position] = directory . directorySeparator;
+				} else {
+					let newViewsDir[position] = directory;
+				}
+			}
+
+			let this->_viewsDirs = newViewsDir;
+		}
+
 		return this;
 	}
 
 	/**
 	 * Gets views directory
 	 */
-	public function getViewsDir() -> string
+	public function getViewsDir() -> string | array
 	{
-		return this->_viewsDir;
+		return this->_viewsDirs;
 	}
 
 	/**
-	 * Sets the layouts sub-directory. Must be a directory under the views directory. Depending of your platform, always add a trailing slash or backslash
+	 * Sets the layouts sub-directory. Must be a directory under the views directory.
+	 * Depending of your platform, always add a trailing slash or backslash
 	 *
 	 *<code>
-	 * $view->setLayoutsDir('../common/layouts/');
+	 * $view->setLayoutsDir("../common/layouts/");
 	 *</code>
 	 */
 	public function setLayoutsDir(string layoutsDir) -> <View>
@@ -197,10 +240,11 @@ class View extends Injectable implements ViewInterface
 	}
 
 	/**
-	 * Sets a partials sub-directory. Must be a directory under the views directory. Depending of your platform, always add a trailing slash or backslash
+	 * Sets a partials sub-directory. Must be a directory under the views directory.
+	 * Depending of your platform, always add a trailing slash or backslash
 	 *
 	 *<code>
-	 * $view->setPartialsDir('../common/partials/');
+	 * $view->setPartialsDir("../common/partials/");
 	 *</code>
 	 */
 	public function setPartialsDir(string partialsDir) -> <View>
@@ -221,7 +265,7 @@ class View extends Injectable implements ViewInterface
 	 * Sets base path. Depending of your platform, always add a trailing slash or backslash
 	 *
 	 * <code>
-	 * 	$view->setBasePath(__DIR__ . '/');
+	 * 	$view->setBasePath(__DIR__ . "/");
 	 * </code>
 	 */
 	public function setBasePath(string basePath) -> <View>
@@ -242,8 +286,10 @@ class View extends Injectable implements ViewInterface
 	 * Sets the render level for the view
 	 *
 	 * <code>
-	 * 	//Render the view related to the controller only
-	 * 	$this->view->setRenderLevel(View::LEVEL_LAYOUT);
+	 * // Render the view related to the controller only
+	 * $this->view->setRenderLevel(
+	 *     View::LEVEL_LAYOUT
+	 * );
 	 * </code>
 	 */
 	public function setRenderLevel(int level) -> <View>
@@ -256,12 +302,11 @@ class View extends Injectable implements ViewInterface
 	 * Disables a specific level of rendering
 	 *
 	 *<code>
-	 * //Render all levels except ACTION level
-	 * $this->view->disableLevel(View::LEVEL_ACTION_VIEW);
+	 * // Render all levels except ACTION level
+	 * $this->view->disableLevel(
+	 *     View::LEVEL_ACTION_VIEW
+	 * );
 	 *</code>
-	 *
-	 * @param int|array level
-	 * @return \Phalcon\Mvc\View
 	 */
 	public function disableLevel(var level) -> <View>
 	{
@@ -277,8 +322,8 @@ class View extends Injectable implements ViewInterface
 	 * Sets default view name. Must be a file without extension in the views directory
 	 *
 	 * <code>
-	 * 	//Renders as main view views-dir/base.phtml
-	 * 	$this->view->setMainView('base');
+	 * // Renders as main view views-dir/base.phtml
+	 * $this->view->setMainView("base");
 	 * </code>
 	 */
 	public function setMainView(string viewPath) -> <View>
@@ -299,7 +344,7 @@ class View extends Injectable implements ViewInterface
 	 * Change the layout to be used instead of using the name of the latest controller name
 	 *
 	 * <code>
-	 * 	$this->view->setLayout('main');
+	 * $this->view->setLayout("main");
 	 * </code>
 	 */
 	public function setLayout(string layout) -> <View>
@@ -318,9 +363,6 @@ class View extends Injectable implements ViewInterface
 
 	/**
 	 * Sets a template before the controller layout
-	 *
-	 * @param string|array templateBefore
-	 * @return \Phalcon\Mvc\View
 	 */
 	public function setTemplateBefore(var templateBefore) -> <View>
 	{
@@ -337,15 +379,12 @@ class View extends Injectable implements ViewInterface
 	 */
 	public function cleanTemplateBefore() -> <View>
 	{
-		let this->_templatesBefore = null;
+		let this->_templatesBefore = [];
 		return this;
 	}
 
 	/**
 	 * Sets a "template after" controller layout
-	 *
-	 * @param string|array templateAfter
-	 * @return \Phalcon\Mvc\View
 	 */
 	public function setTemplateAfter(var templateAfter) -> <View>
 	{
@@ -362,7 +401,7 @@ class View extends Injectable implements ViewInterface
 	 */
 	public function cleanTemplateAfter() -> <View>
 	{
-		let this->_templatesAfter = null;
+		let this->_templatesAfter = [];
 		return this;
 	}
 
@@ -370,14 +409,10 @@ class View extends Injectable implements ViewInterface
 	 * Adds parameters to views (alias of setVar)
 	 *
 	 *<code>
-	 *	$this->view->setParamToView('products', $products);
+	 * $this->view->setParamToView("products", $products);
 	 *</code>
-	 *
-	 * @param string key
-	 * @param mixed value
-	 * @return \Phalcon\Mvc\View
 	 */
-	public function setParamToView(string! key, value) -> <View>
+	public function setParamToView(string! key, var value) -> <View>
 	{
 		let this->_viewParams[key] = value;
 		return this;
@@ -387,24 +422,17 @@ class View extends Injectable implements ViewInterface
 	 * Set all the render params
 	 *
 	 *<code>
-	 *	$this->view->setVars(array('products' => $products));
+	 * $this->view->setVars(
+	 *     [
+	 *         "products" => $products,
+	 *     ]
+	 * );
 	 *</code>
-	 *
-	 * @param array params
-	 * @param boolean merge
-	 * @return \Phalcon\Mvc\View
 	 */
 	public function setVars(array! params, boolean merge = true) -> <View>
 	{
-		var viewParams;
-
 		if merge {
-			let viewParams = this->_viewParams;
-			if typeof viewParams == "array" {
-				let this->_viewParams = array_merge(viewParams, params);
-			} else {
-				let this->_viewParams = params;
-			}
+			let this->_viewParams = array_merge(this->_viewParams, params);
 		} else {
 			let this->_viewParams = params;
 		}
@@ -416,14 +444,10 @@ class View extends Injectable implements ViewInterface
 	 * Set a single view parameter
 	 *
 	 *<code>
-	 *	$this->view->setVar('products', $products);
+	 * $this->view->setVar("products", $products);
 	 *</code>
-	 *
-	 * @param string key
-	 * @param mixed value
-	 * @return \Phalcon\Mvc\View
 	 */
-	public function setVar(string! key, value) -> <View>
+	public function setVar(string! key, var value) -> <View>
 	{
 		let this->_viewParams[key] = value;
 		return this;
@@ -431,46 +455,38 @@ class View extends Injectable implements ViewInterface
 
 	/**
 	 * Returns a parameter previously set in the view
-	 *
-	 * @param string key
-	 * @return mixed
 	 */
 	public function getVar(string! key)
 	{
-		var params, value;
-		let params = this->_viewParams;
-		if fetch value, params[key] {
-			return value;
+		var value;
+
+		if !fetch value, this->_viewParams[key] {
+			return null;
 		}
-		return null;
+
+		return value;
 	}
 
 	/**
 	 * Returns parameters to views
-	 *
-	 * @return array
 	 */
-	public function getParamsToView()
+	public function getParamsToView() -> array
 	{
 		return this->_viewParams;
 	}
 
 	/**
 	 * Gets the name of the controller rendered
-	 *
-	 * @return string
 	 */
-	public function getControllerName()
+	public function getControllerName() -> string
 	{
 		return this->_controllerName;
 	}
 
 	/**
 	 * Gets the name of the action rendered
-	 *
-	 * @return string
 	 */
-	public function getActionName()
+	public function getActionName() -> string
 	{
 		return this->_actionName;
 	}
@@ -478,9 +494,9 @@ class View extends Injectable implements ViewInterface
 	/**
 	 * Gets extra parameters of the action rendered
 	 *
-	 * @return array
+	 * @deprecated Will be removed in 4.0.0
 	 */
-	public function getParams()
+	deprecated public function getParams() -> array
 	{
 		return this->_params;
 	}
@@ -575,113 +591,121 @@ class View extends Injectable implements ViewInterface
 		int renderLevel, cacheLevel;
 		var key, lifetime, viewsDir, basePath, viewsDirPath,
 			viewOptions, cacheOptions, cachedView, viewParams, eventsManager,
-			extension, engine, viewEnginePath;
+			extension, engine, viewEnginePath, viewEnginePaths;
 
 		let notExists = true,
-			viewsDir = this->_viewsDir,
 			basePath = this->_basePath,
-			viewsDirPath = basePath . viewsDir . viewPath;
+			viewParams = this->_viewParams,
+			eventsManager = <ManagerInterface> this->_eventsManager,
+			viewEnginePaths = [];
 
-		if typeof cache == "object" {
-			let renderLevel = (int) this->_renderLevel,
-				cacheLevel = (int) this->_cacheLevel;
+		for viewsDir in this->getViewsDirs() {
 
-			if renderLevel >= cacheLevel {
+			if !this->_isAbsolutePath(viewPath) {
+				let viewsDirPath = basePath . viewsDir . viewPath;
+			} else {
+				let viewsDirPath = viewPath;
+			}
 
-				/**
-				 * Check if the cache is started, the first time a cache is started we start the
-				 * cache
-				 */
-				if cache->isStarted() == false {
+			if typeof cache == "object" {
 
-					let key = null, lifetime = null;
+				let renderLevel = (int) this->_renderLevel,
+					cacheLevel = (int) this->_cacheLevel;
 
-					let viewOptions = this->_options;
+				if renderLevel >= cacheLevel {
 
 					/**
-					 * Check if the user has defined a different options to the default
+					 * Check if the cache is started, the first time a cache is started we start the
+					 * cache
 					 */
-					if typeof viewOptions == "array" {
+					if !cache->isStarted() {
+
+						let key = null,
+							lifetime = null;
+
+						let viewOptions = this->_options;
+
+						/**
+						 * Check if the user has defined a different options to the default
+						 */
 						if fetch cacheOptions, viewOptions["cache"] {
 							if typeof cacheOptions == "array" {
 								fetch key, cacheOptions["key"];
 								fetch lifetime, cacheOptions["lifetime"];
 							}
 						}
+
+						/**
+						 * If a cache key is not set we create one using a md5
+						 */
+						if key === null {
+							let key = md5(viewPath);
+						}
+
+						/**
+						 * We start the cache using the key set
+						 */
+						let cachedView = cache->start(key, lifetime);
+						if cachedView !== null {
+							let this->_content = cachedView;
+							return null;
+						}
 					}
 
 					/**
-					 * If a cache key is not set we create one using a md5
+					 * This method only returns true if the cache has not expired
 					 */
-					if key === null {
-						let key = md5(viewPath);
-					}
-
-					/**
-					 * We start the cache using the key set
-					 */
-					let cachedView = cache->start(key, lifetime);
-					if cachedView !== null {
-						let this->_content = cachedView;
+					if !cache->isFresh() {
 						return null;
 					}
 				}
-
-				/**
-				 * This method only returns true if the cache has not expired
-				 */
-				if !cache->isFresh() {
-					return null;
-				}
 			}
-		}
 
-		let viewParams = this->_viewParams,
-			eventsManager = <ManagerInterface> this->_eventsManager;
+			/**
+			 * Views are rendered in each engine
+			 */
+			for extension, engine in engines {
 
-		/**
-		 * Views are rendered in each engine
-		 */
-		for extension, engine in engines {
+				let viewEnginePath = viewsDirPath . extension;
+				if file_exists(viewEnginePath) {
 
-			let viewEnginePath = viewsDirPath . extension;
-			if file_exists(viewEnginePath) {
-
-				/**
-				 * Call beforeRenderView if there is a events manager available
-				 */
-				if typeof eventsManager == "object" {
-					let this->_activeRenderPath = viewEnginePath;
-					if eventsManager->fire("view:beforeRenderView", this, viewEnginePath) === false {
-						continue;
+					/**
+					 * Call beforeRenderView if there is an events manager available
+					 */
+					if typeof eventsManager == "object" {
+						let this->_activeRenderPaths = [viewEnginePath];
+						if eventsManager->fire("view:beforeRenderView", this, viewEnginePath) === false {
+							continue;
+						}
 					}
+
+					engine->render(viewEnginePath, viewParams, mustClean);
+
+					/**
+					 * Call afterRenderView if there is an events manager available
+					 */
+					let notExists = false;
+					if typeof eventsManager == "object" {
+						eventsManager->fire("view:afterRenderView", this);
+					}
+					break;
 				}
 
-				engine->render(viewEnginePath, viewParams, mustClean);
-
-				/**
-				 * Call afterRenderView if there is a events manager available
-				 */
-				let notExists = false;
-				if typeof eventsManager == "object" {
-					eventsManager->fire("view:afterRenderView", this);
-				}
-				break;
+				let viewEnginePaths[] = viewEnginePath;
 			}
 		}
 
 		if notExists === true {
-
 			/**
 			 * Notify about not found views
 			 */
 			if typeof eventsManager == "object" {
-				let this->_activeRenderPath = viewEnginePath;
+				let this->_activeRenderPaths = viewEnginePaths;
 				eventsManager->fire("view:notFoundView", this, viewEnginePath);
 			}
 
 			if !silence {
-				throw new Exception("View '" . viewsDirPath . "' was not found in the views directory");
+				throw new Exception("View '" . viewPath . "' was not found in any of the views directory");
 			}
 		}
 	}
@@ -690,11 +714,13 @@ class View extends Injectable implements ViewInterface
 	 * Register templating engines
 	 *
 	 *<code>
-	 *$this->view->registerEngines(array(
-	 *  ".phtml" => "Phalcon\Mvc\View\Engine\Php",
-	 *  ".volt"  => "Phalcon\Mvc\View\Engine\Volt",
-	 *  ".mhtml" => "MyCustomEngine"
-	 *));
+	 * $this->view->registerEngines(
+	 *     [
+	 *         ".phtml" => "Phalcon\\Mvc\\View\\Engine\\Php",
+	 *         ".volt"  => "Phalcon\\Mvc\\View\\Engine\\Volt",
+	 *         ".mhtml" => "MyCustomEngine",
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function registerEngines(array! engines) -> <View>
@@ -709,42 +735,39 @@ class View extends Injectable implements ViewInterface
 	public function exists(string! view) -> boolean
 	{
 		var basePath, viewsDir, engines, extension;
-		boolean exists;
 
 		let basePath = this->_basePath,
-			viewsDir = this->_viewsDir,
 			engines = this->_registeredEngines;
 
 		if typeof engines != "array" {
-			let engines = [],
-				engines[".phtml"] = "Phalcon\\Mvc\\View\\Engine\\Php",
+			let engines = [".phtml": "Phalcon\\Mvc\\View\\Engine\\Php"],
 				this->_registeredEngines = engines;
 		}
 
-		let exists = false;
-		for extension, _ in engines {
-			let exists = (boolean) file_exists(basePath . viewsDir . view . extension);
-			if exists {
-				break;
+		for viewsDir in this->getViewsDirs() {
+			for extension, _ in engines {
+				if file_exists(basePath . viewsDir . view . extension) {
+					return true;
+				}
 			}
 		}
 
-		return exists;
+		return false;
 	}
 
 	/**
 	 * Executes render process from dispatching data
 	 *
 	 *<code>
-	 * //Shows recent posts view (app/views/posts/recent.phtml)
-	 * $view->start()->render('posts', 'recent')->finish();
+	 * // Shows recent posts view (app/views/posts/recent.phtml)
+	 * $view->start()->render("posts", "recent")->finish();
 	 *</code>
 	 *
 	 * @param string controllerName
 	 * @param string actionName
 	 * @param array params
 	 */
-	public function render(string! controllerName, string! actionName, params = null) -> <View>|boolean
+	public function render(string! controllerName, string! actionName, params = null) -> <View> | boolean
 	{
 		boolean silence, mustClean;
 		int renderLevel;
@@ -758,14 +781,17 @@ class View extends Injectable implements ViewInterface
 		/**
 		 * If the view is disabled we simply update the buffer from any output produced in the controller
 		 */
-		if this->_disabled != false {
+		if this->_disabled !== false {
 			let this->_content = ob_get_contents();
 			return false;
 		}
 
 		let this->_controllerName = controllerName,
-			this->_actionName = actionName,
-			this->_params = params;
+			this->_actionName = actionName;
+
+		if typeof params == "array" {
+			this->setVars(params);
+		}
 
 		/**
 		 * Check if there is a layouts directory set
@@ -791,7 +817,7 @@ class View extends Injectable implements ViewInterface
 		let engines = this->_loadTemplateEngines();
 
 		/**
-		 * Check if the user has picked a view diferent than the automatic
+		 * Check if the user has picked a view different than the automatic
 		 */
 		let pickView = this->_pickView;
 
@@ -803,8 +829,10 @@ class View extends Injectable implements ViewInterface
 			 * The 'picked' view is an array, where the first element is controller and the second the action
 			 */
 			let renderView = pickView[0];
-			if fetch pickViewAction, pickView[1] {
-				let layoutName = pickViewAction;
+			if layoutName === null {
+				if fetch pickViewAction, pickView[1] {
+					let layoutName = pickViewAction;
+				}
 			}
 		}
 
@@ -820,9 +848,12 @@ class View extends Injectable implements ViewInterface
 		let eventsManager = <ManagerInterface> this->_eventsManager;
 
 		/**
-		 * Create a virtual symbol table
+		 * Create a virtual symbol table.
+		 * Variables are shared across symbol tables in PHP5
 		 */
-		create_symbol_table();
+		if PHP_MAJOR_VERSION == 5 {
+			create_symbol_table();
+		}
 
 		/**
 		 * Call beforeRender if there is an events manager
@@ -867,19 +898,15 @@ class View extends Injectable implements ViewInterface
 			 */
 			if renderLevel >= self::LEVEL_BEFORE_TEMPLATE  {
 				if !isset disabledLevels[self::LEVEL_BEFORE_TEMPLATE] {
-					let this->_currentRenderLevel = self::LEVEL_BEFORE_TEMPLATE,
-						templatesBefore = this->_templatesBefore;
+					let this->_currentRenderLevel = self::LEVEL_BEFORE_TEMPLATE;
 
-					/**
-					 * Templates before must be an array
-					 */
-					if typeof templatesBefore == "array" {
-						let silence = false;
-						for templateBefore in templatesBefore {
-							this->_engineRender(engines, layoutsDir . templateBefore, silence, mustClean, cache);
-						}
-						let silence = true;
+					let templatesBefore = this->_templatesBefore;
+
+					let silence = false;
+					for templateBefore in templatesBefore {
+						this->_engineRender(engines, layoutsDir . templateBefore, silence, mustClean, cache);
 					}
+					let silence = true;
 				}
 			}
 
@@ -900,17 +927,13 @@ class View extends Injectable implements ViewInterface
 				if !isset disabledLevels[self::LEVEL_AFTER_TEMPLATE] {
 					let this->_currentRenderLevel = self::LEVEL_AFTER_TEMPLATE;
 
-					/**
-					 * Templates after must be an array
-					 */
 					let templatesAfter = this->_templatesAfter;
-					if typeof templatesAfter == "array" {
-						let silence = false;
-						for templateAfter in templatesAfter {
-							this->_engineRender(engines, layoutsDir . templateAfter, silence, mustClean, cache);
-						}
-						let silence = true;
+
+					let silence = false;
+					for templateAfter in templatesAfter {
+						this->_engineRender(engines, layoutsDir . templateAfter, silence, mustClean, cache);
 					}
+					let silence = true;
 				}
 			}
 
@@ -930,12 +953,8 @@ class View extends Injectable implements ViewInterface
 			 * Store the data in the cache
 			 */
 			if typeof cache == "object" {
-				if cache->isStarted() == true {
-					if cache->isFresh() == true {
-						cache->save();
-					} else {
-						cache->stop();
-					}
+				if cache->isStarted() && cache->isFresh() {
+					cache->save();
 				} else {
 					cache->stop();
 				}
@@ -956,22 +975,19 @@ class View extends Injectable implements ViewInterface
 	 * Choose a different view to render instead of last-controller/last-action
 	 *
 	 * <code>
-	 * class ProductsController extends \Phalcon\Mvc\Controller
-	 * {
+	 * use Phalcon\Mvc\Controller;
 	 *
+	 * class ProductsController extends Controller
+	 * {
 	 *    public function saveAction()
 	 *    {
+	 *         // Do some save stuff...
 	 *
-	 *         //Do some save stuff...
-	 *
-	 *         //Then show the list view
+	 *         // Then show the list view
 	 *         $this->view->pick("products/list");
 	 *    }
 	 * }
 	 * </code>
-	 *
-	 * @param string|array renderView
-	 * @return \Phalcon\Mvc\View
 	 */
 	public function pick(var renderView) -> <View>
 	{
@@ -1000,20 +1016,21 @@ class View extends Injectable implements ViewInterface
 	 * Renders a partial view
 	 *
 	 * <code>
-	 * 	//Retrieve the contents of a partial
-	 * 	echo $this->getPartial('shared/footer');
+	 * // Retrieve the contents of a partial
+	 * echo $this->getPartial("shared/footer");
 	 * </code>
 	 *
 	 * <code>
-	 * 	//Retrieve the contents of a partial with arguments
-	 * 	echo $this->getPartial('shared/footer', array('content' => $html));
+	 * // Retrieve the contents of a partial with arguments
+	 * echo $this->getPartial(
+	 *     "shared/footer",
+	 *     [
+	 *         "content" => $html,
+	 *     ]
+	 * );
 	 * </code>
-	 *
-	 * @param string partialPath
-	 * @param array params
-	 * @return string
 	 */
-	public function getPartial(string! partialPath, params = null) -> string
+	public function getPartial(string! partialPath, var params = null) -> string
 	{
 		// not liking the ob_* functions here, but it will greatly reduce the
 		// amount of double code.
@@ -1026,17 +1043,19 @@ class View extends Injectable implements ViewInterface
 	 * Renders a partial view
 	 *
 	 * <code>
-	 * 	//Show a partial inside another view
-	 * 	$this->partial('shared/footer');
+	 * // Show a partial inside another view
+	 * $this->partial("shared/footer");
 	 * </code>
 	 *
 	 * <code>
-	 * 	//Show a partial inside another view with parameters
-	 * 	$this->partial('shared/footer', array('content' => $html));
+	 * // Show a partial inside another view with parameters
+	 * $this->partial(
+	 *     "shared/footer",
+	 *     [
+	 *         "content" => $html,
+	 *     ]
+	 * );
 	 * </code>
-	 *
-	 * @param string partialPath
-	 * @param array params
 	 */
 	public function partial(string! partialPath, var params = null)
 	{
@@ -1048,14 +1067,10 @@ class View extends Injectable implements ViewInterface
 		if typeof params == "array" {
 
 			/**
-			 * Merge or assign the new params as parameters
+			 * Merge the new params as parameters
 			 */
 			let viewParams = this->_viewParams;
-			if typeof viewParams == "array" {
-				let this->_viewParams = array_merge(viewParams, params);
-			} else {
-				let this->_viewParams = params;
-			}
+			let this->_viewParams = array_merge(viewParams, params);
 
 			/**
 			 * Create a virtual symbol table
@@ -1085,7 +1100,13 @@ class View extends Injectable implements ViewInterface
 	 * Perform the automatic rendering returning the output as a string
 	 *
 	 * <code>
-	 * 	$template = $this->view->getRender('products', 'show', array('products' => $products));
+	 * $template = $this->view->getRender(
+	 *     "products",
+	 *     "show",
+	 *     [
+	 *         "products" => $products,
+	 *     ]
+	 * );
 	 * </code>
 	 *
 	 * @param string controllerName
@@ -1168,11 +1189,10 @@ class View extends Injectable implements ViewInterface
 		let cacheService = "viewCache";
 
 		let viewOptions = this->_options;
-		if typeof viewOptions == "array" {
-			if fetch cacheOptions, viewOptions["cache"] {
-				if isset cacheOptions["service"] {
-					let cacheService = cacheOptions["service"];
-				}
+
+		if fetch cacheOptions, viewOptions["cache"] {
+			if isset cacheOptions["service"] {
+				let cacheService = cacheOptions["service"];
 			}
 		}
 
@@ -1200,29 +1220,24 @@ class View extends Injectable implements ViewInterface
 	 */
 	public function getCache() -> <BackendInterface>
 	{
-		var cache;
-		let cache = this->_cache;
-		if cache {
-			if typeof cache != "object" {
-				let cache = this->_createCache(),
-					this->_cache = cache;
-			}
-		} else {
-			let cache = this->_createCache(),
-				this->_cache = cache;
+		if !this->_cache || typeof this->_cache != "object" {
+			let this->_cache = this->_createCache();
 		}
-		return cache;
+
+		return this->_cache;
 	}
 
 	/**
 	 * Cache the actual view render to certain level
 	 *
 	 *<code>
-	 *  $this->view->cache(array('key' => 'my-key', 'lifetime' => 86400));
+	 * $this->view->cache(
+	 *     [
+	 *         "key"      => "my-key",
+	 *         "lifetime" => 86400,
+	 *     ]
+	 * );
 	 *</code>
-	 *
-	 * @param boolean|array options
-	 * @return \Phalcon\Mvc\View
 	 */
 	public function cache(var options = true) -> <View>
 	{
@@ -1260,7 +1275,7 @@ class View extends Injectable implements ViewInterface
 		} else {
 
 			/**
-			 * If 'options' isn't an array we enable the cache with the default options
+			 * If 'options' isn't an array we enable the cache with default options
 			 */
 			if options {
 				let this->_cacheLevel = self::LEVEL_MAIN_LAYOUT;
@@ -1276,7 +1291,7 @@ class View extends Injectable implements ViewInterface
 	 * Externally sets the view content
 	 *
 	 *<code>
-	 *	$this->view->setContent("<h1>hello</h1>");
+	 * $this->view->setContent("<h1>hello</h1>");
 	 *</code>
 	 */
 	public function setContent(string content) -> <View>
@@ -1294,11 +1309,29 @@ class View extends Injectable implements ViewInterface
 	}
 
 	/**
-	 * Returns the path of the view that is currently rendered
+	 * Returns the path (or paths) of the views that are currently rendered
 	 */
-	public function getActiveRenderPath() -> string
+	public function getActiveRenderPath() -> string | array
 	{
-		return this->_activeRenderPath;
+		var activeRenderPath;
+		int viewsDirsCount;
+
+		let viewsDirsCount = count(this->getViewsDirs()),
+			activeRenderPath = this->_activeRenderPaths;
+
+		if viewsDirsCount === 1 {
+			if typeof activeRenderPath == "array" {
+				if count(activeRenderPath) {
+					let activeRenderPath = activeRenderPath[0];
+				}
+			}
+		}
+
+		if typeof activeRenderPath == "null" {
+			let activeRenderPath = "";
+		}
+
+		return activeRenderPath;
 	}
 
 	/**
@@ -1330,8 +1363,8 @@ class View extends Injectable implements ViewInterface
 			this->_renderLevel = self::LEVEL_MAIN_LAYOUT,
 			this->_cacheLevel = self::LEVEL_NO_RENDER,
 			this->_content = null,
-			this->_templatesBefore = null,
-			this->_templatesAfter = null;
+			this->_templatesBefore = [],
+			this->_templatesAfter = [];
 		return this;
 	}
 
@@ -1339,13 +1372,10 @@ class View extends Injectable implements ViewInterface
 	 * Magic method to pass variables to the views
 	 *
 	 *<code>
-	 *	$this->view->products = $products;
+	 * $this->view->products = $products;
 	 *</code>
-	 *
-	 * @param string key
-	 * @param mixed value
 	 */
-	public function __set(string! key, value)
+	public function __set(string! key, var value)
 	{
 		let this->_viewParams[key] = value;
 	}
@@ -1354,13 +1384,10 @@ class View extends Injectable implements ViewInterface
 	 * Magic method to retrieve a variable passed to the view
 	 *
 	 *<code>
-	 *	echo $this->view->products;
+	 * echo $this->view->products;
 	 *</code>
-	 *
-	 * @param string key
-	 * @return mixed
 	 */
-	public function __get(string! key)
+	public function __get(string! key) -> var | null
 	{
 		var value;
 		if fetch value, this->_viewParams[key] {
@@ -1381,14 +1408,23 @@ class View extends Injectable implements ViewInterface
 	 * Magic method to retrieve if a variable is set in the view
 	 *
 	 *<code>
-	 *  echo isset($this->view->products);
+	 * echo isset($this->view->products);
 	 *</code>
-	 *
-	 * @param string key
-	 * @return boolean
 	 */
 	public function __isset(string! key) -> boolean
 	{
-		return isset(this->_viewParams[key]);
+		return isset this->_viewParams[key];
+	}
+
+	/**
+	 * Gets views directories
+	 */
+	protected function getViewsDirs() -> array
+	{
+		if typeof this->_viewsDirs === "string" {
+			return [this->_viewsDirs];
+		}
+
+		return this->_viewsDirs;
 	}
 }

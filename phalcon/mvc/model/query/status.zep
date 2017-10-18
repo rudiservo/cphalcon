@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -31,18 +31,22 @@ use Phalcon\Mvc\Model\Query\StatusInterface;
  * model which finally executes the operations when it fails
  *
  *<code>
- *$phql = "UPDATE Robots SET name = :name:, type = :type:, year = :year: WHERE id = :id:";
- *$status = $app->modelsManager->executeQuery($phql, array(
- *   'id' => 100,
- *   'name' => 'Astroy Boy',
- *   'type' => 'mechanical',
- *   'year' => 1959
- *));
+ * $phql = "UPDATE Robots SET name = :name:, type = :type:, year = :year: WHERE id = :id:";
  *
- *\//Check if the update was successful
- *if ($status->success() == true) {
- *   echo 'OK';
- *}
+ * $status = $app->modelsManager->executeQuery(
+ *     $phql,
+ *     [
+ *         "id"   => 100,
+ *         "name" => "Astroy Boy",
+ *         "type" => "mechanical",
+ *         "year" => 1959,
+ *     ]
+ * );
+ *
+ * // Check if the update was successful
+ * if ($status->success() === true) {
+ *     echo "OK";
+ * }
  *</code>
  */
 class Status implements StatusInterface

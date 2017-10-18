@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2016 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://www.phalconphp.com)      |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,15 +21,27 @@
 namespace Phalcon\Translate\Adapter;
 
 use Phalcon\Translate\Exception;
-use Phalcon\Translate\AdapterInterface;
 use Phalcon\Translate\Adapter;
 
 /**
  * Phalcon\Translate\Adapter\Gettext
  *
+ * <code>
+ * use Phalcon\Translate\Adapter\Gettext;
+ *
+ * $adapter = new Gettext(
+ *     [
+ *         "locale"        => "de_DE.UTF-8",
+ *         "defaultDomain" => "translations",
+ *         "directory"     => "/path/to/application/locales",
+ *         "category"      => LC_MESSAGES,
+ *     ]
+ * );
+ * </code>
+ *
  * Allows translate using gettext
  */
-class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
+class Gettext extends Adapter implements \ArrayAccess
 {
 	/**
 	 * @var string|array
@@ -65,28 +77,17 @@ class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
 	}
 
 	/**
-	 * Returns the translation related to the given key
+	 * Returns the translation related to the given key.
 	 *
-	 * @param string  index
-	 * @param array   placeholders
-	 * @param string  domain
-	 * @return string
+	 * <code>
+	 * $translator->query("你好 %name%！", ["name" => "Phalcon"]);
+	 * </code>
 	 */
 	public function query(string! index, placeholders = null) -> string
 	{
-		var translation, domain;
+		var translation;
 
-		let domain = null;
-
-		if func_num_args() > 2 {
-			let domain = func_get_arg(2);
-		}
-
-		if !domain {
-			let translation = gettext(index);
-		} else {
-			let translation = dgettext(domain, index);
-		}
+		let translation = gettext(index);
 
 		return this->replacePlaceholders(translation, placeholders);
 	}
@@ -106,14 +107,6 @@ class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
 	/**
 	 * The plural version of gettext().
 	 * Some languages have more than one form for plural messages dependent on the count.
-	 *
-	 * @param  string  msgid1
-	 * @param  string  msgid2
-	 * @param  int     count
-	 * @param  array   placeholders
-	 * @param  string  domain
-	 *
-	 * @return string
 	 */
 	public function nquery(string! msgid1, string! msgid2, int! count, placeholders = null, string! domain = null) -> string
 	{
@@ -160,10 +153,12 @@ class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
 	 * $gettext->setDirectory("/path/to/the/messages");
 	 *
 	 * // Set the domains and directories path
-	 * $gettext->setDirectory([
-	 *    "messages" => "/path/to/the/messages",
-	 *    "another" => "/path/to/the/another"
-	 * ]);
+	 * $gettext->setDirectory(
+	 *     [
+	 *         "messages" => "/path/to/the/messages",
+	 *         "another"  => "/path/to/the/another",
+	 *     ]
+	 * );
 	 * </code>
 	 *
 	 * @param string|array directory The directory path or an array of directories and domains
@@ -192,13 +187,13 @@ class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
 	 *
 	 * <code>
 	 * // Set locale to Dutch
-	 * $gettext->setLocale(LC_ALL, 'nl_NL');
+	 * $gettext->setLocale(LC_ALL, "nl_NL");
 	 *
 	 * // Try different possible locale names for german
-	 * $gettext->setLocale(LC_ALL, 'de_DE@euro', 'de_DE', 'de', 'ge');
+	 * $gettext->setLocale(LC_ALL, "de_DE@euro", "de_DE", "de", "ge");
 	 * </code>
 	 */
-	public function setLocale(int! category, string! locale) -> string|boolean
+	public function setLocale(int! category, string! locale) -> string | boolean
 	{
 		let this->_locale   = call_user_func_array("setlocale", func_get_args());
 		let this->_category = category;
@@ -214,7 +209,7 @@ class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
 	/**
 	 * Validator for constructor
 	 */
-	private function prepareOptions(array! options) -> void
+	protected function prepareOptions(array! options) -> void
 	{
 		if !isset options["locale"] {
 			throw new Exception("Parameter 'locale' is required");
@@ -235,7 +230,7 @@ class Gettext extends Adapter implements AdapterInterface, \ArrayAccess
 	/**
 	 * Gets default options
 	 */
-	private function getOptionsDefault() -> array
+	protected function getOptionsDefault() -> array
 	{
 		return [
 			"category": LC_ALL,

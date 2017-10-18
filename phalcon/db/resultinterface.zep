@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -26,18 +26,6 @@ namespace Phalcon\Db;
  */
 interface ResultInterface
 {
-
-	/**
-	 * Phalcon\Db\Result\Pdo constructor
-	 *
-	 * @param \Phalcon\Db\AdapterInterface connection
-	 * @param \PDOStatement result
-	 * @param string sqlStatement
-	 * @param array bindParams
-	 * @param array bindTypes
-	 */
-	public function __construct(<\Phalcon\Db\AdapterInterface> connection, <\PDOStatement> result, sqlStatement = null, bindParams = null, bindTypes = null);
-
 	/**
 	 * Allows to executes the statement again. Some database systems don't support scrollable cursors,
 	 * So, as cursors are forward only, we need to execute the cursor again to fetch rows from the begining

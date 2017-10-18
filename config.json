@@ -10,11 +10,14 @@
     "name": "phalcon",
     "description": "Web framework delivered as a C-extension for PHP",
     "author": "Phalcon Team and contributors",
-    "version": "2.0.10",
-    "verbose": true,
+    "version": "3.2.3",
+    "verbose": false,
     "optimizer-dirs": [
         "optimizers"
     ],
+    "prototype-dir": {
+        "php7": "prototypes/php7"
+    },
     "constants-sources": [
         "ext/phalcon/mvc/model/query/scanner.h",
         "ext/phalcon/annotations/scanner.h",
@@ -94,6 +97,14 @@
             "default": false
         },
         "orm.ignore_unknown_columns": {
+            "type": "bool",
+            "default": false
+        },
+        "orm.update_snapshot_on_save": {
+            "type": "bool",
+            "default": true
+        },
+        "orm.disable_assign_setters": {
             "type": "bool",
             "default": false
         }

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -44,7 +44,7 @@ abstract class Element implements ElementInterface
 
 	protected _attributes;
 
-	protected _validators;
+	protected _validators = [];
 
 	protected _filters;
 
@@ -60,6 +60,12 @@ abstract class Element implements ElementInterface
 	 */
 	public function __construct(string name, var attributes = null)
 	{
+		let name = trim(name);
+		
+		if empty name {
+			throw new \InvalidArgumentException("Form element name is required");
+		}
+		
 		let this->_name = name;
 		if typeof attributes == "array" {
 			let this->_attributes = attributes;
@@ -79,7 +85,7 @@ abstract class Element implements ElementInterface
 	/**
 	 * Returns the parent form to the element
 	 */
-	public function getForm() -> <ElementInterface>
+	public function getForm() -> <Form>
 	{
 		return this->_form;
 	}
@@ -158,11 +164,12 @@ abstract class Element implements ElementInterface
 			let currentValidators = this->_validators;
 			if typeof currentValidators == "array" {
 				let mergedValidators = array_merge(currentValidators, validators);
-			} else {
-				let mergedValidators = validators;
 			}
-			let this->_validators = mergedValidators;
 		}
+		else {
+			let mergedValidators = validators;
+		}
+		let this->_validators = mergedValidators;
 		return this;
 	}
 
@@ -186,12 +193,8 @@ abstract class Element implements ElementInterface
 	/**
 	 * Returns an array of prepared attributes for Phalcon\Tag helpers
 	 * according to the element parameters
-	 *
-	 * @param array attributes
-	 * @param boolean useChecked
-	 * @return array
 	 */
-	public function prepareAttributes(attributes = null, boolean useChecked = false)
+	public function prepareAttributes(array attributes = null, boolean useChecked = false) -> array
 	{
 		var value, name, widgetAttributes, mergedAttributes,
 			defaultAttributes, currentValue;
@@ -230,7 +233,9 @@ abstract class Element implements ElementInterface
 		if value !== null {
 			if useChecked {
 				/**
-				 * Check if the element already has a default value, compare it with the one in the attributes, if they are the same mark the element as checked
+				 * Check if the element already has a default value, compare it
+				 * with the one in the attributes, if they are the same mark the
+				 * element as checked
 				 */
 				if fetch currentValue, mergedAttributes["value"] {
 					if currentValue == value {
@@ -325,7 +330,7 @@ abstract class Element implements ElementInterface
 	 * @param mixed defaultValue
 	 * @return mixed
 	 */
-	public function getUserOption(option, defaultValue = null)
+	public function getUserOption(string option, defaultValue = null)
 	{
 		var value;
 		if fetch value, this->_options[option] {
@@ -336,11 +341,8 @@ abstract class Element implements ElementInterface
 
 	/**
 	 * Sets options for the element
-	 *
-	 * @param array options
-	 * @return \Phalcon\Forms\ElementInterface
 	 */
-	public function setUserOptions(options) -> <ElementInterface>
+	public function setUserOptions(array options) -> <ElementInterface>
 	{
 		let this->_options = options;
 		return this;
@@ -348,10 +350,8 @@ abstract class Element implements ElementInterface
 
 	/**
 	 * Returns the options for the element
-	 *
-	 * @return array
 	 */
-	public function getUserOptions()
+	public function getUserOptions() -> array
 	{
 		return this->_options;
 	}
@@ -377,7 +377,6 @@ abstract class Element implements ElementInterface
 	 * Generate the HTML to label the element
 	 *
 	 * @param array attributes
-	 * @return string
 	 */
 	public function label(var attributes = null) -> string
 	{
@@ -406,7 +405,7 @@ abstract class Element implements ElementInterface
 		 * Use the default label or leave the same name as label
 		 */
 		let label = this->_label;
-		if label {
+		if label || is_numeric(label) {
 			let code .= ">" . label . "</label>";
 		} else {
 			let code .= ">" . name . "</label>";
@@ -430,20 +429,16 @@ abstract class Element implements ElementInterface
 
 	/**
 	 * Returns the default value assigned to the element
-	 *
-	 * @return mixed
 	 */
-	public function getDefault()
+	public function getDefault() -> var
 	{
 		return this->_value;
 	}
 
 	/**
 	 * Returns the element value
-	 *
-	 * @return mixed
 	 */
-	public function getValue()
+	public function getValue() -> var
 	{
 		var name, form, value;
 
@@ -524,7 +519,7 @@ abstract class Element implements ElementInterface
 	}
 
 	/**
-	 * Magic method __toString renders the widget without atttributes
+	 * Magic method __toString renders the widget without attributes
 	 */
 	public function __toString() -> string
 	{

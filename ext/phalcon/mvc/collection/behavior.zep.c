@@ -31,6 +31,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_Collection_Behavior) {
 
 	zend_declare_property_null(phalcon_mvc_collection_behavior_ce, SL("_options"), ZEND_ACC_PROTECTED TSRMLS_CC);
 
+	zend_class_implements(phalcon_mvc_collection_behavior_ce TSRMLS_CC, 1, phalcon_mvc_collection_behaviorinterface_ce);
 	return SUCCESS;
 
 }
@@ -51,7 +52,7 @@ PHP_METHOD(Phalcon_Mvc_Collection_Behavior, __construct) {
 	}
 
 
-	zephir_update_property_this(this_ptr, SL("_options"), options TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_options"), options TSRMLS_CC);
 
 }
 
@@ -66,11 +67,11 @@ PHP_METHOD(Phalcon_Mvc_Collection_Behavior, mustTakeAction) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &eventName_param);
 
-	if (unlikely(Z_TYPE_P(eventName_param) != IS_STRING && Z_TYPE_P(eventName_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(eventName_param) != IS_STRING && Z_TYPE_P(eventName_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'eventName' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(eventName_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(eventName_param) == IS_STRING)) {
 		zephir_get_strval(eventName, eventName_param);
 	} else {
 		ZEPHIR_INIT_VAR(eventName);
@@ -101,11 +102,11 @@ PHP_METHOD(Phalcon_Mvc_Collection_Behavior, getOptions) {
 		ZEPHIR_INIT_VAR(eventName);
 		ZVAL_EMPTY_STRING(eventName);
 	} else {
-	if (unlikely(Z_TYPE_P(eventName_param) != IS_STRING && Z_TYPE_P(eventName_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(eventName_param) != IS_STRING && Z_TYPE_P(eventName_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'eventName' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(eventName_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(eventName_param) == IS_STRING)) {
 		zephir_get_strval(eventName, eventName_param);
 	} else {
 		ZEPHIR_INIT_VAR(eventName);

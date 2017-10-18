@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -35,9 +35,12 @@ use Phalcon\Events\ManagerInterface as EventsManagerInterface;
  * <code>
  * $di = new \Phalcon\Di();
  *
- * $di->set('collectionManager', function() {
- *      return new \Phalcon\Mvc\Collection\Manager();
- * });
+ * $di->set(
+ *     "collectionManager",
+ *     function() {
+ *         return new \Phalcon\Mvc\Collection\Manager();
+ *     }
+ * );
  *
  * $robot = new Robots(di);
  * </code>
@@ -91,7 +94,7 @@ interface ManagerInterface
 	public function getConnection(<CollectionInterface> model) -> <AdapterInterface>;
 
 	/**
-	 * Receives events generated in the models and dispatches them to a events-manager if available
+	 * Receives events generated in the models and dispatches them to an events-manager if available
 	 * Notify the behaviors that are listening in the model
 	 */
 	public function notifyEvent(string! eventName, <CollectionInterface> model);

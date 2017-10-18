@@ -14,14 +14,13 @@
 #include "kernel/main.h"
 #include "kernel/object.h"
 #include "kernel/memory.h"
-#include "kernel/string.h"
 #include "kernel/operators.h"
+#include "kernel/string.h"
+#include "kernel/exception.h"
 #include "kernel/concat.h"
 #include "kernel/array.h"
 #include "ext/spl/spl_exceptions.h"
-#include "kernel/exception.h"
 #include "kernel/fcall.h"
-#include "kernel/hash.h"
 #include "Zend/zend_closures.h"
 #include "kernel/file.h"
 
@@ -34,16 +33,20 @@
  * It provides a system of helpers, output filters, and variable escaping.
  *
  * <code>
- * //Setting views directory
- * $view = new \Phalcon\Mvc\View();
- * $view->setViewsDir('app/views/');
+ * use Phalcon\Mvc\View;
+ *
+ * $view = new View();
+ *
+ * // Setting views directory
+ * $view->setViewsDir("app/views/");
  *
  * $view->start();
- * //Shows recent posts view (app/views/posts/recent.phtml)
- * $view->render('posts', 'recent');
+ *
+ * // Shows recent posts view (app/views/posts/recent.phtml)
+ * $view->render("posts", "recent");
  * $view->finish();
  *
- * //Printing views output
+ * // Printing views output
  * echo $view->getContent();
  * </code>
  */
@@ -71,7 +74,7 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_View) {
 
 	zend_declare_property_string(phalcon_mvc_view_ce, SL("_partialsDir"), "", ZEND_ACC_PROTECTED TSRMLS_CC);
 
-	zend_declare_property_null(phalcon_mvc_view_ce, SL("_viewsDir"), ZEND_ACC_PROTECTED TSRMLS_CC);
+	zend_declare_property_null(phalcon_mvc_view_ce, SL("_viewsDirs"), ZEND_ACC_PROTECTED TSRMLS_CC);
 
 	zend_declare_property_null(phalcon_mvc_view_ce, SL("_templatesBefore"), ZEND_ACC_PROTECTED TSRMLS_CC);
 
@@ -98,10 +101,11 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_View) {
 
 	zend_declare_property_long(phalcon_mvc_view_ce, SL("_cacheLevel"), 0, ZEND_ACC_PROTECTED TSRMLS_CC);
 
-	zend_declare_property_null(phalcon_mvc_view_ce, SL("_activeRenderPath"), ZEND_ACC_PROTECTED TSRMLS_CC);
+	zend_declare_property_null(phalcon_mvc_view_ce, SL("_activeRenderPaths"), ZEND_ACC_PROTECTED TSRMLS_CC);
 
 	zend_declare_property_bool(phalcon_mvc_view_ce, SL("_disabled"), 0, ZEND_ACC_PROTECTED TSRMLS_CC);
 
+	phalcon_mvc_view_ce->create_object = zephir_init_properties_Phalcon_Mvc_View;
 	/**
 	 * Render Level: To the main layout
 	 *
@@ -153,7 +157,7 @@ PHP_METHOD(Phalcon_Mvc_View, getRenderLevel) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_renderLevel");
+	RETURN_MEMBER(getThis(), "_renderLevel");
 
 }
 
@@ -161,7 +165,7 @@ PHP_METHOD(Phalcon_Mvc_View, getCurrentRenderLevel) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_currentRenderLevel");
+	RETURN_MEMBER(getThis(), "_currentRenderLevel");
 
 }
 
@@ -171,56 +175,140 @@ PHP_METHOD(Phalcon_Mvc_View, getRegisteredEngines) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_registeredEngines");
+	RETURN_MEMBER(getThis(), "_registeredEngines");
 
 }
 
 /**
  * Phalcon\Mvc\View constructor
- *
- * @param array options
  */
 PHP_METHOD(Phalcon_Mvc_View, __construct) {
 
+	zval *options_param = NULL;
 	zval *options = NULL;
 
-	zephir_fetch_params(0, 0, 1, &options);
+	ZEPHIR_MM_GROW();
+	zephir_fetch_params(1, 0, 1, &options_param);
 
-	if (!options) {
-		options = ZEPHIR_GLOBAL(global_null);
+	if (!options_param) {
+		ZEPHIR_INIT_VAR(options);
+		array_init(options);
+	} else {
+		zephir_get_arrval(options, options_param);
 	}
 
 
-	if (Z_TYPE_P(options) == IS_ARRAY) {
-		zephir_update_property_this(this_ptr, SL("_options"), options TSRMLS_CC);
-	}
+	zephir_update_property_this(getThis(), SL("_options"), options TSRMLS_CC);
+	ZEPHIR_MM_RESTORE();
 
 }
 
 /**
- * Sets the views directory. Depending of your platform, always add a trailing slash or backslash
+ * Checks if a path is absolute or not
+ */
+PHP_METHOD(Phalcon_Mvc_View, _isAbsolutePath) {
+
+	unsigned char _6, _2$$3, _4$$3;
+	zend_bool _5, _1$$3, _3$$3;
+	zval *path_param = NULL, *_0;
+	zval *path = NULL;
+
+	ZEPHIR_MM_GROW();
+	zephir_fetch_params(1, 1, 0, &path_param);
+
+	zephir_get_strval(path, path_param);
+
+
+	ZEPHIR_INIT_VAR(_0);
+	ZEPHIR_GET_CONSTANT(_0, "PHP_OS");
+	if (ZEPHIR_IS_STRING(_0, "WINNT")) {
+		_1$$3 = zephir_fast_strlen_ev(path) >= 3;
+		if (_1$$3) {
+			_2$$3 = ZEPHIR_STRING_OFFSET(path, 1);
+			_1$$3 = _2$$3 == ':';
+		}
+		_3$$3 = _1$$3;
+		if (_3$$3) {
+			_4$$3 = ZEPHIR_STRING_OFFSET(path, 2);
+			_3$$3 = _4$$3 == '\\';
+		}
+		RETURN_MM_BOOL(_3$$3);
+	}
+	_5 = zephir_fast_strlen_ev(path) >= 1;
+	if (_5) {
+		_6 = ZEPHIR_STRING_OFFSET(path, 0);
+		_5 = _6 == '/';
+	}
+	RETURN_MM_BOOL(_5);
+
+}
+
+/**
+ * Sets the views directory. Depending of your platform,
+ * always add a trailing slash or backslash
  */
 PHP_METHOD(Phalcon_Mvc_View, setViewsDir) {
 
-	zval *viewsDir_param = NULL, _0, *_1;
-	zval *viewsDir = NULL, *_2$$3;
+	HashTable *_5$$6;
+	HashPosition _4$$6;
+	zend_bool _0;
+	zval *viewsDir = NULL, *position = NULL, *directory = NULL, *directorySeparator = NULL, *newViewsDir = NULL, _1$$4, *_2$$4, *_3$$5, **_6$$6, _7$$7 = zval_used_for_init, *_8$$7 = NULL, *_9$$9 = NULL;
 
 	ZEPHIR_MM_GROW();
-	zephir_fetch_params(1, 1, 0, &viewsDir_param);
+	zephir_fetch_params(1, 1, 0, &viewsDir);
 
-	zephir_get_strval(viewsDir, viewsDir_param);
+	ZEPHIR_SEPARATE_PARAM(viewsDir);
 
 
-	ZEPHIR_SINIT_VAR(_0);
-	ZVAL_LONG(&_0, -1);
-	ZEPHIR_INIT_VAR(_1);
-	zephir_substr(_1, viewsDir, -1 , 0, ZEPHIR_SUBSTR_NO_LENGTH);
-	if (!ZEPHIR_IS_STRING(_1, "/")) {
-		ZEPHIR_INIT_VAR(_2$$3);
-		ZEPHIR_CONCAT_VS(_2$$3, viewsDir, "/");
-		ZEPHIR_CPY_WRT(viewsDir, _2$$3);
+	_0 = Z_TYPE_P(viewsDir) != IS_STRING;
+	if (_0) {
+		_0 = Z_TYPE_P(viewsDir) != IS_ARRAY;
 	}
-	zephir_update_property_this(this_ptr, SL("_viewsDir"), viewsDir TSRMLS_CC);
+	if (_0) {
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "Views directory must be a string or an array", "phalcon/mvc/view.zep", 179);
+		return;
+	}
+	ZEPHIR_INIT_VAR(directorySeparator);
+	ZVAL_STRING(directorySeparator, "/", 1);
+	if (Z_TYPE_P(viewsDir) == IS_STRING) {
+		ZEPHIR_SINIT_VAR(_1$$4);
+		ZVAL_LONG(&_1$$4, -1);
+		ZEPHIR_INIT_VAR(_2$$4);
+		zephir_substr(_2$$4, viewsDir, -1 , 0, ZEPHIR_SUBSTR_NO_LENGTH);
+		if (!ZEPHIR_IS_EQUAL(_2$$4, directorySeparator)) {
+			ZEPHIR_INIT_VAR(_3$$5);
+			ZEPHIR_CONCAT_VV(_3$$5, viewsDir, directorySeparator);
+			ZEPHIR_CPY_WRT(viewsDir, _3$$5);
+		}
+		zephir_update_property_this(getThis(), SL("_viewsDirs"), viewsDir TSRMLS_CC);
+	} else {
+		ZEPHIR_INIT_VAR(newViewsDir);
+		array_init(newViewsDir);
+		zephir_is_iterable(viewsDir, &_5$$6, &_4$$6, 0, 0, "phalcon/mvc/view.zep", 206);
+		for (
+		  ; zend_hash_get_current_data_ex(_5$$6, (void**) &_6$$6, &_4$$6) == SUCCESS
+		  ; zend_hash_move_forward_ex(_5$$6, &_4$$6)
+		) {
+			ZEPHIR_GET_HMKEY(position, _5$$6, _4$$6);
+			ZEPHIR_GET_HVALUE(directory, _6$$6);
+			if (Z_TYPE_P(directory) != IS_STRING) {
+				ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "Views directory item must be a string", "phalcon/mvc/view.zep", 196);
+				return;
+			}
+			ZEPHIR_SINIT_NVAR(_7$$7);
+			ZVAL_LONG(&_7$$7, -1);
+			ZEPHIR_INIT_NVAR(_8$$7);
+			zephir_substr(_8$$7, directory, -1 , 0, ZEPHIR_SUBSTR_NO_LENGTH);
+			if (!ZEPHIR_IS_EQUAL(_8$$7, directorySeparator)) {
+				ZEPHIR_INIT_LNVAR(_9$$9);
+				ZEPHIR_CONCAT_VV(_9$$9, directory, directorySeparator);
+				zephir_array_update_zval(&newViewsDir, position, &_9$$9, PH_COPY | PH_SEPARATE);
+			} else {
+				zephir_array_update_zval(&newViewsDir, position, &directory, PH_COPY | PH_SEPARATE);
+			}
+		}
+		zephir_update_property_this(getThis(), SL("_viewsDirs"), newViewsDir TSRMLS_CC);
+	}
 	RETURN_THIS();
 
 }
@@ -232,15 +320,16 @@ PHP_METHOD(Phalcon_Mvc_View, getViewsDir) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_viewsDir");
+	RETURN_MEMBER(getThis(), "_viewsDirs");
 
 }
 
 /**
- * Sets the layouts sub-directory. Must be a directory under the views directory. Depending of your platform, always add a trailing slash or backslash
+ * Sets the layouts sub-directory. Must be a directory under the views directory.
+ * Depending of your platform, always add a trailing slash or backslash
  *
  *<code>
- * $view->setLayoutsDir('../common/layouts/');
+ * $view->setLayoutsDir("../common/layouts/");
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setLayoutsDir) {
@@ -254,7 +343,7 @@ PHP_METHOD(Phalcon_Mvc_View, setLayoutsDir) {
 	zephir_get_strval(layoutsDir, layoutsDir_param);
 
 
-	zephir_update_property_this(this_ptr, SL("_layoutsDir"), layoutsDir TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_layoutsDir"), layoutsDir TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -266,15 +355,16 @@ PHP_METHOD(Phalcon_Mvc_View, getLayoutsDir) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_layoutsDir");
+	RETURN_MEMBER(getThis(), "_layoutsDir");
 
 }
 
 /**
- * Sets a partials sub-directory. Must be a directory under the views directory. Depending of your platform, always add a trailing slash or backslash
+ * Sets a partials sub-directory. Must be a directory under the views directory.
+ * Depending of your platform, always add a trailing slash or backslash
  *
  *<code>
- * $view->setPartialsDir('../common/partials/');
+ * $view->setPartialsDir("../common/partials/");
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setPartialsDir) {
@@ -288,7 +378,7 @@ PHP_METHOD(Phalcon_Mvc_View, setPartialsDir) {
 	zephir_get_strval(partialsDir, partialsDir_param);
 
 
-	zephir_update_property_this(this_ptr, SL("_partialsDir"), partialsDir TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_partialsDir"), partialsDir TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -300,7 +390,7 @@ PHP_METHOD(Phalcon_Mvc_View, getPartialsDir) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_partialsDir");
+	RETURN_MEMBER(getThis(), "_partialsDir");
 
 }
 
@@ -308,7 +398,7 @@ PHP_METHOD(Phalcon_Mvc_View, getPartialsDir) {
  * Sets base path. Depending of your platform, always add a trailing slash or backslash
  *
  * <code>
- * 	$view->setBasePath(__DIR__ . '/');
+ * 	$view->setBasePath(__DIR__ . "/");
  * </code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setBasePath) {
@@ -322,7 +412,7 @@ PHP_METHOD(Phalcon_Mvc_View, setBasePath) {
 	zephir_get_strval(basePath, basePath_param);
 
 
-	zephir_update_property_this(this_ptr, SL("_basePath"), basePath TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_basePath"), basePath TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -334,7 +424,7 @@ PHP_METHOD(Phalcon_Mvc_View, getBasePath) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_basePath");
+	RETURN_MEMBER(getThis(), "_basePath");
 
 }
 
@@ -342,14 +432,16 @@ PHP_METHOD(Phalcon_Mvc_View, getBasePath) {
  * Sets the render level for the view
  *
  * <code>
- * 	//Render the view related to the controller only
- * 	$this->view->setRenderLevel(View::LEVEL_LAYOUT);
+ * // Render the view related to the controller only
+ * $this->view->setRenderLevel(
+ *     View::LEVEL_LAYOUT
+ * );
  * </code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setRenderLevel) {
 
 	zval *level_param = NULL, *_0;
-	int level;
+	zend_long level;
 
 	zephir_fetch_params(0, 1, 0, &level_param);
 
@@ -358,7 +450,7 @@ PHP_METHOD(Phalcon_Mvc_View, setRenderLevel) {
 
 	ZEPHIR_INIT_ZVAL_NREF(_0);
 	ZVAL_LONG(_0, level);
-	zephir_update_property_this(this_ptr, SL("_renderLevel"), _0 TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_renderLevel"), _0 TSRMLS_CC);
 	RETURN_THISW();
 
 }
@@ -367,12 +459,11 @@ PHP_METHOD(Phalcon_Mvc_View, setRenderLevel) {
  * Disables a specific level of rendering
  *
  *<code>
- * //Render all levels except ACTION level
- * $this->view->disableLevel(View::LEVEL_ACTION_VIEW);
+ * // Render all levels except ACTION level
+ * $this->view->disableLevel(
+ *     View::LEVEL_ACTION_VIEW
+ * );
  *</code>
- *
- * @param int|array level
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, disableLevel) {
 
@@ -383,7 +474,7 @@ PHP_METHOD(Phalcon_Mvc_View, disableLevel) {
 
 
 	if (Z_TYPE_P(level) == IS_ARRAY) {
-		zephir_update_property_this(this_ptr, SL("_disabledLevels"), level TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabledLevels"), level TSRMLS_CC);
 	} else {
 		zephir_update_property_array(this_ptr, SL("_disabledLevels"), level, ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	}
@@ -395,8 +486,8 @@ PHP_METHOD(Phalcon_Mvc_View, disableLevel) {
  * Sets default view name. Must be a file without extension in the views directory
  *
  * <code>
- * 	//Renders as main view views-dir/base.phtml
- * 	$this->view->setMainView('base');
+ * // Renders as main view views-dir/base.phtml
+ * $this->view->setMainView("base");
  * </code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setMainView) {
@@ -410,7 +501,7 @@ PHP_METHOD(Phalcon_Mvc_View, setMainView) {
 	zephir_get_strval(viewPath, viewPath_param);
 
 
-	zephir_update_property_this(this_ptr, SL("_mainView"), viewPath TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_mainView"), viewPath TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -422,7 +513,7 @@ PHP_METHOD(Phalcon_Mvc_View, getMainView) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_mainView");
+	RETURN_MEMBER(getThis(), "_mainView");
 
 }
 
@@ -430,7 +521,7 @@ PHP_METHOD(Phalcon_Mvc_View, getMainView) {
  * Change the layout to be used instead of using the name of the latest controller name
  *
  * <code>
- * 	$this->view->setLayout('main');
+ * $this->view->setLayout("main");
  * </code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setLayout) {
@@ -444,7 +535,7 @@ PHP_METHOD(Phalcon_Mvc_View, setLayout) {
 	zephir_get_strval(layout, layout_param);
 
 
-	zephir_update_property_this(this_ptr, SL("_layout"), layout TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_layout"), layout TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -456,15 +547,12 @@ PHP_METHOD(Phalcon_Mvc_View, getLayout) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_layout");
+	RETURN_MEMBER(getThis(), "_layout");
 
 }
 
 /**
  * Sets a template before the controller layout
- *
- * @param string|array templateBefore
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, setTemplateBefore) {
 
@@ -480,9 +568,9 @@ PHP_METHOD(Phalcon_Mvc_View, setTemplateBefore) {
 		ZEPHIR_INIT_VAR(_0$$3);
 		zephir_create_array(_0$$3, 1, 0 TSRMLS_CC);
 		zephir_array_fast_append(_0$$3, templateBefore);
-		zephir_update_property_this(this_ptr, SL("_templatesBefore"), _0$$3 TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_templatesBefore"), _0$$3 TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_templatesBefore"), templateBefore TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_templatesBefore"), templateBefore TSRMLS_CC);
 	}
 	RETURN_THIS();
 
@@ -493,18 +581,19 @@ PHP_METHOD(Phalcon_Mvc_View, setTemplateBefore) {
  */
 PHP_METHOD(Phalcon_Mvc_View, cleanTemplateBefore) {
 
-	
+	zval *_0;
 
-	zephir_update_property_this(this_ptr, SL("_templatesBefore"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
-	RETURN_THISW();
+	ZEPHIR_MM_GROW();
+
+	ZEPHIR_INIT_VAR(_0);
+	array_init(_0);
+	zephir_update_property_this(getThis(), SL("_templatesBefore"), _0 TSRMLS_CC);
+	RETURN_THIS();
 
 }
 
 /**
  * Sets a "template after" controller layout
- *
- * @param string|array templateAfter
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, setTemplateAfter) {
 
@@ -520,9 +609,9 @@ PHP_METHOD(Phalcon_Mvc_View, setTemplateAfter) {
 		ZEPHIR_INIT_VAR(_0$$3);
 		zephir_create_array(_0$$3, 1, 0 TSRMLS_CC);
 		zephir_array_fast_append(_0$$3, templateAfter);
-		zephir_update_property_this(this_ptr, SL("_templatesAfter"), _0$$3 TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_templatesAfter"), _0$$3 TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_templatesAfter"), templateAfter TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_templatesAfter"), templateAfter TSRMLS_CC);
 	}
 	RETURN_THIS();
 
@@ -533,10 +622,14 @@ PHP_METHOD(Phalcon_Mvc_View, setTemplateAfter) {
  */
 PHP_METHOD(Phalcon_Mvc_View, cleanTemplateAfter) {
 
-	
+	zval *_0;
 
-	zephir_update_property_this(this_ptr, SL("_templatesAfter"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
-	RETURN_THISW();
+	ZEPHIR_MM_GROW();
+
+	ZEPHIR_INIT_VAR(_0);
+	array_init(_0);
+	zephir_update_property_this(getThis(), SL("_templatesAfter"), _0 TSRMLS_CC);
+	RETURN_THIS();
 
 }
 
@@ -544,12 +637,8 @@ PHP_METHOD(Phalcon_Mvc_View, cleanTemplateAfter) {
  * Adds parameters to views (alias of setVar)
  *
  *<code>
- *	$this->view->setParamToView('products', $products);
+ * $this->view->setParamToView("products", $products);
  *</code>
- *
- * @param string key
- * @param mixed value
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, setParamToView) {
 
@@ -559,11 +648,11 @@ PHP_METHOD(Phalcon_Mvc_View, setParamToView) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 2, 0, &key_param, &value);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -580,17 +669,17 @@ PHP_METHOD(Phalcon_Mvc_View, setParamToView) {
  * Set all the render params
  *
  *<code>
- *	$this->view->setVars(array('products' => $products));
+ * $this->view->setVars(
+ *     [
+ *         "products" => $products,
+ *     ]
+ * );
  *</code>
- *
- * @param array params
- * @param boolean merge
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, setVars) {
 
 	zend_bool merge;
-	zval *params_param = NULL, *merge_param = NULL, *viewParams = NULL, *_0$$4;
+	zval *params_param = NULL, *merge_param = NULL, *_0$$3, *_1$$3;
 	zval *params = NULL;
 
 	ZEPHIR_MM_GROW();
@@ -605,17 +694,12 @@ PHP_METHOD(Phalcon_Mvc_View, setVars) {
 
 
 	if (merge) {
-		ZEPHIR_OBS_VAR(viewParams);
-		zephir_read_property_this(&viewParams, this_ptr, SL("_viewParams"), PH_NOISY_CC);
-		if (Z_TYPE_P(viewParams) == IS_ARRAY) {
-			ZEPHIR_INIT_VAR(_0$$4);
-			zephir_fast_array_merge(_0$$4, &(viewParams), &(params) TSRMLS_CC);
-			zephir_update_property_this(this_ptr, SL("_viewParams"), _0$$4 TSRMLS_CC);
-		} else {
-			zephir_update_property_this(this_ptr, SL("_viewParams"), params TSRMLS_CC);
-		}
+		ZEPHIR_INIT_VAR(_0$$3);
+		_1$$3 = zephir_fetch_nproperty_this(this_ptr, SL("_viewParams"), PH_NOISY_CC);
+		zephir_fast_array_merge(_0$$3, &(_1$$3), &(params) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_viewParams"), _0$$3 TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_viewParams"), params TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_viewParams"), params TSRMLS_CC);
 	}
 	RETURN_THIS();
 
@@ -625,12 +709,8 @@ PHP_METHOD(Phalcon_Mvc_View, setVars) {
  * Set a single view parameter
  *
  *<code>
- *	$this->view->setVar('products', $products);
+ * $this->view->setVar("products", $products);
  *</code>
- *
- * @param string key
- * @param mixed value
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, setVar) {
 
@@ -640,11 +720,11 @@ PHP_METHOD(Phalcon_Mvc_View, setVar) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 2, 0, &key_param, &value);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -659,23 +739,20 @@ PHP_METHOD(Phalcon_Mvc_View, setVar) {
 
 /**
  * Returns a parameter previously set in the view
- *
- * @param string key
- * @return mixed
  */
 PHP_METHOD(Phalcon_Mvc_View, getVar) {
 
-	zval *key_param = NULL, *params = NULL, *value = NULL;
+	zval *key_param = NULL, *value = NULL, *_0;
 	zval *key = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &key_param);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -683,63 +760,57 @@ PHP_METHOD(Phalcon_Mvc_View, getVar) {
 	}
 
 
-	params = zephir_fetch_nproperty_this(this_ptr, SL("_viewParams"), PH_NOISY_CC);
-	if (zephir_array_isset_fetch(&value, params, key, 1 TSRMLS_CC)) {
-		RETURN_CTOR(value);
+	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_viewParams"), PH_NOISY_CC);
+	if (!(zephir_array_isset_fetch(&value, _0, key, 1 TSRMLS_CC))) {
+		RETURN_MM_NULL();
 	}
-	RETURN_MM_NULL();
+	RETURN_CTOR(value);
 
 }
 
 /**
  * Returns parameters to views
- *
- * @return array
  */
 PHP_METHOD(Phalcon_Mvc_View, getParamsToView) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_viewParams");
+	RETURN_MEMBER(getThis(), "_viewParams");
 
 }
 
 /**
  * Gets the name of the controller rendered
- *
- * @return string
  */
 PHP_METHOD(Phalcon_Mvc_View, getControllerName) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_controllerName");
+	RETURN_MEMBER(getThis(), "_controllerName");
 
 }
 
 /**
  * Gets the name of the action rendered
- *
- * @return string
  */
 PHP_METHOD(Phalcon_Mvc_View, getActionName) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_actionName");
+	RETURN_MEMBER(getThis(), "_actionName");
 
 }
 
 /**
  * Gets extra parameters of the action rendered
  *
- * @return array
+ * @deprecated Will be removed in 4.0.0
  */
 PHP_METHOD(Phalcon_Mvc_View, getParams) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_params");
+	RETURN_MEMBER(getThis(), "_params");
 
 }
 
@@ -748,13 +819,13 @@ PHP_METHOD(Phalcon_Mvc_View, getParams) {
  */
 PHP_METHOD(Phalcon_Mvc_View, start) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
-	ZEPHIR_CALL_FUNCTION(NULL, "ob_start", NULL, 120);
+	ZEPHIR_CALL_FUNCTION(NULL, "ob_start", NULL, 138);
 	zephir_check_call_status();
-	zephir_update_property_this(this_ptr, SL("_content"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_content"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -768,7 +839,7 @@ PHP_METHOD(Phalcon_Mvc_View, _loadTemplateEngines) {
 	HashPosition _2$$5;
 	zval *engines = NULL, *dependencyInjector = NULL, *registeredEngines = NULL, *arguments = NULL, *engineService = NULL, *extension = NULL, *_0$$3, *_1$$4, **_4$$5, *_5$$9 = NULL, *_6$$12 = NULL, *_7$$12 = NULL, *_9$$11 = NULL;
 	zephir_fcall_cache_entry *_8 = NULL, *_10 = NULL;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
@@ -784,22 +855,22 @@ PHP_METHOD(Phalcon_Mvc_View, _loadTemplateEngines) {
 		if (Z_TYPE_P(registeredEngines) != IS_ARRAY) {
 			ZEPHIR_INIT_VAR(_1$$4);
 			object_init_ex(_1$$4, phalcon_mvc_view_engine_php_ce);
-			ZEPHIR_CALL_METHOD(NULL, _1$$4, "__construct", NULL, 363, this_ptr, dependencyInjector);
+			ZEPHIR_CALL_METHOD(NULL, _1$$4, "__construct", NULL, 395, this_ptr, dependencyInjector);
 			zephir_check_call_status();
 			zephir_array_update_string(&engines, SL(".phtml"), &_1$$4, PH_COPY | PH_SEPARATE);
 		} else {
 			if (Z_TYPE_P(dependencyInjector) != IS_OBJECT) {
-				ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "A dependency injector container is required to obtain the application services", "phalcon/mvc/view.zep", 526);
+				ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "A dependency injector container is required to obtain the application services", "phalcon/mvc/view.zep", 542);
 				return;
 			}
 			ZEPHIR_INIT_VAR(arguments);
 			zephir_create_array(arguments, 2, 0 TSRMLS_CC);
 			zephir_array_fast_append(arguments, this_ptr);
 			zephir_array_fast_append(arguments, dependencyInjector);
-			zephir_is_iterable(registeredEngines, &_3$$5, &_2$$5, 0, 0, "phalcon/mvc/view.zep", 555);
+			zephir_is_iterable(registeredEngines, &_3$$5, &_2$$5, 0, 0, "phalcon/mvc/view.zep", 571);
 			for (
-			  ; zephir_hash_get_current_data_ex(_3$$5, (void**) &_4$$5, &_2$$5) == SUCCESS
-			  ; zephir_hash_move_forward_ex(_3$$5, &_2$$5)
+			  ; zend_hash_get_current_data_ex(_3$$5, (void**) &_4$$5, &_2$$5) == SUCCESS
+			  ; zend_hash_move_forward_ex(_3$$5, &_2$$5)
 			) {
 				ZEPHIR_GET_HMKEY(extension, _3$$5, _2$$5);
 				ZEPHIR_GET_HVALUE(engineService, _4$$5);
@@ -820,7 +891,7 @@ PHP_METHOD(Phalcon_Mvc_View, _loadTemplateEngines) {
 						ZEPHIR_CONCAT_SV(_7$$12, "Invalid template engine registration for extension: ", extension);
 						ZEPHIR_CALL_METHOD(NULL, _6$$12, "__construct", &_8, 9, _7$$12);
 						zephir_check_call_status();
-						zephir_throw_exception_debug(_6$$12, "phalcon/mvc/view.zep", 549 TSRMLS_CC);
+						zephir_throw_exception_debug(_6$$12, "phalcon/mvc/view.zep", 565 TSRMLS_CC);
 						ZEPHIR_MM_RESTORE();
 						return;
 					}
@@ -830,7 +901,7 @@ PHP_METHOD(Phalcon_Mvc_View, _loadTemplateEngines) {
 				}
 			}
 		}
-		zephir_update_property_this(this_ptr, SL("_engines"), engines TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_engines"), engines TSRMLS_CC);
 	}
 	RETURN_CCTOR(engines);
 
@@ -847,13 +918,14 @@ PHP_METHOD(Phalcon_Mvc_View, _loadTemplateEngines) {
  */
 PHP_METHOD(Phalcon_Mvc_View, _engineRender) {
 
-	HashTable *_6;
-	HashPosition _5;
-	zephir_fcall_cache_entry *_10 = NULL, *_13 = NULL;
-	int ZEPHIR_LAST_CALL_STATUS, renderLevel = 0, cacheLevel = 0;
+	zval *_17$$16 = NULL;
+	HashTable *_3, *_15$$3;
+	HashPosition _2, _14$$3;
+	zephir_fcall_cache_entry *_6 = NULL, *_10 = NULL, *_11 = NULL, *_13 = NULL, *_20 = NULL, *_23 = NULL;
+	zend_long ZEPHIR_LAST_CALL_STATUS, renderLevel = 0, cacheLevel = 0;
 	zend_bool silence, mustClean, notExists = 0;
-	zval *viewPath = NULL;
-	zval *engines, *viewPath_param = NULL, *silence_param = NULL, *mustClean_param = NULL, *cache = NULL, *key = NULL, *lifetime = NULL, *viewsDir = NULL, *basePath = NULL, *viewsDirPath = NULL, *viewOptions = NULL, *cacheOptions = NULL, *cachedView = NULL, *viewParams = NULL, *eventsManager = NULL, *extension = NULL, *engine = NULL, *viewEnginePath = NULL, *_4, **_7, *_0$$3, *_1$$3, *_2$$4 = NULL, *_3$$4 = NULL, *_8$$14 = NULL, *_9$$14 = NULL, *_11$$13 = NULL, *_12$$16 = NULL, *_14$$18, *_15$$19, *_16$$19;
+	zval *viewPath = NULL, *_26$$21;
+	zval *engines, *viewPath_param = NULL, *silence_param = NULL, *mustClean_param = NULL, *cache = NULL, *key = NULL, *lifetime = NULL, *viewsDir = NULL, *basePath = NULL, *viewsDirPath = NULL, *viewOptions = NULL, *cacheOptions = NULL, *cachedView = NULL, *viewParams = NULL, *eventsManager = NULL, *extension = NULL, *engine = NULL, *viewEnginePath = NULL, *viewEnginePaths = NULL, *_0, *_1 = NULL, **_4, *_5$$3 = NULL, **_16$$3, *_7$$6 = NULL, *_8$$6 = NULL, *_9$$7 = NULL, *_12$$7 = NULL, *_18$$16 = NULL, *_19$$16 = NULL, *_21$$15 = NULL, *_22$$18 = NULL, *_24$$20, *_25$$21;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 4, 1, &engines, &viewPath_param, &silence_param, &mustClean_param, &cache);
@@ -867,31 +939,48 @@ PHP_METHOD(Phalcon_Mvc_View, _engineRender) {
 
 
 	notExists = 1;
-	ZEPHIR_OBS_VAR(viewsDir);
-	zephir_read_property_this(&viewsDir, this_ptr, SL("_viewsDir"), PH_NOISY_CC);
 	ZEPHIR_OBS_VAR(basePath);
 	zephir_read_property_this(&basePath, this_ptr, SL("_basePath"), PH_NOISY_CC);
-	ZEPHIR_INIT_VAR(viewsDirPath);
-	ZEPHIR_CONCAT_VVV(viewsDirPath, basePath, viewsDir, viewPath);
-	if (Z_TYPE_P(cache) == IS_OBJECT) {
-		ZEPHIR_OBS_VAR(_0$$3);
-		zephir_read_property_this(&_0$$3, this_ptr, SL("_renderLevel"), PH_NOISY_CC);
-		renderLevel = zephir_get_intval(_0$$3);
-		ZEPHIR_OBS_VAR(_1$$3);
-		zephir_read_property_this(&_1$$3, this_ptr, SL("_cacheLevel"), PH_NOISY_CC);
-		cacheLevel = zephir_get_intval(_1$$3);
-		if (renderLevel >= cacheLevel) {
-			ZEPHIR_CALL_METHOD(&_2$$4, cache, "isstarted", NULL, 0);
-			zephir_check_call_status();
-			if (ZEPHIR_IS_FALSE(_2$$4)) {
-				ZEPHIR_INIT_VAR(key);
-				ZVAL_NULL(key);
-				ZEPHIR_INIT_VAR(lifetime);
-				ZVAL_NULL(lifetime);
-				ZEPHIR_OBS_VAR(viewOptions);
-				zephir_read_property_this(&viewOptions, this_ptr, SL("_options"), PH_NOISY_CC);
-				if (Z_TYPE_P(viewOptions) == IS_ARRAY) {
-					ZEPHIR_OBS_VAR(cacheOptions);
+	ZEPHIR_OBS_VAR(viewParams);
+	zephir_read_property_this(&viewParams, this_ptr, SL("_viewParams"), PH_NOISY_CC);
+	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_eventsManager"), PH_NOISY_CC);
+	ZEPHIR_CPY_WRT(eventsManager, _0);
+	ZEPHIR_INIT_VAR(viewEnginePaths);
+	array_init(viewEnginePaths);
+	ZEPHIR_CALL_METHOD(&_1, this_ptr, "getviewsdirs", NULL, 0);
+	zephir_check_call_status();
+	zephir_is_iterable(_1, &_3, &_2, 0, 0, "phalcon/mvc/view.zep", 698);
+	for (
+	  ; zend_hash_get_current_data_ex(_3, (void**) &_4, &_2) == SUCCESS
+	  ; zend_hash_move_forward_ex(_3, &_2)
+	) {
+		ZEPHIR_GET_HVALUE(viewsDir, _4);
+		ZEPHIR_CALL_METHOD(&_5$$3, this_ptr, "_isabsolutepath", &_6, 396, viewPath);
+		zephir_check_call_status();
+		if (!(zephir_is_true(_5$$3))) {
+			ZEPHIR_INIT_NVAR(viewsDirPath);
+			ZEPHIR_CONCAT_VVV(viewsDirPath, basePath, viewsDir, viewPath);
+		} else {
+			ZEPHIR_CPY_WRT(viewsDirPath, viewPath);
+		}
+		if (Z_TYPE_P(cache) == IS_OBJECT) {
+			ZEPHIR_OBS_NVAR(_7$$6);
+			zephir_read_property_this(&_7$$6, this_ptr, SL("_renderLevel"), PH_NOISY_CC);
+			renderLevel = zephir_get_intval(_7$$6);
+			ZEPHIR_OBS_NVAR(_8$$6);
+			zephir_read_property_this(&_8$$6, this_ptr, SL("_cacheLevel"), PH_NOISY_CC);
+			cacheLevel = zephir_get_intval(_8$$6);
+			if (renderLevel >= cacheLevel) {
+				ZEPHIR_CALL_METHOD(&_9$$7, cache, "isstarted", &_10, 0);
+				zephir_check_call_status();
+				if (!(zephir_is_true(_9$$7))) {
+					ZEPHIR_INIT_NVAR(key);
+					ZVAL_NULL(key);
+					ZEPHIR_INIT_NVAR(lifetime);
+					ZVAL_NULL(lifetime);
+					ZEPHIR_OBS_NVAR(viewOptions);
+					zephir_read_property_this(&viewOptions, this_ptr, SL("_options"), PH_NOISY_CC);
+					ZEPHIR_OBS_NVAR(cacheOptions);
 					if (zephir_array_isset_string_fetch(&cacheOptions, viewOptions, SS("cache"), 0 TSRMLS_CC)) {
 						if (Z_TYPE_P(cacheOptions) == IS_ARRAY) {
 							ZEPHIR_OBS_NVAR(key);
@@ -900,86 +989,86 @@ PHP_METHOD(Phalcon_Mvc_View, _engineRender) {
 							zephir_array_isset_string_fetch(&lifetime, cacheOptions, SS("lifetime"), 0 TSRMLS_CC);
 						}
 					}
+					if (Z_TYPE_P(key) == IS_NULL) {
+						ZEPHIR_INIT_NVAR(key);
+						zephir_md5(key, viewPath);
+					}
+					ZEPHIR_CALL_METHOD(&cachedView, cache, "start", &_11, 0, key, lifetime);
+					zephir_check_call_status();
+					if (Z_TYPE_P(cachedView) != IS_NULL) {
+						zephir_update_property_this(getThis(), SL("_content"), cachedView TSRMLS_CC);
+						RETURN_MM_NULL();
+					}
 				}
-				if (Z_TYPE_P(key) == IS_NULL) {
-					ZEPHIR_INIT_NVAR(key);
-					zephir_md5(key, viewPath);
-				}
-				ZEPHIR_CALL_METHOD(&cachedView, cache, "start", NULL, 0, key, lifetime);
+				ZEPHIR_CALL_METHOD(&_12$$7, cache, "isfresh", &_13, 0);
 				zephir_check_call_status();
-				if (Z_TYPE_P(cachedView) != IS_NULL) {
-					zephir_update_property_this(this_ptr, SL("_content"), cachedView TSRMLS_CC);
+				if (!(zephir_is_true(_12$$7))) {
 					RETURN_MM_NULL();
 				}
 			}
-			ZEPHIR_CALL_METHOD(&_3$$4, cache, "isfresh", NULL, 0);
-			zephir_check_call_status();
-			if (!(zephir_is_true(_3$$4))) {
-				RETURN_MM_NULL();
-			}
 		}
-	}
-	ZEPHIR_OBS_VAR(viewParams);
-	zephir_read_property_this(&viewParams, this_ptr, SL("_viewParams"), PH_NOISY_CC);
-	_4 = zephir_fetch_nproperty_this(this_ptr, SL("_eventsManager"), PH_NOISY_CC);
-	ZEPHIR_CPY_WRT(eventsManager, _4);
-	zephir_is_iterable(engines, &_6, &_5, 0, 0, "phalcon/mvc/view.zep", 673);
-	for (
-	  ; zephir_hash_get_current_data_ex(_6, (void**) &_7, &_5) == SUCCESS
-	  ; zephir_hash_move_forward_ex(_6, &_5)
-	) {
-		ZEPHIR_GET_HMKEY(extension, _6, _5);
-		ZEPHIR_GET_HVALUE(engine, _7);
-		ZEPHIR_INIT_NVAR(viewEnginePath);
-		ZEPHIR_CONCAT_VV(viewEnginePath, viewsDirPath, extension);
-		if ((zephir_file_exists(viewEnginePath TSRMLS_CC) == SUCCESS)) {
-			if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
-				zephir_update_property_this(this_ptr, SL("_activeRenderPath"), viewEnginePath TSRMLS_CC);
-				ZEPHIR_INIT_NVAR(_9$$14);
-				ZVAL_STRING(_9$$14, "view:beforeRenderView", ZEPHIR_TEMP_PARAM_COPY);
-				ZEPHIR_CALL_METHOD(&_8$$14, eventsManager, "fire", &_10, 0, _9$$14, this_ptr, viewEnginePath);
-				zephir_check_temp_parameter(_9$$14);
-				zephir_check_call_status();
-				if (ZEPHIR_IS_FALSE_IDENTICAL(_8$$14)) {
-					continue;
+		zephir_is_iterable(engines, &_15$$3, &_14$$3, 0, 0, "phalcon/mvc/view.zep", 696);
+		for (
+		  ; zend_hash_get_current_data_ex(_15$$3, (void**) &_16$$3, &_14$$3) == SUCCESS
+		  ; zend_hash_move_forward_ex(_15$$3, &_14$$3)
+		) {
+			ZEPHIR_GET_HMKEY(extension, _15$$3, _14$$3);
+			ZEPHIR_GET_HVALUE(engine, _16$$3);
+			ZEPHIR_INIT_NVAR(viewEnginePath);
+			ZEPHIR_CONCAT_VV(viewEnginePath, viewsDirPath, extension);
+			if ((zephir_file_exists(viewEnginePath TSRMLS_CC) == SUCCESS)) {
+				if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
+					ZEPHIR_INIT_NVAR(_17$$16);
+					zephir_create_array(_17$$16, 1, 0 TSRMLS_CC);
+					zephir_array_fast_append(_17$$16, viewEnginePath);
+					zephir_update_property_this(getThis(), SL("_activeRenderPaths"), _17$$16 TSRMLS_CC);
+					ZEPHIR_INIT_NVAR(_19$$16);
+					ZVAL_STRING(_19$$16, "view:beforeRenderView", ZEPHIR_TEMP_PARAM_COPY);
+					ZEPHIR_CALL_METHOD(&_18$$16, eventsManager, "fire", &_20, 0, _19$$16, this_ptr, viewEnginePath);
+					zephir_check_temp_parameter(_19$$16);
+					zephir_check_call_status();
+					if (ZEPHIR_IS_FALSE_IDENTICAL(_18$$16)) {
+						continue;
+					}
 				}
-			}
-			ZEPHIR_INIT_NVAR(_11$$13);
-			if (mustClean) {
-				ZVAL_BOOL(_11$$13, 1);
-			} else {
-				ZVAL_BOOL(_11$$13, 0);
-			}
-			ZEPHIR_CALL_METHOD(NULL, engine, "render", NULL, 0, viewEnginePath, viewParams, _11$$13);
-			zephir_check_call_status();
-			notExists = 0;
-			if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
-				ZEPHIR_INIT_NVAR(_12$$16);
-				ZVAL_STRING(_12$$16, "view:afterRenderView", ZEPHIR_TEMP_PARAM_COPY);
-				ZEPHIR_CALL_METHOD(NULL, eventsManager, "fire", &_13, 0, _12$$16, this_ptr);
-				zephir_check_temp_parameter(_12$$16);
+				ZEPHIR_INIT_NVAR(_21$$15);
+				if (mustClean) {
+					ZVAL_BOOL(_21$$15, 1);
+				} else {
+					ZVAL_BOOL(_21$$15, 0);
+				}
+				ZEPHIR_CALL_METHOD(NULL, engine, "render", NULL, 0, viewEnginePath, viewParams, _21$$15);
 				zephir_check_call_status();
+				notExists = 0;
+				if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
+					ZEPHIR_INIT_NVAR(_22$$18);
+					ZVAL_STRING(_22$$18, "view:afterRenderView", ZEPHIR_TEMP_PARAM_COPY);
+					ZEPHIR_CALL_METHOD(NULL, eventsManager, "fire", &_23, 0, _22$$18, this_ptr);
+					zephir_check_temp_parameter(_22$$18);
+					zephir_check_call_status();
+				}
+				break;
 			}
-			break;
+			zephir_array_append(&viewEnginePaths, viewEnginePath, PH_SEPARATE, "phalcon/mvc/view.zep", 694);
 		}
 	}
 	if (notExists == 1) {
 		if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
-			zephir_update_property_this(this_ptr, SL("_activeRenderPath"), viewEnginePath TSRMLS_CC);
-			ZEPHIR_INIT_VAR(_14$$18);
-			ZVAL_STRING(_14$$18, "view:notFoundView", ZEPHIR_TEMP_PARAM_COPY);
-			ZEPHIR_CALL_METHOD(NULL, eventsManager, "fire", NULL, 0, _14$$18, this_ptr, viewEnginePath);
-			zephir_check_temp_parameter(_14$$18);
+			zephir_update_property_this(getThis(), SL("_activeRenderPaths"), viewEnginePaths TSRMLS_CC);
+			ZEPHIR_INIT_VAR(_24$$20);
+			ZVAL_STRING(_24$$20, "view:notFoundView", ZEPHIR_TEMP_PARAM_COPY);
+			ZEPHIR_CALL_METHOD(NULL, eventsManager, "fire", NULL, 0, _24$$20, this_ptr, viewEnginePath);
+			zephir_check_temp_parameter(_24$$20);
 			zephir_check_call_status();
 		}
 		if (!(silence)) {
-			ZEPHIR_INIT_VAR(_15$$19);
-			object_init_ex(_15$$19, phalcon_mvc_view_exception_ce);
-			ZEPHIR_INIT_VAR(_16$$19);
-			ZEPHIR_CONCAT_SVS(_16$$19, "View '", viewsDirPath, "' was not found in the views directory");
-			ZEPHIR_CALL_METHOD(NULL, _15$$19, "__construct", NULL, 9, _16$$19);
+			ZEPHIR_INIT_VAR(_25$$21);
+			object_init_ex(_25$$21, phalcon_mvc_view_exception_ce);
+			ZEPHIR_INIT_VAR(_26$$21);
+			ZEPHIR_CONCAT_SVS(_26$$21, "View '", viewPath, "' was not found in any of the views directory");
+			ZEPHIR_CALL_METHOD(NULL, _25$$21, "__construct", NULL, 9, _26$$21);
 			zephir_check_call_status();
-			zephir_throw_exception_debug(_15$$19, "phalcon/mvc/view.zep", 684 TSRMLS_CC);
+			zephir_throw_exception_debug(_25$$21, "phalcon/mvc/view.zep", 708 TSRMLS_CC);
 			ZEPHIR_MM_RESTORE();
 			return;
 		}
@@ -992,11 +1081,13 @@ PHP_METHOD(Phalcon_Mvc_View, _engineRender) {
  * Register templating engines
  *
  *<code>
- *$this->view->registerEngines(array(
- *  ".phtml" => "Phalcon\Mvc\View\Engine\Php",
- *  ".volt"  => "Phalcon\Mvc\View\Engine\Volt",
- *  ".mhtml" => "MyCustomEngine"
- *));
+ * $this->view->registerEngines(
+ *     [
+ *         ".phtml" => "Phalcon\\Mvc\\View\\Engine\\Php",
+ *         ".volt"  => "Phalcon\\Mvc\\View\\Engine\\Volt",
+ *         ".mhtml" => "MyCustomEngine",
+ *     ]
+ * );
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_View, registerEngines) {
@@ -1009,7 +1100,7 @@ PHP_METHOD(Phalcon_Mvc_View, registerEngines) {
 	engines = engines_param;
 
 
-	zephir_update_property_this(this_ptr, SL("_registeredEngines"), engines TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_registeredEngines"), engines TSRMLS_CC);
 	RETURN_THISW();
 
 }
@@ -1019,20 +1110,20 @@ PHP_METHOD(Phalcon_Mvc_View, registerEngines) {
  */
 PHP_METHOD(Phalcon_Mvc_View, exists) {
 
-	HashTable *_3;
-	HashPosition _2;
-	zend_bool exists = 0;
-	zval *view_param = NULL, *basePath = NULL, *viewsDir = NULL, *engines = NULL, *extension = NULL, *_1 = NULL, **_4, *_0$$3, *_5$$4 = NULL;
+	HashTable *_2, *_6$$4;
+	HashPosition _1, _5$$4;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
+	zval *view_param = NULL, *basePath = NULL, *viewsDir = NULL, *engines = NULL, *extension = NULL, *_0 = NULL, **_3, *_4$$4 = NULL, **_7$$4, *_8$$5 = NULL;
 	zval *view = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &view_param);
 
-	if (unlikely(Z_TYPE_P(view_param) != IS_STRING && Z_TYPE_P(view_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(view_param) != IS_STRING && Z_TYPE_P(view_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'view' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(view_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(view_param) == IS_STRING)) {
 		zephir_get_strval(view, view_param);
 	} else {
 		ZEPHIR_INIT_VAR(view);
@@ -1042,35 +1133,38 @@ PHP_METHOD(Phalcon_Mvc_View, exists) {
 
 	ZEPHIR_OBS_VAR(basePath);
 	zephir_read_property_this(&basePath, this_ptr, SL("_basePath"), PH_NOISY_CC);
-	ZEPHIR_OBS_VAR(viewsDir);
-	zephir_read_property_this(&viewsDir, this_ptr, SL("_viewsDir"), PH_NOISY_CC);
 	ZEPHIR_OBS_VAR(engines);
 	zephir_read_property_this(&engines, this_ptr, SL("_registeredEngines"), PH_NOISY_CC);
 	if (Z_TYPE_P(engines) != IS_ARRAY) {
 		ZEPHIR_INIT_NVAR(engines);
-		array_init(engines);
-		ZEPHIR_INIT_VAR(_0$$3);
-		ZVAL_STRING(_0$$3, "Phalcon\\Mvc\\View\\Engine\\Php", 1);
-		zephir_array_update_string(&engines, SL(".phtml"), &_0$$3, PH_COPY | PH_SEPARATE);
-		zephir_update_property_this(this_ptr, SL("_registeredEngines"), engines TSRMLS_CC);
+		zephir_create_array(engines, 1, 0 TSRMLS_CC);
+		add_assoc_stringl_ex(engines, SS(".phtml"), SL("Phalcon\\Mvc\\View\\Engine\\Php"), 1);
+		zephir_update_property_this(getThis(), SL("_registeredEngines"), engines TSRMLS_CC);
 	}
-	exists = 0;
-	ZEPHIR_INIT_VAR(_1);
-	zephir_is_iterable(engines, &_3, &_2, 0, 0, "phalcon/mvc/view.zep", 732);
+	ZEPHIR_CALL_METHOD(&_0, this_ptr, "getviewsdirs", NULL, 0);
+	zephir_check_call_status();
+	zephir_is_iterable(_0, &_2, &_1, 0, 0, "phalcon/mvc/view.zep", 755);
 	for (
-	  ; zephir_hash_get_current_data_ex(_3, (void**) &_4, &_2) == SUCCESS
-	  ; zephir_hash_move_forward_ex(_3, &_2)
+	  ; zend_hash_get_current_data_ex(_2, (void**) &_3, &_1) == SUCCESS
+	  ; zend_hash_move_forward_ex(_2, &_1)
 	) {
-		ZEPHIR_GET_HMKEY(extension, _3, _2);
-		ZEPHIR_GET_HVALUE(_1, _4);
-		ZEPHIR_INIT_LNVAR(_5$$4);
-		ZEPHIR_CONCAT_VVVV(_5$$4, basePath, viewsDir, view, extension);
-		exists = (zephir_file_exists(_5$$4 TSRMLS_CC) == SUCCESS);
-		if (exists) {
-			break;
+		ZEPHIR_GET_HVALUE(viewsDir, _3);
+		ZEPHIR_INIT_NVAR(_4$$4);
+		zephir_is_iterable(engines, &_6$$4, &_5$$4, 0, 0, "phalcon/mvc/view.zep", 753);
+		for (
+		  ; zend_hash_get_current_data_ex(_6$$4, (void**) &_7$$4, &_5$$4) == SUCCESS
+		  ; zend_hash_move_forward_ex(_6$$4, &_5$$4)
+		) {
+			ZEPHIR_GET_HMKEY(extension, _6$$4, _5$$4);
+			ZEPHIR_GET_HVALUE(_4$$4, _7$$4);
+			ZEPHIR_INIT_LNVAR(_8$$5);
+			ZEPHIR_CONCAT_VVVV(_8$$5, basePath, viewsDir, view, extension);
+			if ((zephir_file_exists(_8$$5 TSRMLS_CC) == SUCCESS)) {
+				RETURN_MM_BOOL(1);
+			}
 		}
 	}
-	RETURN_MM_BOOL(exists);
+	RETURN_MM_BOOL(0);
 
 }
 
@@ -1078,8 +1172,8 @@ PHP_METHOD(Phalcon_Mvc_View, exists) {
  * Executes render process from dispatching data
  *
  *<code>
- * //Shows recent posts view (app/views/posts/recent.phtml)
- * $view->start()->render('posts', 'recent')->finish();
+ * // Shows recent posts view (app/views/posts/recent.phtml)
+ * $view->start()->render("posts", "recent")->finish();
  *</code>
  *
  * @param string controllerName
@@ -1088,32 +1182,31 @@ PHP_METHOD(Phalcon_Mvc_View, exists) {
  */
 PHP_METHOD(Phalcon_Mvc_View, render) {
 
-	HashTable *_17$$19, *_28$$25;
-	HashPosition _16$$19, _27$$25;
-	zend_bool silence = 0, mustClean = 0;
-	int ZEPHIR_LAST_CALL_STATUS, renderLevel = 0;
-	zephir_fcall_cache_entry *_2 = NULL, *_14 = NULL;
-	zval *controllerName_param = NULL, *actionName_param = NULL, *params = NULL, *layoutsDir = NULL, *layout = NULL, *pickView = NULL, *layoutName = NULL, *engines = NULL, *renderView = NULL, *pickViewAction = NULL, *eventsManager = NULL, *disabledLevels = NULL, *templatesBefore = NULL, *templatesAfter = NULL, *templateBefore = NULL, *templateAfter = NULL, *cache = NULL, *_0, *_4, *_5, *_6, *_9 = NULL, *_10, *_1$$3 = NULL, *_7$$12 = NULL, *_8$$12, *_11$$16, *_12$$16, *_13$$16, *_15$$18, **_18$$19, *_19$$20 = NULL, *_20$$20 = NULL, *_21$$20 = NULL, *_22$$22, *_23$$22, *_24$$22, *_25$$22, *_26$$24, **_29$$25, *_30$$26 = NULL, *_31$$26 = NULL, *_32$$26 = NULL, *_33$$28, *_34$$28, *_35$$28, *_36$$14, *_37$$29 = NULL, *_38$$30 = NULL, *_39$$34;
-	zval *controllerName = NULL, *actionName = NULL, *_3$$7;
+	HashTable *_16$$21, *_27$$26;
+	HashPosition _15$$21, _26$$26;
+	zend_bool silence = 0, mustClean = 0, _37$$30;
+	zend_long ZEPHIR_LAST_CALL_STATUS, renderLevel = 0;
+	zval *controllerName_param = NULL, *actionName_param = NULL, *params = NULL, *layoutsDir = NULL, *layout = NULL, *pickView = NULL, *layoutName = NULL, *engines = NULL, *renderView = NULL, *pickViewAction = NULL, *eventsManager = NULL, *disabledLevels = NULL, *templatesBefore = NULL, *templatesAfter = NULL, *templateBefore = NULL, *templateAfter = NULL, *cache = NULL, *_0, *_3, *_4, *_5, *_9 = NULL, *_10, *_1$$3 = NULL, *_6$$14, *_7$$15 = NULL, *_8$$15, *_11$$19, *_12$$19, *_13$$19, *_14$$21, **_17$$21, *_18$$22 = NULL, *_19$$22 = NULL, *_20$$22 = NULL, *_21$$24, *_22$$24, *_23$$24, *_24$$24, *_25$$26, **_28$$26, *_29$$27 = NULL, *_30$$27 = NULL, *_31$$27 = NULL, *_32$$29, *_33$$29, *_34$$29, *_35$$17, *_36$$30 = NULL, *_38$$30 = NULL, *_39$$33;
+	zval *controllerName = NULL, *actionName = NULL, *_2$$8;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 2, 1, &controllerName_param, &actionName_param, &params);
 
-	if (unlikely(Z_TYPE_P(controllerName_param) != IS_STRING && Z_TYPE_P(controllerName_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(controllerName_param) != IS_STRING && Z_TYPE_P(controllerName_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'controllerName' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(controllerName_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(controllerName_param) == IS_STRING)) {
 		zephir_get_strval(controllerName, controllerName_param);
 	} else {
 		ZEPHIR_INIT_VAR(controllerName);
 		ZVAL_EMPTY_STRING(controllerName);
 	}
-	if (unlikely(Z_TYPE_P(actionName_param) != IS_STRING && Z_TYPE_P(actionName_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(actionName_param) != IS_STRING && Z_TYPE_P(actionName_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'actionName' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(actionName_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(actionName_param) == IS_STRING)) {
 		zephir_get_strval(actionName, actionName_param);
 	} else {
 		ZEPHIR_INIT_VAR(actionName);
@@ -1126,17 +1219,20 @@ PHP_METHOD(Phalcon_Mvc_View, render) {
 
 	ZEPHIR_INIT_ZVAL_NREF(_0);
 	ZVAL_LONG(_0, 0);
-	zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _0 TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _0 TSRMLS_CC);
 	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_disabled"), PH_NOISY_CC);
-	if (!ZEPHIR_IS_FALSE(_0)) {
-		ZEPHIR_CALL_FUNCTION(&_1$$3, "ob_get_contents", &_2, 121);
+	if (!ZEPHIR_IS_FALSE_IDENTICAL(_0)) {
+		ZEPHIR_CALL_FUNCTION(&_1$$3, "ob_get_contents", NULL, 139);
 		zephir_check_call_status();
-		zephir_update_property_this(this_ptr, SL("_content"), _1$$3 TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_content"), _1$$3 TSRMLS_CC);
 		RETURN_MM_BOOL(0);
 	}
-	zephir_update_property_this(this_ptr, SL("_controllerName"), controllerName TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_actionName"), actionName TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_params"), params TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_controllerName"), controllerName TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_actionName"), actionName TSRMLS_CC);
+	if (Z_TYPE_P(params) == IS_ARRAY) {
+		ZEPHIR_CALL_METHOD(NULL, this_ptr, "setvars", NULL, 0, params);
+		zephir_check_call_status();
+	}
 	ZEPHIR_OBS_VAR(layoutsDir);
 	zephir_read_property_this(&layoutsDir, this_ptr, SL("_layoutsDir"), PH_NOISY_CC);
 	if (!(zephir_is_true(layoutsDir))) {
@@ -1155,43 +1251,49 @@ PHP_METHOD(Phalcon_Mvc_View, render) {
 	ZEPHIR_OBS_VAR(pickView);
 	zephir_read_property_this(&pickView, this_ptr, SL("_pickView"), PH_NOISY_CC);
 	if (Z_TYPE_P(pickView) == IS_NULL) {
-		ZEPHIR_INIT_VAR(_3$$7);
-		ZEPHIR_CONCAT_VSV(_3$$7, controllerName, "/", actionName);
-		ZEPHIR_CPY_WRT(renderView, _3$$7);
+		ZEPHIR_INIT_VAR(_2$$8);
+		ZEPHIR_CONCAT_VSV(_2$$8, controllerName, "/", actionName);
+		ZEPHIR_CPY_WRT(renderView, _2$$8);
 	} else {
 		ZEPHIR_OBS_NVAR(renderView);
-		zephir_array_fetch_long(&renderView, pickView, 0, PH_NOISY, "phalcon/mvc/view.zep", 805 TSRMLS_CC);
-		ZEPHIR_OBS_VAR(pickViewAction);
-		if (zephir_array_isset_long_fetch(&pickViewAction, pickView, 1, 0 TSRMLS_CC)) {
-			ZEPHIR_CPY_WRT(layoutName, pickViewAction);
+		zephir_array_fetch_long(&renderView, pickView, 0, PH_NOISY, "phalcon/mvc/view.zep", 831 TSRMLS_CC);
+		if (Z_TYPE_P(layoutName) == IS_NULL) {
+			ZEPHIR_OBS_VAR(pickViewAction);
+			if (zephir_array_isset_long_fetch(&pickViewAction, pickView, 1, 0 TSRMLS_CC)) {
+				ZEPHIR_CPY_WRT(layoutName, pickViewAction);
+			}
 		}
 	}
-	_4 = zephir_fetch_nproperty_this(this_ptr, SL("_cacheLevel"), PH_NOISY_CC);
-	if (zephir_is_true(_4)) {
+	_3 = zephir_fetch_nproperty_this(this_ptr, SL("_cacheLevel"), PH_NOISY_CC);
+	if (zephir_is_true(_3)) {
 		ZEPHIR_CALL_METHOD(&cache, this_ptr, "getcache", NULL, 0);
 		zephir_check_call_status();
 	} else {
 		ZEPHIR_INIT_NVAR(cache);
 		ZVAL_NULL(cache);
 	}
-	_5 = zephir_fetch_nproperty_this(this_ptr, SL("_eventsManager"), PH_NOISY_CC);
-	ZEPHIR_CPY_WRT(eventsManager, _5);
-	ZEPHIR_INIT_VAR(_6);
-	zephir_create_symbol_table(TSRMLS_C);
-	
+	_4 = zephir_fetch_nproperty_this(this_ptr, SL("_eventsManager"), PH_NOISY_CC);
+	ZEPHIR_CPY_WRT(eventsManager, _4);
+	ZEPHIR_INIT_VAR(_5);
+	ZEPHIR_GET_CONSTANT(_5, "PHP_MAJOR_VERSION");
+	if (ZEPHIR_IS_LONG(_5, 5)) {
+		ZEPHIR_INIT_VAR(_6$$14);
+		zephir_create_symbol_table(TSRMLS_C);
+		
+	}
 	if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
-		ZEPHIR_INIT_VAR(_8$$12);
-		ZVAL_STRING(_8$$12, "view:beforeRender", ZEPHIR_TEMP_PARAM_COPY);
-		ZEPHIR_CALL_METHOD(&_7$$12, eventsManager, "fire", NULL, 0, _8$$12, this_ptr);
-		zephir_check_temp_parameter(_8$$12);
+		ZEPHIR_INIT_VAR(_8$$15);
+		ZVAL_STRING(_8$$15, "view:beforeRender", ZEPHIR_TEMP_PARAM_COPY);
+		ZEPHIR_CALL_METHOD(&_7$$15, eventsManager, "fire", NULL, 0, _8$$15, this_ptr);
+		zephir_check_temp_parameter(_8$$15);
 		zephir_check_call_status();
-		if (ZEPHIR_IS_FALSE_IDENTICAL(_7$$12)) {
+		if (ZEPHIR_IS_FALSE_IDENTICAL(_7$$15)) {
 			RETURN_MM_BOOL(0);
 		}
 	}
-	ZEPHIR_CALL_FUNCTION(&_9, "ob_get_contents", &_2, 121);
+	ZEPHIR_CALL_FUNCTION(&_9, "ob_get_contents", NULL, 139);
 	zephir_check_call_status();
-	zephir_update_property_this(this_ptr, SL("_content"), _9 TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_content"), _9 TSRMLS_CC);
 	mustClean = 1;
 	silence = 1;
 	ZEPHIR_OBS_VAR(disabledLevels);
@@ -1202,158 +1304,153 @@ PHP_METHOD(Phalcon_Mvc_View, render) {
 	if (renderLevel) {
 		if (renderLevel >= 1) {
 			if (!(zephir_array_isset_long(disabledLevels, 1))) {
-				ZEPHIR_INIT_ZVAL_NREF(_11$$16);
-				ZVAL_LONG(_11$$16, 1);
-				zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _11$$16 TSRMLS_CC);
-				ZEPHIR_INIT_VAR(_12$$16);
+				ZEPHIR_INIT_ZVAL_NREF(_11$$19);
+				ZVAL_LONG(_11$$19, 1);
+				zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _11$$19 TSRMLS_CC);
+				ZEPHIR_INIT_VAR(_12$$19);
 				if (silence) {
-					ZVAL_BOOL(_12$$16, 1);
+					ZVAL_BOOL(_12$$19, 1);
 				} else {
-					ZVAL_BOOL(_12$$16, 0);
+					ZVAL_BOOL(_12$$19, 0);
 				}
-				ZEPHIR_INIT_VAR(_13$$16);
+				ZEPHIR_INIT_VAR(_13$$19);
 				if (mustClean) {
-					ZVAL_BOOL(_13$$16, 1);
+					ZVAL_BOOL(_13$$19, 1);
 				} else {
-					ZVAL_BOOL(_13$$16, 0);
+					ZVAL_BOOL(_13$$19, 0);
 				}
-				ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", &_14, 0, engines, renderView, _12$$16, _13$$16, cache);
+				ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", NULL, 0, engines, renderView, _12$$19, _13$$19, cache);
 				zephir_check_call_status();
 			}
 		}
 		if (renderLevel >= 2) {
 			if (!(zephir_array_isset_long(disabledLevels, 2))) {
-				ZEPHIR_INIT_ZVAL_NREF(_15$$18);
-				ZVAL_LONG(_15$$18, 2);
-				zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _15$$18 TSRMLS_CC);
+				ZEPHIR_INIT_ZVAL_NREF(_14$$21);
+				ZVAL_LONG(_14$$21, 2);
+				zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _14$$21 TSRMLS_CC);
 				ZEPHIR_OBS_VAR(templatesBefore);
 				zephir_read_property_this(&templatesBefore, this_ptr, SL("_templatesBefore"), PH_NOISY_CC);
-				if (Z_TYPE_P(templatesBefore) == IS_ARRAY) {
-					silence = 0;
-					zephir_is_iterable(templatesBefore, &_17$$19, &_16$$19, 0, 0, "phalcon/mvc/view.zep", 881);
-					for (
-					  ; zephir_hash_get_current_data_ex(_17$$19, (void**) &_18$$19, &_16$$19) == SUCCESS
-					  ; zephir_hash_move_forward_ex(_17$$19, &_16$$19)
-					) {
-						ZEPHIR_GET_HVALUE(templateBefore, _18$$19);
-						ZEPHIR_INIT_LNVAR(_19$$20);
-						ZEPHIR_CONCAT_VV(_19$$20, layoutsDir, templateBefore);
-						ZEPHIR_INIT_NVAR(_20$$20);
-						if (silence) {
-							ZVAL_BOOL(_20$$20, 1);
-						} else {
-							ZVAL_BOOL(_20$$20, 0);
-						}
-						ZEPHIR_INIT_NVAR(_21$$20);
-						if (mustClean) {
-							ZVAL_BOOL(_21$$20, 1);
-						} else {
-							ZVAL_BOOL(_21$$20, 0);
-						}
-						ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", &_14, 0, engines, _19$$20, _20$$20, _21$$20, cache);
-						zephir_check_call_status();
+				silence = 0;
+				zephir_is_iterable(templatesBefore, &_16$$21, &_15$$21, 0, 0, "phalcon/mvc/view.zep", 909);
+				for (
+				  ; zend_hash_get_current_data_ex(_16$$21, (void**) &_17$$21, &_15$$21) == SUCCESS
+				  ; zend_hash_move_forward_ex(_16$$21, &_15$$21)
+				) {
+					ZEPHIR_GET_HVALUE(templateBefore, _17$$21);
+					ZEPHIR_INIT_LNVAR(_18$$22);
+					ZEPHIR_CONCAT_VV(_18$$22, layoutsDir, templateBefore);
+					ZEPHIR_INIT_NVAR(_19$$22);
+					if (silence) {
+						ZVAL_BOOL(_19$$22, 1);
+					} else {
+						ZVAL_BOOL(_19$$22, 0);
 					}
-					silence = 1;
+					ZEPHIR_INIT_NVAR(_20$$22);
+					if (mustClean) {
+						ZVAL_BOOL(_20$$22, 1);
+					} else {
+						ZVAL_BOOL(_20$$22, 0);
+					}
+					ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", NULL, 0, engines, _18$$22, _19$$22, _20$$22, cache);
+					zephir_check_call_status();
 				}
+				silence = 1;
 			}
 		}
 		if (renderLevel >= 3) {
 			if (!(zephir_array_isset_long(disabledLevels, 3))) {
-				ZEPHIR_INIT_ZVAL_NREF(_22$$22);
-				ZVAL_LONG(_22$$22, 3);
-				zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _22$$22 TSRMLS_CC);
-				ZEPHIR_INIT_VAR(_23$$22);
-				ZEPHIR_CONCAT_VV(_23$$22, layoutsDir, layoutName);
-				ZEPHIR_INIT_VAR(_24$$22);
+				ZEPHIR_INIT_ZVAL_NREF(_21$$24);
+				ZVAL_LONG(_21$$24, 3);
+				zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _21$$24 TSRMLS_CC);
+				ZEPHIR_INIT_VAR(_22$$24);
+				ZEPHIR_CONCAT_VV(_22$$24, layoutsDir, layoutName);
+				ZEPHIR_INIT_VAR(_23$$24);
 				if (silence) {
-					ZVAL_BOOL(_24$$22, 1);
+					ZVAL_BOOL(_23$$24, 1);
 				} else {
-					ZVAL_BOOL(_24$$22, 0);
+					ZVAL_BOOL(_23$$24, 0);
 				}
-				ZEPHIR_INIT_VAR(_25$$22);
+				ZEPHIR_INIT_VAR(_24$$24);
 				if (mustClean) {
-					ZVAL_BOOL(_25$$22, 1);
+					ZVAL_BOOL(_24$$24, 1);
 				} else {
-					ZVAL_BOOL(_25$$22, 0);
+					ZVAL_BOOL(_24$$24, 0);
 				}
-				ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", &_14, 0, engines, _23$$22, _24$$22, _25$$22, cache);
+				ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", NULL, 0, engines, _22$$24, _23$$24, _24$$24, cache);
 				zephir_check_call_status();
 			}
 		}
 		if (renderLevel >= 4) {
 			if (!(zephir_array_isset_long(disabledLevels, 4))) {
-				ZEPHIR_INIT_ZVAL_NREF(_26$$24);
-				ZVAL_LONG(_26$$24, 4);
-				zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _26$$24 TSRMLS_CC);
+				ZEPHIR_INIT_ZVAL_NREF(_25$$26);
+				ZVAL_LONG(_25$$26, 4);
+				zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _25$$26 TSRMLS_CC);
 				ZEPHIR_OBS_VAR(templatesAfter);
 				zephir_read_property_this(&templatesAfter, this_ptr, SL("_templatesAfter"), PH_NOISY_CC);
-				if (Z_TYPE_P(templatesAfter) == IS_ARRAY) {
-					silence = 0;
-					zephir_is_iterable(templatesAfter, &_28$$25, &_27$$25, 0, 0, "phalcon/mvc/view.zep", 912);
-					for (
-					  ; zephir_hash_get_current_data_ex(_28$$25, (void**) &_29$$25, &_27$$25) == SUCCESS
-					  ; zephir_hash_move_forward_ex(_28$$25, &_27$$25)
-					) {
-						ZEPHIR_GET_HVALUE(templateAfter, _29$$25);
-						ZEPHIR_INIT_LNVAR(_30$$26);
-						ZEPHIR_CONCAT_VV(_30$$26, layoutsDir, templateAfter);
-						ZEPHIR_INIT_NVAR(_31$$26);
-						if (silence) {
-							ZVAL_BOOL(_31$$26, 1);
-						} else {
-							ZVAL_BOOL(_31$$26, 0);
-						}
-						ZEPHIR_INIT_NVAR(_32$$26);
-						if (mustClean) {
-							ZVAL_BOOL(_32$$26, 1);
-						} else {
-							ZVAL_BOOL(_32$$26, 0);
-						}
-						ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", &_14, 0, engines, _30$$26, _31$$26, _32$$26, cache);
-						zephir_check_call_status();
+				silence = 0;
+				zephir_is_iterable(templatesAfter, &_27$$26, &_26$$26, 0, 0, "phalcon/mvc/view.zep", 936);
+				for (
+				  ; zend_hash_get_current_data_ex(_27$$26, (void**) &_28$$26, &_26$$26) == SUCCESS
+				  ; zend_hash_move_forward_ex(_27$$26, &_26$$26)
+				) {
+					ZEPHIR_GET_HVALUE(templateAfter, _28$$26);
+					ZEPHIR_INIT_LNVAR(_29$$27);
+					ZEPHIR_CONCAT_VV(_29$$27, layoutsDir, templateAfter);
+					ZEPHIR_INIT_NVAR(_30$$27);
+					if (silence) {
+						ZVAL_BOOL(_30$$27, 1);
+					} else {
+						ZVAL_BOOL(_30$$27, 0);
 					}
-					silence = 1;
+					ZEPHIR_INIT_NVAR(_31$$27);
+					if (mustClean) {
+						ZVAL_BOOL(_31$$27, 1);
+					} else {
+						ZVAL_BOOL(_31$$27, 0);
+					}
+					ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", NULL, 0, engines, _29$$27, _30$$27, _31$$27, cache);
+					zephir_check_call_status();
 				}
+				silence = 1;
 			}
 		}
 		if (renderLevel >= 5) {
 			if (!(zephir_array_isset_long(disabledLevels, 5))) {
-				ZEPHIR_INIT_ZVAL_NREF(_33$$28);
-				ZVAL_LONG(_33$$28, 5);
-				zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _33$$28 TSRMLS_CC);
-				_33$$28 = zephir_fetch_nproperty_this(this_ptr, SL("_mainView"), PH_NOISY_CC);
-				ZEPHIR_INIT_VAR(_34$$28);
+				ZEPHIR_INIT_ZVAL_NREF(_32$$29);
+				ZVAL_LONG(_32$$29, 5);
+				zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _32$$29 TSRMLS_CC);
+				_32$$29 = zephir_fetch_nproperty_this(this_ptr, SL("_mainView"), PH_NOISY_CC);
+				ZEPHIR_INIT_VAR(_33$$29);
 				if (silence) {
-					ZVAL_BOOL(_34$$28, 1);
+					ZVAL_BOOL(_33$$29, 1);
 				} else {
-					ZVAL_BOOL(_34$$28, 0);
+					ZVAL_BOOL(_33$$29, 0);
 				}
-				ZEPHIR_INIT_VAR(_35$$28);
+				ZEPHIR_INIT_VAR(_34$$29);
 				if (mustClean) {
-					ZVAL_BOOL(_35$$28, 1);
+					ZVAL_BOOL(_34$$29, 1);
 				} else {
-					ZVAL_BOOL(_35$$28, 0);
+					ZVAL_BOOL(_34$$29, 0);
 				}
-				ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", &_14, 0, engines, _33$$28, _34$$28, _35$$28, cache);
+				ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", NULL, 0, engines, _32$$29, _33$$29, _34$$29, cache);
 				zephir_check_call_status();
 			}
 		}
-		ZEPHIR_INIT_ZVAL_NREF(_36$$14);
-		ZVAL_LONG(_36$$14, 0);
-		zephir_update_property_this(this_ptr, SL("_currentRenderLevel"), _36$$14 TSRMLS_CC);
+		ZEPHIR_INIT_ZVAL_NREF(_35$$17);
+		ZVAL_LONG(_35$$17, 0);
+		zephir_update_property_this(getThis(), SL("_currentRenderLevel"), _35$$17 TSRMLS_CC);
 		if (Z_TYPE_P(cache) == IS_OBJECT) {
-			ZEPHIR_CALL_METHOD(&_37$$29, cache, "isstarted", NULL, 0);
+			ZEPHIR_CALL_METHOD(&_36$$30, cache, "isstarted", NULL, 0);
 			zephir_check_call_status();
-			if (ZEPHIR_IS_TRUE(_37$$29)) {
+			_37$$30 = zephir_is_true(_36$$30);
+			if (_37$$30) {
 				ZEPHIR_CALL_METHOD(&_38$$30, cache, "isfresh", NULL, 0);
 				zephir_check_call_status();
-				if (ZEPHIR_IS_TRUE(_38$$30)) {
-					ZEPHIR_CALL_METHOD(NULL, cache, "save", NULL, 0);
-					zephir_check_call_status();
-				} else {
-					ZEPHIR_CALL_METHOD(NULL, cache, "stop", NULL, 0);
-					zephir_check_call_status();
-				}
+				_37$$30 = zephir_is_true(_38$$30);
+			}
+			if (_37$$30) {
+				ZEPHIR_CALL_METHOD(NULL, cache, "save", NULL, 0);
+				zephir_check_call_status();
 			} else {
 				ZEPHIR_CALL_METHOD(NULL, cache, "stop", NULL, 0);
 				zephir_check_call_status();
@@ -1361,10 +1458,10 @@ PHP_METHOD(Phalcon_Mvc_View, render) {
 		}
 	}
 	if (Z_TYPE_P(eventsManager) == IS_OBJECT) {
-		ZEPHIR_INIT_VAR(_39$$34);
-		ZVAL_STRING(_39$$34, "view:afterRender", ZEPHIR_TEMP_PARAM_COPY);
-		ZEPHIR_CALL_METHOD(NULL, eventsManager, "fire", NULL, 0, _39$$34, this_ptr);
-		zephir_check_temp_parameter(_39$$34);
+		ZEPHIR_INIT_VAR(_39$$33);
+		ZVAL_STRING(_39$$33, "view:afterRender", ZEPHIR_TEMP_PARAM_COPY);
+		ZEPHIR_CALL_METHOD(NULL, eventsManager, "fire", NULL, 0, _39$$33, this_ptr);
+		zephir_check_temp_parameter(_39$$33);
 		zephir_check_call_status();
 	}
 	RETURN_THIS();
@@ -1375,22 +1472,19 @@ PHP_METHOD(Phalcon_Mvc_View, render) {
  * Choose a different view to render instead of last-controller/last-action
  *
  * <code>
- * class ProductsController extends \Phalcon\Mvc\Controller
- * {
+ * use Phalcon\Mvc\Controller;
  *
+ * class ProductsController extends Controller
+ * {
  *    public function saveAction()
  *    {
+ *         // Do some save stuff...
  *
- *         //Do some save stuff...
- *
- *         //Then show the list view
+ *         // Then show the list view
  *         $this->view->pick("products/list");
  *    }
  * }
  * </code>
- *
- * @param string|array renderView
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, pick) {
 
@@ -1406,20 +1500,20 @@ PHP_METHOD(Phalcon_Mvc_View, pick) {
 	} else {
 		ZEPHIR_INIT_VAR(layout);
 		ZVAL_NULL(layout);
-		if (zephir_memnstr_str(renderView, SL("/"), "phalcon/mvc/view.zep", 985)) {
+		if (zephir_memnstr_str(renderView, SL("/"), "phalcon/mvc/view.zep", 1001)) {
 			ZEPHIR_INIT_VAR(parts);
 			zephir_fast_explode_str(parts, SL("/"), renderView, LONG_MAX TSRMLS_CC);
 			ZEPHIR_OBS_NVAR(layout);
-			zephir_array_fetch_long(&layout, parts, 0, PH_NOISY, "phalcon/mvc/view.zep", 986 TSRMLS_CC);
+			zephir_array_fetch_long(&layout, parts, 0, PH_NOISY, "phalcon/mvc/view.zep", 1002 TSRMLS_CC);
 		}
 		ZEPHIR_INIT_NVAR(pickView);
 		zephir_create_array(pickView, 1, 0 TSRMLS_CC);
 		zephir_array_fast_append(pickView, renderView);
 		if (Z_TYPE_P(layout) != IS_NULL) {
-			zephir_array_append(&pickView, layout, PH_SEPARATE, "phalcon/mvc/view.zep", 991);
+			zephir_array_append(&pickView, layout, PH_SEPARATE, "phalcon/mvc/view.zep", 1007);
 		}
 	}
-	zephir_update_property_this(this_ptr, SL("_pickView"), pickView TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_pickView"), pickView TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -1428,33 +1522,34 @@ PHP_METHOD(Phalcon_Mvc_View, pick) {
  * Renders a partial view
  *
  * <code>
- * 	//Retrieve the contents of a partial
- * 	echo $this->getPartial('shared/footer');
+ * // Retrieve the contents of a partial
+ * echo $this->getPartial("shared/footer");
  * </code>
  *
  * <code>
- * 	//Retrieve the contents of a partial with arguments
- * 	echo $this->getPartial('shared/footer', array('content' => $html));
+ * // Retrieve the contents of a partial with arguments
+ * echo $this->getPartial(
+ *     "shared/footer",
+ *     [
+ *         "content" => $html,
+ *     ]
+ * );
  * </code>
- *
- * @param string partialPath
- * @param array params
- * @return string
  */
 PHP_METHOD(Phalcon_Mvc_View, getPartial) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *partialPath_param = NULL, *params = NULL;
 	zval *partialPath = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 1, &partialPath_param, &params);
 
-	if (unlikely(Z_TYPE_P(partialPath_param) != IS_STRING && Z_TYPE_P(partialPath_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(partialPath_param) != IS_STRING && Z_TYPE_P(partialPath_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'partialPath' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(partialPath_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(partialPath_param) == IS_STRING)) {
 		zephir_get_strval(partialPath, partialPath_param);
 	} else {
 		ZEPHIR_INIT_VAR(partialPath);
@@ -1465,11 +1560,11 @@ PHP_METHOD(Phalcon_Mvc_View, getPartial) {
 	}
 
 
-	ZEPHIR_CALL_FUNCTION(NULL, "ob_start", NULL, 120);
+	ZEPHIR_CALL_FUNCTION(NULL, "ob_start", NULL, 138);
 	zephir_check_call_status();
 	ZEPHIR_CALL_METHOD(NULL, this_ptr, "partial", NULL, 0, partialPath, params);
 	zephir_check_call_status();
-	ZEPHIR_RETURN_CALL_FUNCTION("ob_get_clean", NULL, 285);
+	ZEPHIR_RETURN_CALL_FUNCTION("ob_get_clean", NULL, 302);
 	zephir_check_call_status();
 	RETURN_MM();
 
@@ -1479,32 +1574,34 @@ PHP_METHOD(Phalcon_Mvc_View, getPartial) {
  * Renders a partial view
  *
  * <code>
- * 	//Show a partial inside another view
- * 	$this->partial('shared/footer');
+ * // Show a partial inside another view
+ * $this->partial("shared/footer");
  * </code>
  *
  * <code>
- * 	//Show a partial inside another view with parameters
- * 	$this->partial('shared/footer', array('content' => $html));
+ * // Show a partial inside another view with parameters
+ * $this->partial(
+ *     "shared/footer",
+ *     [
+ *         "content" => $html,
+ *     ]
+ * );
  * </code>
- *
- * @param string partialPath
- * @param array params
  */
 PHP_METHOD(Phalcon_Mvc_View, partial) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
-	zval *partialPath_param = NULL, *params = NULL, *viewParams = NULL, *_2 = NULL, *_3, *_4, *_5, *_6, *_0$$4, *_1$$3;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
+	zval *partialPath_param = NULL, *params = NULL, *viewParams = NULL, *_2 = NULL, *_3, *_4, *_5, *_6, *_0$$3, *_1$$3;
 	zval *partialPath = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 1, &partialPath_param, &params);
 
-	if (unlikely(Z_TYPE_P(partialPath_param) != IS_STRING && Z_TYPE_P(partialPath_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(partialPath_param) != IS_STRING && Z_TYPE_P(partialPath_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'partialPath' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(partialPath_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(partialPath_param) == IS_STRING)) {
 		zephir_get_strval(partialPath, partialPath_param);
 	} else {
 		ZEPHIR_INIT_VAR(partialPath);
@@ -1518,13 +1615,9 @@ PHP_METHOD(Phalcon_Mvc_View, partial) {
 	if (Z_TYPE_P(params) == IS_ARRAY) {
 		ZEPHIR_OBS_VAR(viewParams);
 		zephir_read_property_this(&viewParams, this_ptr, SL("_viewParams"), PH_NOISY_CC);
-		if (Z_TYPE_P(viewParams) == IS_ARRAY) {
-			ZEPHIR_INIT_VAR(_0$$4);
-			zephir_fast_array_merge(_0$$4, &(viewParams), &(params) TSRMLS_CC);
-			zephir_update_property_this(this_ptr, SL("_viewParams"), _0$$4 TSRMLS_CC);
-		} else {
-			zephir_update_property_this(this_ptr, SL("_viewParams"), params TSRMLS_CC);
-		}
+		ZEPHIR_INIT_VAR(_0$$3);
+		zephir_fast_array_merge(_0$$3, &(viewParams), &(params) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_viewParams"), _0$$3 TSRMLS_CC);
 		ZEPHIR_INIT_VAR(_1$$3);
 		zephir_create_symbol_table(TSRMLS_C);
 		
@@ -1541,7 +1634,7 @@ PHP_METHOD(Phalcon_Mvc_View, partial) {
 	ZEPHIR_CALL_METHOD(NULL, this_ptr, "_enginerender", NULL, 0, _2, _4, _5, _6);
 	zephir_check_call_status();
 	if (Z_TYPE_P(params) == IS_ARRAY) {
-		zephir_update_property_this(this_ptr, SL("_viewParams"), viewParams TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_viewParams"), viewParams TSRMLS_CC);
 	}
 	ZEPHIR_MM_RESTORE();
 
@@ -1551,7 +1644,13 @@ PHP_METHOD(Phalcon_Mvc_View, partial) {
  * Perform the automatic rendering returning the output as a string
  *
  * <code>
- * 	$template = $this->view->getRender('products', 'show', array('products' => $products));
+ * $template = $this->view->getRender(
+ *     "products",
+ *     "show",
+ *     [
+ *         "products" => $products,
+ *     ]
+ * );
  * </code>
  *
  * @param string controllerName
@@ -1563,28 +1662,28 @@ PHP_METHOD(Phalcon_Mvc_View, partial) {
 PHP_METHOD(Phalcon_Mvc_View, getRender) {
 
 	zval *_1$$4;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *controllerName_param = NULL, *actionName_param = NULL, *params = NULL, *configCallback = NULL, *view = NULL, *_0$$4;
 	zval *controllerName = NULL, *actionName = NULL;
 
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 2, 2, &controllerName_param, &actionName_param, &params, &configCallback);
 
-	if (unlikely(Z_TYPE_P(controllerName_param) != IS_STRING && Z_TYPE_P(controllerName_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(controllerName_param) != IS_STRING && Z_TYPE_P(controllerName_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'controllerName' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(controllerName_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(controllerName_param) == IS_STRING)) {
 		zephir_get_strval(controllerName, controllerName_param);
 	} else {
 		ZEPHIR_INIT_VAR(controllerName);
 		ZVAL_EMPTY_STRING(controllerName);
 	}
-	if (unlikely(Z_TYPE_P(actionName_param) != IS_STRING && Z_TYPE_P(actionName_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(actionName_param) != IS_STRING && Z_TYPE_P(actionName_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'actionName' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(actionName_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(actionName_param) == IS_STRING)) {
 		zephir_get_strval(actionName, actionName_param);
 	} else {
 		ZEPHIR_INIT_VAR(actionName);
@@ -1620,7 +1719,7 @@ PHP_METHOD(Phalcon_Mvc_View, getRender) {
 	zephir_check_call_status();
 	ZEPHIR_CALL_METHOD(NULL, view, "render", NULL, 0, controllerName, actionName);
 	zephir_check_call_status();
-	ZEPHIR_CALL_FUNCTION(NULL, "ob_end_clean", NULL, 122);
+	ZEPHIR_CALL_FUNCTION(NULL, "ob_end_clean", NULL, 140);
 	zephir_check_call_status();
 	ZEPHIR_RETURN_CALL_METHOD(view, "getcontent", NULL, 0);
 	zephir_check_call_status();
@@ -1633,11 +1732,11 @@ PHP_METHOD(Phalcon_Mvc_View, getRender) {
  */
 PHP_METHOD(Phalcon_Mvc_View, finish) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
-	ZEPHIR_CALL_FUNCTION(NULL, "ob_end_clean", NULL, 122);
+	ZEPHIR_CALL_FUNCTION(NULL, "ob_end_clean", NULL, 140);
 	zephir_check_call_status();
 	RETURN_THIS();
 
@@ -1649,34 +1748,32 @@ PHP_METHOD(Phalcon_Mvc_View, finish) {
 PHP_METHOD(Phalcon_Mvc_View, _createCache) {
 
 	zval *dependencyInjector = NULL, *cacheService = NULL, *viewCache = NULL, *viewOptions = NULL, *cacheOptions = NULL, *_0, *_1 = NULL;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
 	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_dependencyInjector"), PH_NOISY_CC);
 	ZEPHIR_CPY_WRT(dependencyInjector, _0);
 	if (Z_TYPE_P(dependencyInjector) != IS_OBJECT) {
-		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "A dependency injector container is required to obtain the view cache services", "phalcon/mvc/view.zep", 1165);
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "A dependency injector container is required to obtain the view cache services", "phalcon/mvc/view.zep", 1186);
 		return;
 	}
 	ZEPHIR_INIT_VAR(cacheService);
 	ZVAL_STRING(cacheService, "viewCache", 1);
 	ZEPHIR_OBS_VAR(viewOptions);
 	zephir_read_property_this(&viewOptions, this_ptr, SL("_options"), PH_NOISY_CC);
-	if (Z_TYPE_P(viewOptions) == IS_ARRAY) {
-		ZEPHIR_OBS_VAR(cacheOptions);
-		if (zephir_array_isset_string_fetch(&cacheOptions, viewOptions, SS("cache"), 0 TSRMLS_CC)) {
-			if (zephir_array_isset_string(cacheOptions, SS("service"))) {
-				ZEPHIR_OBS_NVAR(cacheService);
-				zephir_array_fetch_string(&cacheService, cacheOptions, SL("service"), PH_NOISY, "phalcon/mvc/view.zep", 1174 TSRMLS_CC);
-			}
+	ZEPHIR_OBS_VAR(cacheOptions);
+	if (zephir_array_isset_string_fetch(&cacheOptions, viewOptions, SS("cache"), 0 TSRMLS_CC)) {
+		if (zephir_array_isset_string(cacheOptions, SS("service"))) {
+			ZEPHIR_OBS_NVAR(cacheService);
+			zephir_array_fetch_string(&cacheService, cacheOptions, SL("service"), PH_NOISY, "phalcon/mvc/view.zep", 1195 TSRMLS_CC);
 		}
 	}
 	ZEPHIR_CALL_METHOD(&_1, dependencyInjector, "getshared", NULL, 0, cacheService);
 	zephir_check_call_status();
 	ZEPHIR_CPY_WRT(viewCache, _1);
 	if (Z_TYPE_P(viewCache) != IS_OBJECT) {
-		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "The injected caching service is invalid", "phalcon/mvc/view.zep", 1184);
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_view_exception_ce, "The injected caching service is invalid", "phalcon/mvc/view.zep", 1204);
 		return;
 	}
 	RETURN_CCTOR(viewCache);
@@ -1701,26 +1798,25 @@ PHP_METHOD(Phalcon_Mvc_View, isCaching) {
  */
 PHP_METHOD(Phalcon_Mvc_View, getCache) {
 
-	zval *cache = NULL;
-	zephir_fcall_cache_entry *_0 = NULL;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_bool _1;
+	zval *_0, *_2, *_3$$3 = NULL;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 
 	ZEPHIR_MM_GROW();
 
-	ZEPHIR_OBS_VAR(cache);
-	zephir_read_property_this(&cache, this_ptr, SL("_cache"), PH_NOISY_CC);
-	if (zephir_is_true(cache)) {
-		if (Z_TYPE_P(cache) != IS_OBJECT) {
-			ZEPHIR_CALL_METHOD(&cache, this_ptr, "_createcache", &_0, 0);
-			zephir_check_call_status();
-			zephir_update_property_this(this_ptr, SL("_cache"), cache TSRMLS_CC);
-		}
-	} else {
-		ZEPHIR_CALL_METHOD(&cache, this_ptr, "_createcache", &_0, 0);
-		zephir_check_call_status();
-		zephir_update_property_this(this_ptr, SL("_cache"), cache TSRMLS_CC);
+	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_cache"), PH_NOISY_CC);
+	_1 = !zephir_is_true(_0);
+	if (!(_1)) {
+		ZEPHIR_OBS_VAR(_2);
+		zephir_read_property_this(&_2, this_ptr, SL("_cache"), PH_NOISY_CC);
+		_1 = Z_TYPE_P(_2) != IS_OBJECT;
 	}
-	RETURN_CCTOR(cache);
+	if (_1) {
+		ZEPHIR_CALL_METHOD(&_3$$3, this_ptr, "_createcache", NULL, 0);
+		zephir_check_call_status();
+		zephir_update_property_this(getThis(), SL("_cache"), _3$$3 TSRMLS_CC);
+	}
+	RETURN_MM_MEMBER(getThis(), "_cache");
 
 }
 
@@ -1728,11 +1824,13 @@ PHP_METHOD(Phalcon_Mvc_View, getCache) {
  * Cache the actual view render to certain level
  *
  *<code>
- *  $this->view->cache(array('key' => 'my-key', 'lifetime' => 86400));
+ * $this->view->cache(
+ *     [
+ *         "key"      => "my-key",
+ *         "lifetime" => 86400,
+ *     ]
+ * );
  *</code>
- *
- * @param boolean|array options
- * @return \Phalcon\Mvc\View
  */
 PHP_METHOD(Phalcon_Mvc_View, cache) {
 
@@ -1760,33 +1858,33 @@ PHP_METHOD(Phalcon_Mvc_View, cache) {
 			ZEPHIR_INIT_NVAR(cacheOptions);
 			array_init(cacheOptions);
 		}
-		zephir_is_iterable(options, &_1$$3, &_0$$3, 0, 0, "phalcon/mvc/view.zep", 1252);
+		zephir_is_iterable(options, &_1$$3, &_0$$3, 0, 0, "phalcon/mvc/view.zep", 1267);
 		for (
-		  ; zephir_hash_get_current_data_ex(_1$$3, (void**) &_2$$3, &_0$$3) == SUCCESS
-		  ; zephir_hash_move_forward_ex(_1$$3, &_0$$3)
+		  ; zend_hash_get_current_data_ex(_1$$3, (void**) &_2$$3, &_0$$3) == SUCCESS
+		  ; zend_hash_move_forward_ex(_1$$3, &_0$$3)
 		) {
 			ZEPHIR_GET_HMKEY(key, _1$$3, _0$$3);
 			ZEPHIR_GET_HVALUE(value, _2$$3);
 			zephir_array_update_zval(&cacheOptions, key, &value, PH_COPY | PH_SEPARATE);
 		}
 		if (zephir_array_isset_string_fetch(&cacheLevel, cacheOptions, SS("level"), 1 TSRMLS_CC)) {
-			zephir_update_property_this(this_ptr, SL("_cacheLevel"), cacheLevel TSRMLS_CC);
+			zephir_update_property_this(getThis(), SL("_cacheLevel"), cacheLevel TSRMLS_CC);
 		} else {
 			ZEPHIR_INIT_ZVAL_NREF(_3$$8);
 			ZVAL_LONG(_3$$8, 5);
-			zephir_update_property_this(this_ptr, SL("_cacheLevel"), _3$$8 TSRMLS_CC);
+			zephir_update_property_this(getThis(), SL("_cacheLevel"), _3$$8 TSRMLS_CC);
 		}
 		zephir_array_update_string(&viewOptions, SL("cache"), &cacheOptions, PH_COPY | PH_SEPARATE);
-		zephir_update_property_this(this_ptr, SL("_options"), viewOptions TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_options"), viewOptions TSRMLS_CC);
 	} else {
 		if (zephir_is_true(options)) {
 			ZEPHIR_INIT_ZVAL_NREF(_4$$10);
 			ZVAL_LONG(_4$$10, 5);
-			zephir_update_property_this(this_ptr, SL("_cacheLevel"), _4$$10 TSRMLS_CC);
+			zephir_update_property_this(getThis(), SL("_cacheLevel"), _4$$10 TSRMLS_CC);
 		} else {
 			ZEPHIR_INIT_ZVAL_NREF(_5$$11);
 			ZVAL_LONG(_5$$11, 0);
-			zephir_update_property_this(this_ptr, SL("_cacheLevel"), _5$$11 TSRMLS_CC);
+			zephir_update_property_this(getThis(), SL("_cacheLevel"), _5$$11 TSRMLS_CC);
 		}
 	}
 	RETURN_THIS();
@@ -1797,7 +1895,7 @@ PHP_METHOD(Phalcon_Mvc_View, cache) {
  * Externally sets the view content
  *
  *<code>
- *	$this->view->setContent("<h1>hello</h1>");
+ * $this->view->setContent("<h1>hello</h1>");
  *</code>
  */
 PHP_METHOD(Phalcon_Mvc_View, setContent) {
@@ -1811,7 +1909,7 @@ PHP_METHOD(Phalcon_Mvc_View, setContent) {
 	zephir_get_strval(content, content_param);
 
 
-	zephir_update_property_this(this_ptr, SL("_content"), content TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_content"), content TSRMLS_CC);
 	RETURN_THIS();
 
 }
@@ -1823,18 +1921,38 @@ PHP_METHOD(Phalcon_Mvc_View, getContent) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_content");
+	RETURN_MEMBER(getThis(), "_content");
 
 }
 
 /**
- * Returns the path of the view that is currently rendered
+ * Returns the path (or paths) of the views that are currently rendered
  */
 PHP_METHOD(Phalcon_Mvc_View, getActiveRenderPath) {
 
-	
+	zval *activeRenderPath = NULL, *_0 = NULL, *_1$$5;
+	zend_long ZEPHIR_LAST_CALL_STATUS, viewsDirsCount = 0;
 
-	RETURN_MEMBER(this_ptr, "_activeRenderPath");
+	ZEPHIR_MM_GROW();
+
+	ZEPHIR_CALL_METHOD(&_0, this_ptr, "getviewsdirs", NULL, 0);
+	zephir_check_call_status();
+	viewsDirsCount = zephir_fast_count_int(_0 TSRMLS_CC);
+	ZEPHIR_OBS_VAR(activeRenderPath);
+	zephir_read_property_this(&activeRenderPath, this_ptr, SL("_activeRenderPaths"), PH_NOISY_CC);
+	if (viewsDirsCount == 1) {
+		if (Z_TYPE_P(activeRenderPath) == IS_ARRAY) {
+			if (zephir_fast_count_int(activeRenderPath TSRMLS_CC)) {
+				zephir_array_fetch_long(&_1$$5, activeRenderPath, 0, PH_NOISY | PH_READONLY, "phalcon/mvc/view.zep", 1325 TSRMLS_CC);
+				ZEPHIR_CPY_WRT(activeRenderPath, _1$$5);
+			}
+		}
+	}
+	if (Z_TYPE_P(activeRenderPath) == IS_NULL) {
+		ZEPHIR_INIT_NVAR(activeRenderPath);
+		ZVAL_STRING(activeRenderPath, "", 1);
+	}
+	RETURN_CCTOR(activeRenderPath);
 
 }
 
@@ -1846,9 +1964,9 @@ PHP_METHOD(Phalcon_Mvc_View, disable) {
 	
 
 	if (1) {
-		zephir_update_property_this(this_ptr, SL("_disabled"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabled"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_disabled"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabled"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
 	RETURN_THISW();
 
@@ -1862,9 +1980,9 @@ PHP_METHOD(Phalcon_Mvc_View, enable) {
 	
 
 	if (0) {
-		zephir_update_property_this(this_ptr, SL("_disabled"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabled"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_disabled"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabled"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
 	RETURN_THISW();
 
@@ -1875,30 +1993,35 @@ PHP_METHOD(Phalcon_Mvc_View, enable) {
  */
 PHP_METHOD(Phalcon_Mvc_View, reset) {
 
-	zval *_0;
+	zval *_0, *_1, *_2;
 
+	ZEPHIR_MM_GROW();
 
 	if (0) {
-		zephir_update_property_this(this_ptr, SL("_disabled"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabled"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_disabled"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_disabled"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
 	if (0) {
-		zephir_update_property_this(this_ptr, SL("_engines"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_engines"), ZEPHIR_GLOBAL(global_true) TSRMLS_CC);
 	} else {
-		zephir_update_property_this(this_ptr, SL("_engines"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
+		zephir_update_property_this(getThis(), SL("_engines"), ZEPHIR_GLOBAL(global_false) TSRMLS_CC);
 	}
-	zephir_update_property_this(this_ptr, SL("_cache"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_cache"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
 	ZEPHIR_INIT_ZVAL_NREF(_0);
 	ZVAL_LONG(_0, 5);
-	zephir_update_property_this(this_ptr, SL("_renderLevel"), _0 TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_renderLevel"), _0 TSRMLS_CC);
 	ZEPHIR_INIT_ZVAL_NREF(_0);
 	ZVAL_LONG(_0, 0);
-	zephir_update_property_this(this_ptr, SL("_cacheLevel"), _0 TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_content"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_templatesBefore"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
-	zephir_update_property_this(this_ptr, SL("_templatesAfter"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
-	RETURN_THISW();
+	zephir_update_property_this(getThis(), SL("_cacheLevel"), _0 TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_content"), ZEPHIR_GLOBAL(global_null) TSRMLS_CC);
+	ZEPHIR_INIT_VAR(_1);
+	array_init(_1);
+	zephir_update_property_this(getThis(), SL("_templatesBefore"), _1 TSRMLS_CC);
+	ZEPHIR_INIT_VAR(_2);
+	array_init(_2);
+	zephir_update_property_this(getThis(), SL("_templatesAfter"), _2 TSRMLS_CC);
+	RETURN_THIS();
 
 }
 
@@ -1906,11 +2029,8 @@ PHP_METHOD(Phalcon_Mvc_View, reset) {
  * Magic method to pass variables to the views
  *
  *<code>
- *	$this->view->products = $products;
+ * $this->view->products = $products;
  *</code>
- *
- * @param string key
- * @param mixed value
  */
 PHP_METHOD(Phalcon_Mvc_View, __set) {
 
@@ -1920,11 +2040,11 @@ PHP_METHOD(Phalcon_Mvc_View, __set) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 2, 0, &key_param, &value);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -1941,11 +2061,8 @@ PHP_METHOD(Phalcon_Mvc_View, __set) {
  * Magic method to retrieve a variable passed to the view
  *
  *<code>
- *	echo $this->view->products;
+ * echo $this->view->products;
  *</code>
- *
- * @param string key
- * @return mixed
  */
 PHP_METHOD(Phalcon_Mvc_View, __get) {
 
@@ -1955,11 +2072,11 @@ PHP_METHOD(Phalcon_Mvc_View, __get) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &key_param);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -1982,7 +2099,7 @@ PHP_METHOD(Phalcon_Mvc_View, isDisabled) {
 
 	
 
-	RETURN_MEMBER(this_ptr, "_disabled");
+	RETURN_MEMBER(getThis(), "_disabled");
 
 }
 
@@ -1990,11 +2107,8 @@ PHP_METHOD(Phalcon_Mvc_View, isDisabled) {
  * Magic method to retrieve if a variable is set in the view
  *
  *<code>
- *  echo isset($this->view->products);
+ * echo isset($this->view->products);
  *</code>
- *
- * @param string key
- * @return boolean
  */
 PHP_METHOD(Phalcon_Mvc_View, __isset) {
 
@@ -2004,11 +2118,11 @@ PHP_METHOD(Phalcon_Mvc_View, __isset) {
 	ZEPHIR_MM_GROW();
 	zephir_fetch_params(1, 1, 0, &key_param);
 
-	if (unlikely(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
+	if (UNEXPECTED(Z_TYPE_P(key_param) != IS_STRING && Z_TYPE_P(key_param) != IS_NULL)) {
 		zephir_throw_exception_string(spl_ce_InvalidArgumentException, SL("Parameter 'key' must be a string") TSRMLS_CC);
 		RETURN_MM_NULL();
 	}
-	if (likely(Z_TYPE_P(key_param) == IS_STRING)) {
+	if (EXPECTED(Z_TYPE_P(key_param) == IS_STRING)) {
 		zephir_get_strval(key, key_param);
 	} else {
 		ZEPHIR_INIT_VAR(key);
@@ -2018,6 +2132,78 @@ PHP_METHOD(Phalcon_Mvc_View, __isset) {
 
 	_0 = zephir_fetch_nproperty_this(this_ptr, SL("_viewParams"), PH_NOISY_CC);
 	RETURN_MM_BOOL(zephir_array_isset(_0, key));
+
+}
+
+/**
+ * Gets views directories
+ */
+PHP_METHOD(Phalcon_Mvc_View, getViewsDirs) {
+
+	zval *_0, *_1$$3;
+
+	ZEPHIR_MM_GROW();
+
+	ZEPHIR_OBS_VAR(_0);
+	zephir_read_property_this(&_0, this_ptr, SL("_viewsDirs"), PH_NOISY_CC);
+	if (Z_TYPE_P(_0) == IS_STRING) {
+		zephir_create_array(return_value, 1, 0 TSRMLS_CC);
+		ZEPHIR_OBS_VAR(_1$$3);
+		zephir_read_property_this(&_1$$3, this_ptr, SL("_viewsDirs"), PH_NOISY_CC);
+		zephir_array_fast_append(return_value, _1$$3);
+		RETURN_MM();
+	}
+	RETURN_MM_MEMBER(getThis(), "_viewsDirs");
+
+}
+
+zend_object_value zephir_init_properties_Phalcon_Mvc_View(zend_class_entry *class_type TSRMLS_DC) {
+
+		zval *_0, *_2, *_4, *_6, *_1$$3, *_3$$4, *_5$$5, *_7$$6;
+
+		ZEPHIR_MM_GROW();
+	
+	{
+		zval zthis       = zval_used_for_init;
+		zval *this_ptr   = &zthis;
+		zend_object* obj = ecalloc(1, sizeof(zend_object));
+		zend_object_value retval;
+
+		zend_object_std_init(obj, class_type TSRMLS_CC);
+		object_properties_init(obj, class_type);
+		retval.handle   = zend_objects_store_put(obj, (zend_objects_store_dtor_t)zend_objects_destroy_object, zephir_free_object_storage, NULL TSRMLS_CC);
+		retval.handlers = zend_get_std_object_handlers();
+
+		Z_TYPE(zthis)   = IS_OBJECT;
+		Z_OBJVAL(zthis) = retval;
+
+		_0 = zephir_fetch_nproperty_this(this_ptr, SL("_templatesAfter"), PH_NOISY_CC);
+		if (Z_TYPE_P(_0) == IS_NULL) {
+			ZEPHIR_INIT_VAR(_1$$3);
+			array_init(_1$$3);
+			zephir_update_property_this(getThis(), SL("_templatesAfter"), _1$$3 TSRMLS_CC);
+		}
+		_2 = zephir_fetch_nproperty_this(this_ptr, SL("_templatesBefore"), PH_NOISY_CC);
+		if (Z_TYPE_P(_2) == IS_NULL) {
+			ZEPHIR_INIT_VAR(_3$$4);
+			array_init(_3$$4);
+			zephir_update_property_this(getThis(), SL("_templatesBefore"), _3$$4 TSRMLS_CC);
+		}
+		_4 = zephir_fetch_nproperty_this(this_ptr, SL("_viewsDirs"), PH_NOISY_CC);
+		if (Z_TYPE_P(_4) == IS_NULL) {
+			ZEPHIR_INIT_VAR(_5$$5);
+			array_init(_5$$5);
+			zephir_update_property_this(getThis(), SL("_viewsDirs"), _5$$5 TSRMLS_CC);
+		}
+		_6 = zephir_fetch_nproperty_this(this_ptr, SL("_viewParams"), PH_NOISY_CC);
+		if (Z_TYPE_P(_6) == IS_NULL) {
+			ZEPHIR_INIT_VAR(_7$$6);
+			array_init(_7$$6);
+			zephir_update_property_this(getThis(), SL("_viewParams"), _7$$6 TSRMLS_CC);
+		}
+		ZEPHIR_MM_RESTORE();
+		return retval;
+	}
 
 }
 

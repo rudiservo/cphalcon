@@ -1,12 +1,12 @@
 
 /*
  +------------------------------------------------------------------------+
- | Phalcon Framework							  |
+ | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
- | This source file is subject to the New BSD License that is bundled	  |
- | with this package in the file docs/LICENSE.txt.                        |
+ | This source file is subject to the New BSD License that is bundled     |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -34,6 +34,7 @@ use Phalcon\Db\DialectInterface;
 use Phalcon\Mvc\Model\CriteriaInterface;
 use Phalcon\Mvc\Model\TransactionInterface;
 use Phalcon\Mvc\Model\Resultset;
+use Phalcon\Mvc\Model\ResultsetInterface;
 use Phalcon\Mvc\Model\Query;
 use Phalcon\Mvc\Model\Query\Builder;
 use Phalcon\Mvc\Model\Relation;
@@ -41,6 +42,8 @@ use Phalcon\Mvc\Model\RelationInterface;
 use Phalcon\Mvc\Model\BehaviorInterface;
 use Phalcon\Mvc\Model\Exception;
 use Phalcon\Mvc\Model\MessageInterface;
+use Phalcon\Mvc\Model\Message;
+use Phalcon\ValidationInterface;
 use Phalcon\Mvc\Model\ValidationFailed;
 use Phalcon\Events\ManagerInterface as EventsManagerInterface;
 
@@ -61,21 +64,25 @@ use Phalcon\Events\ManagerInterface as EventsManagerInterface;
  *
  * <code>
  * $robot = new Robots();
- * $robot->type = 'mechanical';
- * $robot->name = 'Astro Boy';
+ *
+ * $robot->type = "mechanical";
+ * $robot->name = "Astro Boy";
  * $robot->year = 1952;
- * if ($robot->save() == false) {
- *  echo "Umh, We can store robots: ";
- *  foreach ($robot->getMessages() as $message) {
- *	 echo message;
- *  }
+ *
+ * if ($robot->save() === false) {
+ *     echo "Umh, We can store robots: ";
+ *
+ *     $messages = $robot->getMessages();
+ *
+ *     foreach ($messages as $message) {
+ *         echo $message;
+ *     }
  * } else {
- *  echo "Great, a new robot was saved successfully!";
+ *     echo "Great, a new robot was saved successfully!";
  * }
  * </code>
- *
  */
-abstract class Model implements EntityInterface, ModelInterface, ResultInterface, InjectionAwareInterface, \Serializable
+abstract class Model implements EntityInterface, ModelInterface, ResultInterface, InjectionAwareInterface, \Serializable, \JsonSerializable
 {
 
 	protected _dependencyInjector;
@@ -104,6 +111,8 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 
 	protected _snapshot;
 
+	protected _oldSnapshot = [];
+
 	const OP_NONE = 0;
 
 	const OP_CREATE = 1;
@@ -121,7 +130,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	/**
 	 * Phalcon\Mvc\Model constructor
 	 */
-	public final function __construct(<DiInterface> dependencyInjector = null, <ManagerInterface> modelsManager = null)
+	public final function __construct(var data = null, <DiInterface> dependencyInjector = null, <ManagerInterface> modelsManager = null)
 	{
 		/**
 		 * We use a default DI if the user doesn't define one
@@ -160,7 +169,11 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 * This allows the developer to execute initialization stuff every time an instance is created
 		 */
 		if method_exists(this, "onConstruct") {
-			this->{"onConstruct"}();
+			this->{"onConstruct"}(data);
+		}
+
+		if typeof data == "array" {
+			this->assign(data);
 		}
 	}
 
@@ -206,13 +219,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		let metaData = this->_modelsMetaData;
 		if typeof metaData != "object" {
 
-			/**
-			 * Check if the DI is valid
-			 */
 			let dependencyInjector = <DiInterface> this->_dependencyInjector;
-			if typeof dependencyInjector != "object" {
-				throw new Exception("A dependency injector container is required to obtain the services related to the ORM");
-			}
 
 			/**
 			 * Obtain the models-metadata service from the DI
@@ -223,7 +230,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			}
 
 			/**
-			 * Update the models-metada property
+			 * Update the models-metadata property
 			 */
 			let this->_modelsMetaData = metaData;
 		}
@@ -242,36 +249,39 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Sets a transaction related to the Model instance
 	 *
 	 *<code>
-	 *use Phalcon\Mvc\Model\Transaction\Manager as TxManager;
-	 *use Phalcon\Mvc\Model\Transaction\Failed as TxFailed;
+	 * use Phalcon\Mvc\Model\Transaction\Manager as TxManager;
+	 * use Phalcon\Mvc\Model\Transaction\Failed as TxFailed;
 	 *
-	 *try {
+	 * try {
+	 *     $txManager = new TxManager();
 	 *
-	 *  $txManager = new TxManager();
+	 *     $transaction = $txManager->get();
 	 *
-	 *  $transaction = $txManager->get();
+	 *     $robot = new Robots();
 	 *
-	 *  $robot = new Robots();
-	 *  $robot->setTransaction($transaction);
-	 *  $robot->name = 'WALL·E';
-	 *  $robot->created_at = date('Y-m-d');
-	 *  if ($robot->save() == false) {
-	 *	  $transaction->rollback("Can't save robot");
-	 *  }
+	 *     $robot->setTransaction($transaction);
 	 *
-	 *  $robotPart = new RobotParts();
-	 *  $robotPart->setTransaction($transaction);
-	 *  $robotPart->type = 'head';
-	 *  if ($robotPart->save() == false) {
-	 *	  $transaction->rollback("Robot part cannot be saved");
-	 *  }
+	 *     $robot->name       = "WALL·E";
+	 *     $robot->created_at = date("Y-m-d");
 	 *
-	 *  $transaction->commit();
+	 *     if ($robot->save() === false) {
+	 *         $transaction->rollback("Can't save robot");
+	 *     }
 	 *
-	 *} catch (TxFailed $e) {
-	 *  echo 'Failed, reason: ', $e->getMessage();
-	 *}
+	 *     $robotPart = new RobotParts();
 	 *
+	 *     $robotPart->setTransaction($transaction);
+	 *
+	 *     $robotPart->type = "head";
+	 *
+	 *     if ($robotPart->save() === false) {
+	 *         $transaction->rollback("Robot part cannot be saved");
+	 *     }
+	 *
+	 *     $transaction->commit();
+	 * } catch (TxFailed $e) {
+	 *     echo "Failed, reason: ", $e->getMessage();
+	 * }
 	 *</code>
 	 */
 	public function setTransaction(<TransactionInterface> transaction) -> <Model>
@@ -281,7 +291,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Sets table name which model should be mapped
+	 * Sets the table name to which model should be mapped
 	 */
 	protected function setSource(string! source) -> <Model>
 	{
@@ -290,7 +300,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Returns table name mapped in the model
+	 * Returns the table name mapped in the model
 	 */
 	public function getSource() -> string
 	{
@@ -298,7 +308,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Sets schema name where table mapped is located
+	 * Sets schema name where the mapped table is located
 	 */
 	protected function setSchema(string! schema) -> <Model>
 	{
@@ -306,7 +316,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Returns schema name where table mapped is located
+	 * Returns schema name where the mapped table is located
 	 */
 	public function getSchema() -> string
 	{
@@ -406,22 +416,47 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Assigns values to a model from an array
 	 *
 	 * <code>
-	 * $robot->assign(array(
-	 *	'type' => 'mechanical',
-	 *	'name' => 'Astro Boy',
-	 *	'year' => 1952
-	 * ));
+	 * $robot->assign(
+	 *     [
+	 *         "type" => "mechanical",
+	 *         "name" => "Astro Boy",
+	 *         "year" => 1952,
+	 *     ]
+	 * );
 	 *
-	 * //assign by db row, column map needed
-	 * $robot->assign($dbRow, array(
-	 *	'db_type' => 'type',
-	 *	'db_name' => 'name',
-	 *	'db_year' => 'year'
-	 * ));
+	 * // Assign by db row, column map needed
+	 * $robot->assign(
+	 *     $dbRow,
+	 *     [
+	 *         "db_type" => "type",
+	 *         "db_name" => "name",
+	 *         "db_year" => "year",
+	 *     ]
+	 * );
 	 *
-	 * //allow assign only name and year
-	 * $robot->assign($_POST, null, array('name', 'year');
-	 *</code>
+	 * // Allow assign only name and year
+	 * $robot->assign(
+	 *     $_POST,
+	 *     null,
+	 *     [
+	 *         "name",
+	 *         "year",
+	 *     ]
+	 * );
+	 *
+	 * // By default assign method will use setters if exist, you can disable it by using ini_set to directly use properties
+	 *
+	 * ini_set("phalcon.orm.disable_assign_setters", true);
+	 *
+	 * $robot->assign(
+	 *     $_POST,
+	 *     null,
+	 *     [
+	 *         "name",
+	 *         "year",
+	 *     ]
+	 * );
+	 * </code>
 	 *
 	 * @param array data
 	 * @param array dataColumnMap array to transform keys of data to another
@@ -430,7 +465,9 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 */
 	public function assign(array! data, var dataColumnMap = null, var whiteList = null) -> <Model>
 	{
-		var key, keyMapped, value, attribute, attributeField, possibleSetter, metaData, columnMap, dataMapped;
+		var key, keyMapped, value, attribute, attributeField, metaData, columnMap, dataMapped, disableAssignSetters;
+
+        let disableAssignSetters = globals_get("orm.disable_assign_setters");
 
 		// apply column map for data, if exist
 		if typeof dataColumnMap == "array" {
@@ -483,10 +520,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 				}
 
 				// Try to find a possible getter
-				let possibleSetter = "set" . camelize(attributeField);
-				if method_exists(this, possibleSetter) {
-					this->{possibleSetter}(value);
-				} else {
+				if disableAssignSetters || !this->_possibleSetter(attributeField, value) {
 					let this->{attributeField} = value;
 				}
 			}
@@ -496,22 +530,24 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Assigns values to a model from an array returning a new model.
+	 * Assigns values to a model from an array, returning a new model.
 	 *
 	 *<code>
-	 *$robot = \Phalcon\Mvc\Model::cloneResultMap(new Robots(), array(
-	 *  'type' => 'mechanical',
-	 *  'name' => 'Astro Boy',
-	 *  'year' => 1952
-	 *));
+	 * $robot = \Phalcon\Mvc\Model::cloneResultMap(
+	 *     new Robots(),
+	 *     [
+	 *         "type" => "mechanical",
+	 *         "name" => "Astro Boy",
+	 *         "year" => 1952,
+	 *     ]
+	 * );
 	 *</code>
 	 *
-	 * @param \Phalcon\Mvc\ModelInterface|Phalcon\Mvc\Model\Row base
+	 * @param \Phalcon\Mvc\ModelInterface|\Phalcon\Mvc\Model\Row base
 	 * @param array data
 	 * @param array columnMap
 	 * @param int dirtyState
 	 * @param boolean keepSnapshots
-	 * @return \Phalcon\Mvc\Model
 	 */
 	public static function cloneResultMap(var base, array! data, var columnMap, int dirtyState = 0, boolean keepSnapshots = null) -> <Model>
 	{
@@ -599,8 +635,8 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		/**
 		 * Call afterFetch, this allows the developer to execute actions after a record is fetched from the database
 		 */
-		if method_exists(instance, "afterFetch") {
-			instance->{"afterFetch"}();
+		if method_exists(instance, "fireEvent") {
+			instance->{"fireEvent"}("afterFetch");
 		}
 
 		return instance;
@@ -616,7 +652,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 */
 	public static function cloneResultMapHydrate(array! data, var columnMap, int hydrationMode)
 	{
-		var hydrateArray, hydrateObject, key, value, attribute;
+		var hydrateArray, hydrateObject, key, value, attribute, attributeName;
 
 		/**
 		 * If there is no column map and the hydration mode is arrays return the data as it is
@@ -637,31 +673,42 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		}
 
 		for key, value in data {
-			if typeof key == "string" {
-				if typeof columnMap == "array" {
+			if typeof key != "string" {
+				continue;
+			}
 
-					/**
-					 * Every field must be part of the column map
-					 */
-					if !fetch attribute, columnMap[key] {
-						if !globals_get("orm.ignore_unknown_columns") {
-							throw new Exception("Column '" . key . "' doesn't make part of the column map");
-						} else {
-							continue;
-						}
-					}
+			if typeof columnMap == "array" {
 
-					if hydrationMode == Resultset::HYDRATE_ARRAYS {
-						let hydrateArray[attribute] = value;
+				/**
+				 * Every field must be part of the column map
+				 */
+				if !fetch attribute, columnMap[key] {
+					if !globals_get("orm.ignore_unknown_columns") {
+						throw new Exception("Column '" . key . "' doesn't make part of the column map");
 					} else {
-						let hydrateObject->{attribute} = value;
+						continue;
 					}
+				}
+
+				/**
+				 * Attribute can store info about his type
+				 */
+				if (typeof attribute == "array") {
+					let attributeName = attribute[0];
 				} else {
-					if hydrationMode == Resultset::HYDRATE_ARRAYS {
-						let hydrateArray[key] = value;
-					} else {
-						let hydrateObject->{key} = value;
-					}
+					let attributeName = attribute;
+				}
+
+				if hydrationMode == Resultset::HYDRATE_ARRAYS {
+					let hydrateArray[attributeName] = value;
+				} else {
+					let hydrateObject->{attributeName} = value;
+				}
+			} else {
+				if hydrationMode == Resultset::HYDRATE_ARRAYS {
+					let hydrateArray[key] = value;
+				} else {
+					let hydrateObject->{key} = value;
 				}
 			}
 		}
@@ -677,11 +724,14 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Assigns values to a model from an array returning a new model
 	 *
 	 *<code>
-	 *$robot = Phalcon\Mvc\Model::cloneResult(new Robots(), array(
-	 *  'type' => 'mechanical',
-	 *  'name' => 'Astro Boy',
-	 *  'year' => 1952
-	 *));
+	 * $robot = Phalcon\Mvc\Model::cloneResult(
+	 *     new Robots(),
+	 *     [
+	 *         "type" => "mechanical",
+	 *         "name" => "Astro Boy",
+	 *         "year" => 1952,
+	 *     ]
+	 * );
 	 *</code>
 	 *
 	 * @param \Phalcon\Mvc\ModelInterface $base
@@ -713,41 +763,52 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		/**
 		 * Call afterFetch, this allows the developer to execute actions after a record is fetched from the database
 		 */
-		if method_exists(instance, "afterFetch") {
-			instance->{"afterFetch"}();
-		}
+		(<ModelInterface> instance)->fireEvent("afterFetch");
 
 		return instance;
 	}
 
 	/**
-	 * Allows to query a set of records that match the specified conditions
+	 * Query for a set of records that match the specified conditions
 	 *
 	 * <code>
-	 *
-	 * //How many robots are there?
+	 * // How many robots are there?
 	 * $robots = Robots::find();
+	 *
 	 * echo "There are ", count($robots), "\n";
 	 *
-	 * //How many mechanical robots are there?
-	 * $robots = Robots::find("type='mechanical'");
+	 * // How many mechanical robots are there?
+	 * $robots = Robots::find(
+	 *     "type = 'mechanical'"
+	 * );
+	 *
 	 * echo "There are ", count($robots), "\n";
 	 *
-	 * //Get and print virtual robots ordered by name
-	 * $robots = Robots::find(array("type='virtual'", "order" => "name"));
+	 * // Get and print virtual robots ordered by name
+	 * $robots = Robots::find(
+	 *     [
+	 *         "type = 'virtual'",
+	 *         "order" => "name",
+	 *     ]
+	 * );
+	 *
 	 * foreach ($robots as $robot) {
-	 *	   echo $robot->name, "\n";
+	 *	 echo $robot->name, "\n";
 	 * }
 	 *
-	 * //Get first 100 virtual robots ordered by name
-	 * $robots = Robots::find(array("type='virtual'", "order" => "name", "limit" => 100));
+	 * // Get first 100 virtual robots ordered by name
+	 * $robots = Robots::find(
+	 *     [
+	 *         "type = 'virtual'",
+	 *         "order" => "name",
+	 *         "limit" => 100,
+	 *     ]
+	 * );
+	 *
 	 * foreach ($robots as $robot) {
-	 *	   echo $robot->name, "\n";
+	 *	 echo $robot->name, "\n";
 	 * }
 	 * </code>
-	 *
-	 * @param 	array parameters
-	 * @return  Phalcon\Mvc\Model\ResultsetInterface
 	 */
 	public static function find(var parameters = null) -> <ResultsetInterface>
 	{
@@ -814,22 +875,30 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Allows to query the first record that match the specified conditions
+	 * Query the first record that matches the specified conditions
 	 *
 	 * <code>
-	 *
-	 * //What's the first robot in robots table?
+	 * // What's the first robot in robots table?
 	 * $robot = Robots::findFirst();
+	 *
 	 * echo "The robot name is ", $robot->name;
 	 *
-	 * //What's the first mechanical robot in robots table?
-	 * $robot = Robots::findFirst("type='mechanical'");
+	 * // What's the first mechanical robot in robots table?
+	 * $robot = Robots::findFirst(
+	 *     "type = 'mechanical'"
+	 * );
+	 *
 	 * echo "The first mechanical robot name is ", $robot->name;
 	 *
-	 * //Get first virtual robot ordered by name
-	 * $robot = Robots::findFirst(array("type='virtual'", "order" => "name"));
-	 * echo "The first virtual robot name is ", $robot->name;
+	 * // Get first virtual robot ordered by name
+	 * $robot = Robots::findFirst(
+	 *     [
+	 *         "type = 'virtual'",
+	 *         "order" => "name",
+	 *     ]
+	 * );
 	 *
+	 * echo "The first virtual robot name is ", $robot->name;
 	 * </code>
 	 *
 	 * @param string|array parameters
@@ -929,7 +998,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Checks if the current record already exists or not
+	 * Checks whether the current record already exists
 	 *
 	 * @param \Phalcon\Mvc\Model\MetaDataInterface metaData
 	 * @param \Phalcon\Db\AdapterInterface connection
@@ -1164,18 +1233,18 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Allows to count how many records match the specified conditions
+	 * Counts how many records match the specified conditions
 	 *
 	 * <code>
-	 *
-	 * //How many robots are there?
+	 * // How many robots are there?
 	 * $number = Robots::count();
+	 *
 	 * echo "There are ", $number, "\n";
 	 *
-	 * //How many mechanical robots are there?
+	 * // How many mechanical robots are there?
 	 * $number = Robots::count("type = 'mechanical'");
-	 * echo "There are ", $number, " mechanical robots\n";
 	 *
+	 * echo "There are ", $number, " mechanical robots\n";
 	 * </code>
 	 *
 	 * @param array parameters
@@ -1193,18 +1262,27 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Allows to calculate a summatory on a column that match the specified conditions
+	 * Calculates the sum on a column for a result-set of rows that match the specified conditions
 	 *
 	 * <code>
+	 * // How much are all robots?
+	 * $sum = Robots::sum(
+	 *     [
+	 *         "column" => "price",
+	 *     ]
+	 * );
 	 *
-	 * //How much are all robots?
-	 * $sum = Robots::sum(array('column' => 'price'));
 	 * echo "The total price of robots is ", $sum, "\n";
 	 *
-	 * //How much are mechanical robots?
-	 * $sum = Robots::sum(array("type = 'mechanical'", 'column' => 'price'));
-	 * echo "The total price of mechanical robots is  ", $sum, "\n";
+	 * // How much are mechanical robots?
+	 * $sum = Robots::sum(
+	 *     [
+	 *         "type = 'mechanical'",
+	 *         "column" => "price",
+	 *     ]
+	 * );
 	 *
+	 * echo "The total price of mechanical robots is  ", $sum, "\n";
 	 * </code>
 	 *
 	 * @param array parameters
@@ -1216,18 +1294,27 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Allows to get the maximum value of a column that match the specified conditions
+	 * Returns the maximum value of a column for a result-set of rows that match the specified conditions
 	 *
 	 * <code>
+	 * // What is the maximum robot id?
+	 * $id = Robots::maximum(
+	 *     [
+	 *         "column" => "id",
+	 *     ]
+	 * );
 	 *
-	 * //What is the maximum robot id?
-	 * $id = Robots::maximum(array('column' => 'id'));
 	 * echo "The maximum robot id is: ", $id, "\n";
 	 *
-	 * //What is the maximum id of mechanical robots?
-	 * $sum = Robots::maximum(array("type='mechanical'", 'column' => 'id'));
-	 * echo "The maximum robot id of mechanical robots is ", $id, "\n";
+	 * // What is the maximum id of mechanical robots?
+	 * $sum = Robots::maximum(
+	 *     [
+	 *         "type = 'mechanical'",
+	 *         "column" => "id",
+	 *     ]
+	 * );
 	 *
+	 * echo "The maximum robot id of mechanical robots is ", $id, "\n";
 	 * </code>
 	 *
 	 * @param array parameters
@@ -1239,18 +1326,27 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Allows to get the minimum value of a column that match the specified conditions
+	 * Returns the minimum value of a column for a result-set of rows that match the specified conditions
 	 *
 	 * <code>
+	 * // What is the minimum robot id?
+	 * $id = Robots::minimum(
+	 *     [
+	 *         "column" => "id",
+	 *     ]
+	 * );
 	 *
-	 * //What is the minimum robot id?
-	 * $id = Robots::minimum(array('column' => 'id'));
 	 * echo "The minimum robot id is: ", $id;
 	 *
-	 * //What is the minimum id of mechanical robots?
-	 * $sum = Robots::minimum(array("type='mechanical'", 'column' => 'id'));
-	 * echo "The minimum robot id of mechanical robots is ", $id;
+	 * // What is the minimum id of mechanical robots?
+	 * $sum = Robots::minimum(
+	 *     [
+	 *         "type = 'mechanical'",
+	 *         "column" => "id",
+	 *     ]
+	 * );
 	 *
+	 * echo "The minimum robot id of mechanical robots is ", $id;
 	 * </code>
 	 *
 	 * @param array parameters
@@ -1262,18 +1358,27 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Allows to calculate the average value on a column matching the specified conditions
+	 * Returns the average value on a column for a result-set of rows matching the specified conditions
 	 *
 	 * <code>
+	 * // What's the average price of robots?
+	 * $average = Robots::average(
+	 *     [
+	 *         "column" => "price",
+	 *     ]
+	 * );
 	 *
-	 * //What's the average price of robots?
-	 * $average = Robots::average(array('column' => 'price'));
 	 * echo "The average price is ", $average, "\n";
 	 *
-	 * //What's the average price of mechanical robots?
-	 * $average = Robots::average(array("type='mechanical'", 'column' => 'price'));
-	 * echo "The average price of mechanical robots is ", $average, "\n";
+	 * // What's the average price of mechanical robots?
+	 * $average = Robots::average(
+	 *     [
+	 *         "type = 'mechanical'",
+	 *         "column" => "price",
+	 *     ]
+	 * );
 	 *
+	 * echo "The average price of mechanical robots is ", $average, "\n";
 	 * </code>
 	 *
 	 * @param array parameters
@@ -1343,18 +1448,21 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Appends a customized message on the validation process
 	 *
 	 * <code>
-	 * use \Phalcon\Mvc\Model\Message as Message;
+	 * use Phalcon\Mvc\Model;
+	 * use Phalcon\Mvc\Model\Message as Message;
 	 *
-	 * class Robots extends \Phalcon\Mvc\Model
+	 * class Robots extends Model
 	 * {
+	 *     public function beforeSave()
+	 *     {
+	 *         if ($this->name === "Peter") {
+	 *             $message = new Message(
+	 *                 "Sorry, but a robot cannot be named Peter"
+	 *             );
 	 *
-	 *   public function beforeSave()
-	 *   {
-	 *	 if ($this->name == 'Peter') {
-	 *		$message = new Message("Sorry, but a robot cannot be named Peter");
-	 *		$this->appendMessage($message);
-	 *	 }
-	 *   }
+	 *             $this->appendMessage($message);
+	 *         }
+	 *     }
 	 * }
 	 * </code>
 	 */
@@ -1368,60 +1476,90 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Executes validators on every validation call
 	 *
 	 *<code>
-	 *use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionIn;
+	 * use Phalcon\Mvc\Model;
+	 * use Phalcon\Validation;
+	 * use Phalcon\Validation\Validator\ExclusionIn;
 	 *
-	 *class Subscriptors extends \Phalcon\Mvc\Model
-	 *{
+	 * class Subscriptors extends Model
+	 * {
+	 *     public function validation()
+	 *     {
+	 *         $validator = new Validation();
 	 *
-	 *	public function validation()
-	 *  {
-	 * 		$this->validate(new ExclusionIn(array(
-	 *			'field' => 'status',
-	 *			'domain' => array('A', 'I')
-	 *		)));
-	 *		if ($this->validationHasFailed() == true) {
-	 *			return false;
-	 *		}
-	 *	}
-	 *}
+	 *         $validator->add(
+	 *             "status",
+	 *             new ExclusionIn(
+	 *                 [
+	 *                     "domain" => [
+	 *                         "A",
+	 *                         "I",
+	 *                     ],
+	 *                 ]
+	 *             )
+	 *         );
+	 *
+	 *         return $this->validate($validator);
+	 *     }
+	 * }
 	 *</code>
 	 */
-	protected function validate(<Model\ValidatorInterface> validator) -> <Model>
+	protected function validate(<ValidationInterface> validator) -> boolean
 	{
-		var message;
+		var messages, message;
 
-		/**
-		 * Call the validation, if it returns false we append the messages to the current object
-		 */
-		if validator->validate(this) === false {
-			for message in validator->getMessages() {
-				let this->_errorMessages[] = message;
-			}
+		let messages = validator->validate(null, this);
+
+		// Call the validation, if it returns not the boolean
+		// we append the messages to the current object
+		if typeof messages == "boolean" {
+			return messages;
 		}
 
-		return this;
+		for message in iterator(messages) {
+			this->appendMessage(
+				new Message(
+					message->getMessage(),
+					message->getField(),
+					message->getType(),
+					null,
+					message->getCode()
+				)
+			);
+		}
+
+		// If there is a message, it returns false otherwise true
+		return !count(messages);
 	}
 
 	/**
 	 * Check whether validation process has generated any messages
 	 *
 	 *<code>
-	 *use Phalcon\Mvc\Model\Validator\ExclusionIn as ExclusionIn;
+	 * use Phalcon\Mvc\Model;
+	 * use Phalcon\Validation;
+	 * use Phalcon\Validation\Validator\ExclusionIn;
 	 *
-	 *class Subscriptors extends \Phalcon\Mvc\Model
-	 *{
+	 * class Subscriptors extends Model
+	 * {
+	 *     public function validation()
+	 *     {
+	 *         $validator = new Validation();
 	 *
-	 *	public function validation()
-	 *  {
-	 * 		$this->validate(new ExclusionIn(array(
-	 *			'field' => 'status',
-	 *			'domain' => array('A', 'I')
-	 *		)));
-	 *		if ($this->validationHasFailed() == true) {
-	 *			return false;
-	 *		}
-	 *	}
-	 *}
+	 *         $validator->validate(
+	 *             "status",
+	 *             new ExclusionIn(
+	 *                 [
+	 *                     "domain" => [
+	 *                         "A",
+	 *                         "I",
+	 *                     ],
+	 *                 ]
+	 *             )
+	 *         );
+	 *
+	 *         return $this->validate($validator);
+	 *     }
+	 * }
 	 *</code>
 	 */
 	public function validationHasFailed() -> boolean
@@ -1438,18 +1576,23 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Returns array of validation messages
 	 *
 	 *<code>
-	 *	$robot = new Robots();
-	 *	$robot->type = 'mechanical';
-	 *	$robot->name = 'Astro Boy';
-	 *	$robot->year = 1952;
-	 *	if ($robot->save() == false) {
-	 *  	echo "Umh, We can't store robots right now ";
-	 *  	foreach ($robot->getMessages() as $message) {
-	 *			echo $message;
-	 *		}
-	 *	} else {
-	 *  	echo "Great, a new robot was saved successfully!";
-	 *	}
+	 * $robot = new Robots();
+	 *
+	 * $robot->type = "mechanical";
+	 * $robot->name = "Astro Boy";
+	 * $robot->year = 1952;
+	 *
+	 * if ($robot->save() === false) {
+	 *     echo "Umh, We can't store robots right now ";
+	 *
+	 *     $messages = $robot->getMessages();
+	 *
+	 *     foreach ($messages as $message) {
+	 *         echo $message;
+	 *     }
+	 * } else {
+	 *     echo "Great, a new robot was saved successfully!";
+	 * }
 	 * </code>
 	 */
 	public function getMessages(var filter = null) -> <MessageInterface[]>
@@ -1465,6 +1608,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			}
 			return filtered;
 		}
+
 		return this->_errorMessages;
 	}
 
@@ -1472,13 +1616,13 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Reads "belongs to" relations and check the virtual foreign keys when inserting or updating records
 	 * to verify that inserted/updated values are present in the related entity
 	 */
-	protected function _checkForeignKeysRestrict() -> boolean
+	protected final function _checkForeignKeysRestrict() -> boolean
 	{
 		var manager, belongsTo, foreignKey, relation, conditions,
 			position, bindParams, extraConditions, message, fields,
 			referencedFields, field, referencedModel, value, allowNulls;
 		int action, numberNull;
-		boolean error, validateWithNulls = false;
+		boolean error, validateWithNulls;
 
 		/**
 		 * Get the models manager
@@ -1489,130 +1633,130 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 * We check if some of the belongsTo relations act as virtual foreign key
 		 */
 		let belongsTo = manager->getBelongsTo(this);
-		if count(belongsTo) {
 
-			let error = false;
-			for relation in belongsTo {
+		let error = false;
+		for relation in belongsTo {
 
-				let foreignKey = relation->getForeignKey();
-				if foreignKey !== false {
+			let validateWithNulls = false;
+			let foreignKey = relation->getForeignKey();
+			if foreignKey === false {
+				continue;
+			}
 
-					/**
-					 * By default action is restrict
-					 */
-					let action = Relation::ACTION_RESTRICT;
+			/**
+			 * By default action is restrict
+			 */
+			let action = Relation::ACTION_RESTRICT;
 
-					/**
-					 * Try to find a different action in the foreign key's options
-					 */
-					if typeof foreignKey == "array" {
-						if isset foreignKey["action"] {
-							let action = (int) foreignKey["action"];
-						}
-					}
-
-					/**
-					 * Check only if the operation is restrict
-					 */
-					if action == Relation::ACTION_RESTRICT {
-
-						/**
-						 * Load the referenced model if needed
-						 */
-						let referencedModel = manager->load(relation->getReferencedModel());
-
-						/**
-						 * Since relations can have multiple columns or a single one, we need to build a condition for each of these cases
-						 */
-						let conditions = [], bindParams = [];
-
-						let numberNull = 0,
-							fields = relation->getFields(),
-							referencedFields = relation->getReferencedFields();
-
-						if typeof fields == "array" {
-							/**
-							 * Create a compound condition
-							 */
-							for position, field in fields {
-								fetch value, this->{field};
-								let conditions[] = "[" . referencedFields[position] . "] = ?" . position,
-									bindParams[] = value;
-								if typeof value == "null" {
-									let numberNull++;
-								}
-							}
-
-							let validateWithNulls = numberNull == count(fields);
-
-						} else {
-
-							fetch value, this->{fields};
-							let conditions[] = "[" . referencedFields . "] = ?0",
-								bindParams[] = value;
-
-							if typeof value == "null" {
-								let validateWithNulls = true;
-							}
-						}
-
-						/**
-						 * Check if the virtual foreign key has extra conditions
-						 */
-						if fetch extraConditions, foreignKey["conditions"] {
-							let conditions[] = extraConditions;
-						}
-
-						/**
-						 * Check if the relation definition allows nulls
-						 */
-						if validateWithNulls {
-							if fetch allowNulls, foreignKey["allowNulls"] {
-								let validateWithNulls = (boolean) allowNulls;
-							} else {
-								let validateWithNulls = false;
-							}
-						}
-
-						/**
-						 * We don't trust the actual values in the object and pass the values using bound parameters
-						 * Let's make the checking
-						 */
-						if !validateWithNulls && !referencedModel->count([join(" AND ", conditions), "bind": bindParams]) {
-
-							/**
-							 * Get the user message or produce a new one
-							 */
-							if !fetch message, foreignKey["message"] {
-								if typeof fields == "array" {
-									let message = "Value of fields \"" . join(", ", fields) . "\" does not exist on referenced table";
-								} else {
-									let message = "Value of field \"" . fields . "\" does not exist on referenced table";
-								}
-							}
-
-							/**
-							 * Create a message
-							 */
-							this->appendMessage(new Message(message, fields, "ConstraintViolation"));
-							let error = true;
-							break;
-						}
-
-					}
+			/**
+			 * Try to find a different action in the foreign key's options
+			 */
+			if typeof foreignKey == "array" {
+				if isset foreignKey["action"] {
+					let action = (int) foreignKey["action"];
 				}
 			}
 
 			/**
-			 * Call 'onValidationFails' if the validation fails
+			 * Check only if the operation is restrict
 			 */
-			if error === true {
-				if globals_get("orm.events") {
-					this->fireEvent("onValidationFails");
-					this->_cancelOperation();
-				}
-				return false;
+			if action != Relation::ACTION_RESTRICT {
+				continue;
 			}
+
+			/**
+			 * Load the referenced model if needed
+			 */
+			let referencedModel = manager->load(relation->getReferencedModel());
+
+			/**
+			 * Since relations can have multiple columns or a single one, we need to build a condition for each of these cases
+			 */
+			let conditions = [], bindParams = [];
+
+			let numberNull = 0,
+				fields = relation->getFields(),
+				referencedFields = relation->getReferencedFields();
+
+			if typeof fields == "array" {
+				/**
+				 * Create a compound condition
+				 */
+				for position, field in fields {
+					fetch value, this->{field};
+					let conditions[] = "[" . referencedFields[position] . "] = ?" . position,
+						bindParams[] = value;
+					if typeof value == "null" {
+						let numberNull++;
+					}
+				}
+
+				let validateWithNulls = numberNull == count(fields);
+
+			} else {
+
+				fetch value, this->{fields};
+				let conditions[] = "[" . referencedFields . "] = ?0",
+					bindParams[] = value;
+
+				if typeof value == "null" {
+					let validateWithNulls = true;
+				}
+			}
+
+			/**
+			 * Check if the virtual foreign key has extra conditions
+			 */
+			if fetch extraConditions, foreignKey["conditions"] {
+				let conditions[] = extraConditions;
+			}
+
+			/**
+			 * Check if the relation definition allows nulls
+			 */
+			if validateWithNulls {
+				if fetch allowNulls, foreignKey["allowNulls"] {
+					let validateWithNulls = (boolean) allowNulls;
+				} else {
+					let validateWithNulls = false;
+				}
+			}
+
+			/**
+			 * We don't trust the actual values in the object and pass the values using bound parameters
+			 * Let's make the checking
+			 */
+			if !validateWithNulls && !referencedModel->count([join(" AND ", conditions), "bind": bindParams]) {
+
+				/**
+				 * Get the user message or produce a new one
+				 */
+				if !fetch message, foreignKey["message"] {
+					if typeof fields == "array" {
+						let message = "Value of fields \"" . join(", ", fields) . "\" does not exist on referenced table";
+					} else {
+						let message = "Value of field \"" . fields . "\" does not exist on referenced table";
+					}
+				}
+
+				/**
+				 * Create a message
+				 */
+				this->appendMessage(new Message(message, fields, "ConstraintViolation"));
+				let error = true;
+				break;
+			}
+		}
+
+		/**
+		 * Call 'onValidationFails' if the validation fails
+		 */
+		if error === true {
+			if globals_get("orm.events") {
+				this->fireEvent("onValidationFails");
+				this->_cancelOperation();
+			}
+			return false;
 		}
 
 		return true;
@@ -1621,7 +1765,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	/**
 	 * Reads both "hasMany" and "hasOne" relations and checks the virtual foreign keys (cascade) when deleting records
 	 */
-	protected function _checkForeignKeysReverseCascade() -> boolean
+	protected final function _checkForeignKeysReverseCascade() -> boolean
 	{
 		var manager, relations, relation, foreignKey,
 			resultset, conditions, bindParams, referencedModel,
@@ -1639,87 +1783,85 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 */
 		let relations = manager->getHasOneAndHasMany(this);
 
-		if count(relations) {
+		for relation in relations {
 
-			for relation in relations {
+			/**
+			 * Check if the relation has a virtual foreign key
+			 */
+			let foreignKey = relation->getForeignKey();
+			if foreignKey === false {
+				continue;
+			}
 
-				/**
-				 * Check if the relation has a virtual foreign key
-				 */
-				let foreignKey = relation->getForeignKey();
-				if foreignKey !== false {
+			/**
+			 * By default action is restrict
+			 */
+			let action = Relation::NO_ACTION;
 
-					/**
-					 * By default action is restrict
-					 */
-					let action = Relation::NO_ACTION;
-
-					/**
-					 * Try to find a different action in the foreign key's options
-					 */
-					if typeof foreignKey == "array" {
-						if isset foreignKey["action"] {
-							let action = (int) foreignKey["action"];
-						}
-					}
-
-					/**
-					 * Check only if the operation is restrict
-					 */
-					if action == Relation::ACTION_CASCADE {
-
-						/**
-						 * Load a plain instance from the models manager
-						 */
-						let referencedModel = manager->load(relation->getReferencedModel());
-
-						let fields = relation->getFields(),
-							referencedFields = relation->getReferencedFields();
-
-						/**
-						 * Create the checking conditions. A relation can has many fields or a single one
-						 */
-						let conditions = [], bindParams = [];
-
-						if typeof fields == "array" {
-							for position, field in fields {
-								fetch value, this->{field};
-								let conditions[] = "[". referencedFields[position] . "] = ?" . position,
-									bindParams[] = value;
-							}
-						} else {
-							fetch value, this->{fields};
-							let conditions[] = "[" . referencedFields . "] = ?0",
-								bindParams[] = value;
-						}
-
-						/**
-						 * Check if the virtual foreign key has extra conditions
-						 */
-						if fetch extraConditions, foreignKey["conditions"] {
-							let conditions[] = extraConditions;
-						}
-
-						/**
-						 * We don't trust the actual values in the object and then we're passing the values using bound parameters
-						 * Let's make the checking
-						 */
-						let resultset = referencedModel->find([
-							join(" AND ", conditions),
-							"bind": bindParams
-						]);
-
-						/**
-						 * Delete the resultset
-						 * Stop the operation if needed
-						 */
-						if resultset->delete() === false {
-							return false;
-						}
-					}
+			/**
+			 * Try to find a different action in the foreign key's options
+			 */
+			if typeof foreignKey == "array" {
+				if isset foreignKey["action"] {
+					let action = (int) foreignKey["action"];
 				}
 			}
 
+			/**
+			 * Check only if the operation is restrict
+			 */
+			if action != Relation::ACTION_CASCADE {
+				continue;
+			}
+
+			/**
+			 * Load a plain instance from the models manager
+			 */
+			let referencedModel = manager->load(relation->getReferencedModel());
+
+			let fields = relation->getFields(),
+				referencedFields = relation->getReferencedFields();
+
+			/**
+			 * Create the checking conditions. A relation can has many fields or a single one
+			 */
+			let conditions = [], bindParams = [];
+
+			if typeof fields == "array" {
+				for position, field in fields {
+					fetch value, this->{field};
+					let conditions[] = "[". referencedFields[position] . "] = ?" . position,
+						bindParams[] = value;
+				}
+			} else {
+				fetch value, this->{fields};
+				let conditions[] = "[" . referencedFields . "] = ?0",
+					bindParams[] = value;
+			}
+
+			/**
+			 * Check if the virtual foreign key has extra conditions
+			 */
+			if fetch extraConditions, foreignKey["conditions"] {
+				let conditions[] = extraConditions;
+			}
+
+			/**
+			 * We don't trust the actual values in the object and then we're passing the values using bound parameters
+			 * Let's make the checking
+			 */
+			let resultset = referencedModel->find([
+				join(" AND ", conditions),
+				"bind": bindParams
+			]);
+
+			/**
+			 * Delete the resultset
+			 * Stop the operation if needed
+			 */
+			if resultset->delete() === false {
+				return false;
+			}
 		}
 
 		return true;
@@ -1728,7 +1870,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	/**
 	 * Reads both "hasMany" and "hasOne" relations and checks the virtual foreign keys (restrict) when deleting records
 	 */
-	protected function _checkForeignKeysReverseRestrict() -> boolean
+	protected final function _checkForeignKeysReverseRestrict() -> boolean
 	{
 		boolean error;
 		var manager, relations, foreignKey, relation,
@@ -1746,106 +1888,106 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 * We check if some of the hasOne/hasMany relations is a foreign key
 		 */
 		let relations = manager->getHasOneAndHasMany(this);
-		if count(relations) {
 
-			let error = false;
-			for relation in relations {
+		let error = false;
+		for relation in relations {
 
-				/**
-				 * Check if the relation has a virtual foreign key
-				 */
-				let foreignKey = relation->getForeignKey();
-				if foreignKey !== false {
+			/**
+			 * Check if the relation has a virtual foreign key
+			 */
+			let foreignKey = relation->getForeignKey();
+			if foreignKey === false {
+				continue;
+			}
 
-					/**
-					 * By default action is restrict
-					 */
-					let action = Relation::ACTION_RESTRICT;
+			/**
+			 * By default action is restrict
+			 */
+			let action = Relation::ACTION_RESTRICT;
 
-					/**
-					 * Try to find a different action in the foreign key's options
-					 */
-					if typeof foreignKey == "array" {
-						if isset foreignKey["action"] {
-							let action = (int) foreignKey["action"];
-						}
-					}
-
-					/**
-					 * Check only if the operation is restrict
-					 */
-					if action == Relation::ACTION_RESTRICT {
-
-						let relationClass = relation->getReferencedModel();
-
-						/**
-						 * Load a plain instance from the models manager
-						 */
-						let referencedModel = manager->load(relationClass);
-
-						let fields = relation->getFields(),
-							referencedFields = relation->getReferencedFields();
-
-						/**
-						 * Create the checking conditions. A relation can has many fields or a single one
-						 */
-						let conditions = [], bindParams = [];
-
-						if typeof fields == "array" {
-
-							for position, field in fields {
-								fetch value, this->{field};
-								let conditions[] = "[" . referencedFields[position] . "] = ?" . position,
-									bindParams[] = value;
-							}
-
-						} else {
-							fetch value, this->{fields};
-							let conditions[] = "[" . referencedFields . "] = ?0",
-								bindParams[] = value;
-						}
-
-						/**
-						 * Check if the virtual foreign key has extra conditions
-						 */
-						if fetch extraConditions, foreignKey["conditions"] {
-							let conditions[] = extraConditions;
-						}
-
-						/**
-						 * We don't trust the actual values in the object and then we're passing the values using bound parameters
-						 * Let's make the checking
-						 */
-						if referencedModel->count([join(" AND ", conditions), "bind": bindParams]) {
-
-							/**
-							 * Create a new message
-							 */
-							if !fetch message, foreignKey["message"] {
-								let message = "Record is referenced by model " . relationClass;
-							}
-
-							/**
-							 * Create a message
-							 */
-							this->appendMessage(new Message(message, fields, "ConstraintViolation"));
-							let error = true;
-							break;
-						}
-					}
+			/**
+			 * Try to find a different action in the foreign key's options
+			 */
+			if typeof foreignKey == "array" {
+				if isset foreignKey["action"] {
+					let action = (int) foreignKey["action"];
 				}
 			}
 
 			/**
-			 * Call validation fails event
+			 * Check only if the operation is restrict
 			 */
-			if error === true {
-				if globals_get("orm.events") {
-					this->fireEvent("onValidationFails");
-					this->_cancelOperation();
-				}
-				return false;
+			if action != Relation::ACTION_RESTRICT {
+				continue;
 			}
+
+			let relationClass = relation->getReferencedModel();
+
+			/**
+			 * Load a plain instance from the models manager
+			 */
+			let referencedModel = manager->load(relationClass);
+
+			let fields = relation->getFields(),
+				referencedFields = relation->getReferencedFields();
+
+			/**
+			 * Create the checking conditions. A relation can has many fields or a single one
+			 */
+			let conditions = [], bindParams = [];
+
+			if typeof fields == "array" {
+
+				for position, field in fields {
+					fetch value, this->{field};
+					let conditions[] = "[" . referencedFields[position] . "] = ?" . position,
+						bindParams[] = value;
+				}
+
+			} else {
+				fetch value, this->{fields};
+				let conditions[] = "[" . referencedFields . "] = ?0",
+					bindParams[] = value;
+			}
+
+			/**
+			 * Check if the virtual foreign key has extra conditions
+			 */
+			if fetch extraConditions, foreignKey["conditions"] {
+				let conditions[] = extraConditions;
+			}
+
+			/**
+			 * We don't trust the actual values in the object and then we're passing the values using bound parameters
+			 * Let's make the checking
+			 */
+			if referencedModel->count([join(" AND ", conditions), "bind": bindParams]) {
+
+				/**
+				 * Create a new message
+				 */
+				if !fetch message, foreignKey["message"] {
+					let message = "Record is referenced by model " . relationClass;
+				}
+
+				/**
+				 * Create a message
+				 */
+				this->appendMessage(new Message(message, fields, "ConstraintViolation"));
+				let error = true;
+				break;
+			}
+		}
+
+		/**
+		 * Call validation fails event
+		 */
+		if error === true {
+			if globals_get("orm.events") {
+				this->fireEvent("onValidationFails");
+				this->_cancelOperation();
+			}
+			return false;
 		}
 
 		return true;
@@ -1904,7 +2046,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			if typeof notNull == "array" {
 
 				/**
-				 * Gets the fields that are numeric, these are validated in a diferent way
+				 * Gets the fields that are numeric, these are validated in a different way
 				 */
 				let dataTypeNumeric = metaData->getDataTypesNumeric(this);
 
@@ -1921,8 +2063,8 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 					let automaticAttributes = metaData->getAutomaticUpdateAttributes(this);
 				} else {
 					let automaticAttributes = metaData->getAutomaticCreateAttributes(this);
-					let defaultValues = metaData->getDefaultValues(this);
 				}
+                let defaultValues = metaData->getDefaultValues(this);
 
 				/**
 				 * Get string attributes that allow empty strings as defaults
@@ -1948,7 +2090,8 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 						}
 
 						/**
-						 * Field is null when: 1) is not set, 2) is numeric but its value is not numeric, 3) is null or 4) is empty string
+						 * Field is null when: 1) is not set, 2) is numeric but
+						 * its value is not numeric, 3) is null or 4) is empty string
 						 * Read the attribute from the this_ptr using the real or renamed name
 						 */
 						if fetch value, this->{attributeField} {
@@ -1963,7 +2106,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 											let isNull = true;
 										}
 									} else {
-										if value === null || value === "" {
+										if value === null || (value === "" && (!isset defaultValues[field] || value !== defaultValues[field])) {
 											let isNull = true;
 										}
 									}
@@ -1997,7 +2140,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 							}
 
 							/**
-							 * A implicit PresenceOf message is created
+							 * An implicit PresenceOf message is created
 							 */
 							let this->_errorMessages[] = new Message(attributeField . " is required", attributeField, "PresenceOf"),
 								error = true;
@@ -2111,13 +2254,15 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	{
 		var bindSkip, fields, values, bindTypes, attributes, bindDataTypes, automaticAttributes,
 			field, columnMap, value, attributeField, success, bindType,
-			defaultValue, sequenceName, defaultValues, source, schema;
+			defaultValue, sequenceName, defaultValues, source, schema, snapshot, lastInsertedId, manager;
 		boolean useExplicitIdentity;
 
 		let bindSkip = Column::BIND_SKIP;
+		let manager = <ManagerInterface> this->_modelsManager;
 
 		let fields = [],
 			values = [],
+			snapshot = [],
 			bindTypes = [];
 
 		let attributes = metaData->getAttributes(this),
@@ -2160,7 +2305,10 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 					if fetch value, this->{attributeField} {
 
 						if value === null && isset defaultValues[field] {
+							let snapshot[attributeField] = null;
 							let value = connection->getDefaultValue();
+						} else {
+							let snapshot[attributeField] = value;
 						}
 
 						/**
@@ -2171,13 +2319,17 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 						}
 
 						let fields[] = field, values[] = value, bindTypes[] = bindType;
-
 					} else {
 
 						if isset defaultValues[field] {
 							let values[] = connection->getDefaultValue();
+							/**
+							 * This is default value so we set null, keep in mind it's value in database!
+							 */
+							let snapshot[attributeField] = null;
 						} else {
 							let values[] = value;
+							let snapshot[attributeField] = value;
 						}
 
 						let fields[] = field, bindTypes[] = bindSkip;
@@ -2275,10 +2427,18 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			/**
 			 * Recover the last "insert id" and assign it to the object
 			 */
-			let this->{attributeField} = connection->lastInsertId(sequenceName);
+			let lastInsertedId = connection->lastInsertId(sequenceName);
+
+			let this->{attributeField} = lastInsertedId;
+			let snapshot[attributeField] = lastInsertedId;
+
+			if manager->isKeepingSnapshots(this) && globals_get("orm.update_snapshot_on_save") {
+			    let this->_snapshot = snapshot;
+			}
 
 			/**
-			 * Since the primary key was modified, we delete the _uniqueParams to force any future update to re-build the primary key
+			 * Since the primary key was modified, we delete the _uniqueParams
+			 * to force any future update to re-build the primary key
 			 */
 			let this->_uniqueParams = null;
 		}
@@ -2294,207 +2454,231 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * @param string|array table
 	 * @return boolean
 	 */
-	protected function _doLowUpdate(<MetaDataInterface> metaData, <AdapterInterface> connection, var table) -> boolean
-	{
-		var bindSkip, fields, values, bindTypes, manager, bindDataTypes, field,
-			automaticAttributes, snapshotValue, uniqueKey, uniqueParams, uniqueTypes,
-			snapshot, nonPrimary, columnMap, attributeField, value, primaryKeys, bindType;
-		boolean useDynamicUpdate, changed;
+	 protected function _doLowUpdate(<MetaDataInterface> metaData, <AdapterInterface> connection, var table) -> boolean
+ 	{
+ 		var bindSkip, fields, values, dataType, dataTypes, bindTypes, manager, bindDataTypes, field,
+ 			automaticAttributes, snapshotValue, uniqueKey, uniqueParams, uniqueTypes,
+ 			snapshot, nonPrimary, columnMap, attributeField, value, primaryKeys, bindType, newSnapshot, success;
+ 		boolean useDynamicUpdate, changed;
 
-		let bindSkip = Column::BIND_SKIP,
-			fields = [],
-			values = [],
-			bindTypes = [],
-			manager = <ManagerInterface> this->_modelsManager;
+ 		let bindSkip = Column::BIND_SKIP,
+ 			fields = [],
+ 			values = [],
+ 			bindTypes = [],
+ 			newSnapshot = [],
+ 			manager = <ManagerInterface> this->_modelsManager;
 
-		/**
-		 * Check if the model must use dynamic update
-		 */
-		let useDynamicUpdate = (boolean) manager->isUsingDynamicUpdate(this);
+ 		/**
+ 		 * Check if the model must use dynamic update
+ 		 */
+ 		let useDynamicUpdate = (boolean) manager->isUsingDynamicUpdate(this);
 
-		if useDynamicUpdate {
-			let snapshot = this->_snapshot;
-			if typeof snapshot != "array" {
-				let useDynamicUpdate = false;
+		let snapshot = this->_snapshot;
+
+ 		if useDynamicUpdate {
+ 			if typeof snapshot != "array" {
+ 				let useDynamicUpdate = false;
+ 			}
+ 		}
+
+ 		let dataTypes = metaData->getDataTypes(this),
+			 bindDataTypes = metaData->getBindTypes(this),
+ 			nonPrimary = metaData->getNonPrimaryKeyAttributes(this),
+ 			automaticAttributes = metaData->getAutomaticUpdateAttributes(this);
+
+ 		if globals_get("orm.column_renaming") {
+ 			let columnMap = metaData->getColumnMap(this);
+ 		} else {
+ 			let columnMap = null;
+ 		}
+
+ 		/**
+ 		 * We only make the update based on the non-primary attributes, values in primary key attributes are ignored
+ 		 */
+ 		for field in nonPrimary {
+
+ 			if !isset automaticAttributes[field] {
+
+ 				/**
+ 				 * Check a bind type for field to update
+ 				 */
+ 				if !fetch bindType, bindDataTypes[field] {
+ 					throw new Exception("Column '" . field . "' have not defined a bind data type");
+ 				}
+
+ 				/**
+ 				 * Check if the model has a column map
+ 				 */
+ 				if typeof columnMap == "array" {
+ 					if !fetch attributeField, columnMap[field] {
+ 						throw new Exception("Column '" . field . "' isn't part of the column map");
+ 					}
+ 				} else {
+ 					let attributeField = field;
+ 				}
+
+ 				/**
+ 				 * Get the field's value
+ 				 * If a field isn't set we pass a null value
+ 				 */
+ 				if fetch value, this->{attributeField} {
+
+ 					/**
+ 					 * When dynamic update is not used we pass every field to the update
+ 					 */
+ 					if !useDynamicUpdate {
+ 						let fields[] = field, values[] = value;
+ 						let bindTypes[] = bindType;
+ 					} else {
+
+ 						/**
+ 						 * If the field is not part of the snapshot we add them as changed
+ 						 */
+ 						if !fetch snapshotValue, snapshot[attributeField] {
+ 							let changed = true;
+ 						} else {
+ 							/**
+ 							 * See https://github.com/phalcon/cphalcon/issues/3247
+ 							 * Take a TEXT column with value '4' and replace it by
+ 							 * the value '4.0'. For PHP '4' and '4.0' are the same.
+ 							 * We can't use simple comparison...
+ 							 *
+ 							 * We must use the type of snapshotValue.
+ 							 */
+ 							if value === null {
+ 								let changed = snapshotValue !== null;
+ 							} else {
+ 								if snapshotValue === null {
+ 									let changed = true;
+ 								} else {
+
+									 if !fetch dataType, dataTypes[field] {
+										 throw new Exception("Column '" . field . "' have not defined a data type");
+									 }
+
+ 									switch dataType {
+
+ 										case Column::TYPE_BOOLEAN:
+ 											let changed = (boolean) snapshotValue !== (boolean) value;
+ 											break;
+
+ 										case Column::TYPE_INTEGER:
+ 											let changed = (int) snapshotValue !== (int) value;
+ 											break;
+
+ 										case Column::TYPE_DECIMAL:
+ 										case Column::TYPE_FLOAT:
+ 											let changed = floatval(snapshotValue) !== floatval(value);
+ 											break;
+
+ 										case Column::TYPE_DATE:
+ 										case Column::TYPE_VARCHAR:
+ 										case Column::TYPE_DATETIME:
+ 										case Column::TYPE_CHAR:
+ 										case Column::TYPE_TEXT:
+ 										case Column::TYPE_VARCHAR:
+ 										case Column::TYPE_BIGINTEGER:
+ 											let changed = (string) snapshotValue !== (string) value;
+ 											break;
+
+ 										/**
+ 										 * Any other type is not really supported...
+ 										 */
+ 										default:
+ 											let changed = value != snapshotValue;
+ 									}
+ 								}
+ 							}
+ 						}
+
+ 						/**
+ 						 * Only changed values are added to the SQL Update
+ 						 */
+ 						if changed {
+ 							let fields[] = field, values[] = value;
+ 							let bindTypes[] = bindType;
+ 						}
+ 					}
+                    let newSnapshot[attributeField] = value;
+
+ 				} else {
+ 				    let newSnapshot[attributeField] = null;
+ 					let fields[] = field, values[] = null, bindTypes[] = bindSkip;
+ 				}
+ 			}
+ 		}
+
+ 		/**
+ 		 * If there is no fields to update we return true
+ 		 */
+ 		if !count(fields) {
+ 			return true;
+ 		}
+
+ 		let uniqueKey = this->_uniqueKey,
+ 			uniqueParams = this->_uniqueParams,
+ 			uniqueTypes = this->_uniqueTypes;
+
+ 		/**
+ 		 * When unique params is null we need to rebuild the bind params
+ 		 */
+ 		if typeof uniqueParams != "array" {
+
+ 			let primaryKeys = metaData->getPrimaryKeyAttributes(this);
+
+ 			/**
+ 			 * We can't create dynamic SQL without a primary key
+ 			 */
+ 			if !count(primaryKeys) {
+ 				throw new Exception("A primary key must be defined in the model in order to perform the operation");
+ 			}
+
+ 			let uniqueParams = [];
+ 			for field in primaryKeys {
+
+ 				/**
+ 				 * Check if the model has a column map
+ 				 */
+ 				if typeof columnMap == "array" {
+ 					if !fetch attributeField, columnMap[field] {
+ 						throw new Exception("Column '" . field . "' isn't part of the column map");
+ 					}
+ 				} else {
+ 					let attributeField = field;
+ 				}
+
+ 				if fetch value, this->{attributeField} {
+ 				    let newSnapshot[attributeField] = value;
+ 					let uniqueParams[] = value;
+ 				} else {
+ 				    let newSnapshot[attributeField] = null;
+ 					let uniqueParams[] = null;
+ 				}
+ 			}
+ 		}
+
+ 		/**
+ 		 * We build the conditions as an array
+ 		 * Perform the low level update
+ 		 */
+ 		let success = connection->update(table, fields, values, [
+ 			"conditions" : uniqueKey,
+ 			"bind"	     : uniqueParams,
+ 			"bindTypes"  : uniqueTypes
+ 		], bindTypes);
+
+ 		if success && manager->isKeepingSnapshots(this) && globals_get("orm.update_snapshot_on_save") {
+			if typeof snapshot == "array" {
+				let this->_oldSnapshot = snapshot;
+				let this->_snapshot = array_merge(snapshot, newSnapshot);
+			} else {
+				let this->_oldSnapshot = [];
+				let this->_snapshot = newSnapshot;
 			}
 		}
 
-		let bindDataTypes = metaData->getBindTypes(this),
-			nonPrimary = metaData->getNonPrimaryKeyAttributes(this),
-			automaticAttributes = metaData->getAutomaticUpdateAttributes(this);
-
-		if globals_get("orm.column_renaming") {
-			let columnMap = metaData->getColumnMap(this);
-		} else {
-			let columnMap = null;
-		}
-
-		/**
-		 * We only make the update based on the non-primary attributes, values in primary key attributes are ignored
-		 */
-		for field in nonPrimary {
-
-			if !isset automaticAttributes[field] {
-
-				/**
-				 * Check a bind type for field to update
-				 */
-				if !fetch bindType, bindDataTypes[field] {
-					throw new Exception("Column '" . field . "' have not defined a bind data type");
-				}
-
-				/**
-				 * Check if the model has a column map
-				 */
-				if typeof columnMap == "array" {
-					if !fetch attributeField, columnMap[field] {
-						throw new Exception("Column '" . field . "' isn't part of the column map");
-					}
-				} else {
-					let attributeField = field;
-				}
-
-				/**
-				 * Get the field's value
-				 * If a field isn't set we pass a null value
-				 */
-				if fetch value, this->{attributeField} {
-
-					/**
-					 * When dynamic update is not used we pass every field to the update
-					 */
-					if !useDynamicUpdate {
-						let fields[] = field, values[] = value;
-						let bindTypes[] = bindType;
-					} else {
-
-						/**
-						 * If the field is not part of the snapshot we add them as changed
-						 */
-						if !fetch snapshotValue, snapshot[attributeField] {
-							let changed = true;
-						} else {
-							/**
-							 * See https://github.com/phalcon/cphalcon/issues/3247
-							 * Take a TEXT column with value '4' and replace it by
-							 * the value '4.0'. For PHP '4' and '4.0' are the same.
-							 * We can't use simple comparison...
-							 *
-							 * We must use the type of snapshotValue.
-							 */
-							if value === null {
-								let changed = snapshotValue !== null;
-							} else {
-								if snapshotValue === null {
-									let changed = true;
-								} else {
-									switch bindType {
-
-										case Column::TYPE_BOOLEAN:
-											let changed = (boolean) snapshotValue !== (boolean) value;
-											break;
-
-										case Column::TYPE_INTEGER:
-											let changed = (int) snapshotValue !== (int) value;
-											break;
-
-										case Column::TYPE_DECIMAL:
-										case Column::TYPE_FLOAT:
-											let changed = floatval(snapshotValue) !== floatval(value);
-											break;
-
-										case Column::TYPE_DATE:
-										case Column::TYPE_VARCHAR:
-										case Column::TYPE_DATETIME:
-										case Column::TYPE_CHAR:
-										case Column::TYPE_TEXT:
-										case Column::TYPE_VARCHAR:
-										case Column::TYPE_BIGINTEGER:
-											let changed = (string) snapshotValue !== (string) value;
-											break;
-
-										/**
-										 * Any other type is not really supported...
-										 */
-										default:
-											let changed = value != snapshotValue;
-									}
-								}
-							}
-						}
-
-						/**
-						 * Only changed values are added to the SQL Update
-						 */
-						if changed {
-							let fields[] = field, values[] = value;
-							let bindTypes[] = bindType;
-						}
-					}
-
-				} else {
-					let fields[] = field, values[] = null, bindTypes[] = bindSkip;
-				}
-			}
-		}
-
-		/**
-		 * If there is no fields to update we return true
-		 */
-		if !count(fields) {
-			return true;
-		}
-
-		let uniqueKey = this->_uniqueKey,
-			uniqueParams = this->_uniqueParams,
-			uniqueTypes = this->_uniqueTypes;
-
-		/**
-		 * When unique params is null we need to rebuild the bind params
-		 */
-		if typeof uniqueParams != "array" {
-
-			let primaryKeys = metaData->getPrimaryKeyAttributes(this);
-
-			/**
-			 * We can't create dynamic SQL without a primary key
-			 */
-			if !count(primaryKeys) {
-				throw new Exception("A primary key must be defined in the model in order to perform the operation");
-			}
-
-			let uniqueParams = [];
-			for field in primaryKeys {
-
-				/**
-				 * Check if the model has a column map
-				 */
-				if typeof columnMap == "array" {
-					if !fetch attributeField, columnMap[field] {
-						throw new Exception("Column '" . field . "' isn't part of the column map");
-					}
-				} else {
-					let attributeField = field;
-				}
-
-				if fetch value, this->{attributeField} {
-					let uniqueParams[] = value;
-				} else {
-					let uniqueParams[] = null;
-				}
-			}
-		}
-
-		/**
-		 * We build the conditions as an array
-		 * Perform the low level update
-		 */
-		return connection->update(table, fields, values, [
-			"conditions": uniqueKey,
-			"bind"	  : uniqueParams,
-			"bindTypes" : uniqueTypes
-		], bindTypes);
-	}
+ 		return success;
+ 	}
 
 	/**
 	 * Saves related records that must be stored prior to save the master record
@@ -2769,7 +2953,10 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			} else {
 				if typeof record != "array" {
 					connection->rollback(nesting);
-					throw new Exception("There are no defined relations for the model '" . className . "' using alias '" . name . "'");
+
+					throw new Exception(
+						"There are no defined relations for the model '" . className . "' using alias '" . name . "'"
+					);
 				}
 			}
 		}
@@ -2785,17 +2972,21 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Inserts or updates a model instance. Returning true on success or false otherwise.
 	 *
 	 *<code>
-	 *	//Creating a new robot
-	 *	$robot = new Robots();
-	 *	$robot->type = 'mechanical';
-	 *	$robot->name = 'Astro Boy';
-	 *	$robot->year = 1952;
-	 *	$robot->save();
+	 * // Creating a new robot
+	 * $robot = new Robots();
 	 *
-	 *	//Updating a robot name
-	 *	$robot = Robots::findFirst("id=100");
-	 *	$robot->name = "Biomass";
-	 *	$robot->save();
+	 * $robot->type = "mechanical";
+	 * $robot->name = "Astro Boy";
+	 * $robot->year = 1952;
+	 *
+	 * $robot->save();
+	 *
+	 * // Updating a robot name
+	 * $robot = Robots::findFirst("id = 100");
+	 *
+	 * $robot->name = "Biomass";
+	 *
+	 * $robot->save();
 	 *</code>
 	 *
 	 * @param array data
@@ -2817,6 +3008,11 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 * Create/Get the current database connection
 		 */
 		let writeConnection = this->getWriteConnection();
+
+		/**
+		 * Fire the start event
+		 */
+		this->fireEvent("prepareSave");
 
 		/**
 		 * Save related records in belongsTo relationships
@@ -2936,24 +3132,29 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Inserts a model instance. If the instance already exists in the persistance it will throw an exception
+	 * Inserts a model instance. If the instance already exists in the persistence it will throw an exception
 	 * Returning true on success or false otherwise.
 	 *
 	 *<code>
-	 *	//Creating a new robot
-	 *	$robot = new Robots();
-	 *	$robot->type = 'mechanical';
-	 *	$robot->name = 'Astro Boy';
-	 *	$robot->year = 1952;
-	 *	$robot->create();
+	 * // Creating a new robot
+	 * $robot = new Robots();
 	 *
-	 *  //Passing an array to create
-	 *  $robot = new Robots();
-	 *  $robot->create(array(
-	 *	  'type' => 'mechanical',
-	 *	  'name' => 'Astroy Boy',
-	 *	  'year' => 1952
-	 *  ));
+	 * $robot->type = "mechanical";
+	 * $robot->name = "Astro Boy";
+	 * $robot->year = 1952;
+	 *
+	 * $robot->create();
+	 *
+	 * // Passing an array to create
+	 * $robot = new Robots();
+	 *
+	 * $robot->create(
+	 *     [
+	 *         "type" => "mechanical",
+	 *         "name" => "Astro Boy",
+	 *         "year" => 1952,
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function create(var data = null, var whiteList = null) -> boolean
@@ -2980,14 +3181,16 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Updates a model instance. If the instance doesn't exist in the persistance it will throw an exception
+	 * Updates a model instance. If the instance doesn't exist in the persistence it will throw an exception
 	 * Returning true on success or false otherwise.
 	 *
 	 *<code>
-	 *	//Updating a robot name
-	 *	$robot = Robots::findFirst("id=100");
-	 *	$robot->name = "Biomass";
-	 *	$robot->update();
+	 * // Updating a robot name
+	 * $robot = Robots::findFirst("id = 100");
+	 *
+	 * $robot->name = "Biomass";
+	 *
+	 * $robot->update();
 	 *</code>
 	 */
 	public function update(var data = null, var whiteList = null) -> boolean
@@ -3002,7 +3205,14 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			let metaData = this->getModelsMetaData();
 
 			if !this->_exists(metaData, this->getReadConnection()) {
-				let this->_errorMessages = [new Message("Record cannot be updated because it does not exist", null, "InvalidUpdateAttempt")];
+				let this->_errorMessages = [
+					new Message(
+						"Record cannot be updated because it does not exist",
+						null,
+						"InvalidUpdateAttempt"
+					)
+				];
+
 				return false;
 			}
 		}
@@ -3017,12 +3227,15 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Deletes a model instance. Returning true on success or false otherwise.
 	 *
 	 * <code>
-	 *$robot = Robots::findFirst("id=100");
-	 *$robot->delete();
+	 * $robot = Robots::findFirst("id=100");
 	 *
-	 *foreach (Robots::find("type = 'mechanical'") as $robot) {
-	 *   $robot->delete();
-	 *}
+	 * $robot->delete();
+	 *
+	 * $robots = Robots::find("type = 'mechanical'");
+	 *
+	 * foreach ($robots as $robot) {
+	 *     $robot->delete();
+	 * }
 	 * </code>
 	 */
 	public function delete() -> boolean
@@ -3096,7 +3309,9 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			 * If the attribute is currently set in the object add it to the conditions
 			 */
 			if !fetch value, this->{attributeField} {
-				throw new Exception("Cannot delete the record because the primary key attribute: '" . attributeField . "' wasn't set");
+				throw new Exception(
+					"Cannot delete the record because the primary key attribute: '" . attributeField . "' wasn't set"
+				);
 			}
 
 			/**
@@ -3179,14 +3394,15 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	public function refresh() -> <Model>
 	{
 		var metaData, readConnection, schema, source, table,
-			uniqueKey, tables, uniqueParams, dialect, row, fields, attribute;
+			uniqueKey, tables, uniqueParams, dialect, row, fields, attribute, manager, columnMap;
 
 		if this->_dirtyState != self::DIRTY_STATE_PERSISTENT {
 			throw new Exception("The record cannot be refreshed because it does not exist or is deleted");
 		}
 
 		let metaData = this->getModelsMetaData(),
-			readConnection = this->getReadConnection();
+			readConnection = this->getReadConnection(),
+			manager = <ManagerInterface> this->_modelsManager;
 
 		let schema = this->getSchema(),
 			source = this->getSource();
@@ -3239,7 +3455,11 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 * Assign the resulting array to the this object
 		 */
 		if typeof row == "array" {
-			this->assign(row, metaData->getColumnMap(this));
+			let columnMap = metaData->getColumnMap(this);
+			this->assign(row, columnMap);
+			if manager->isKeepingSnapshots(this) {
+				this->setSnapshotData(row, columnMap);
+			}
 		}
 
 		return this;
@@ -3257,7 +3477,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Reads an attribute value by its name
 	 *
 	 * <code>
-	 * echo $robot->readAttribute('name');
+	 * echo $robot->readAttribute("name");
 	 * </code>
 	 */
 	public function readAttribute(string! attribute)
@@ -3273,7 +3493,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Writes an attribute value by its name
 	 *
 	 *<code>
-	 * 	$robot->writeAttribute('name', 'Rosey');
+	 * $robot->writeAttribute("name", "Rosey");
 	 *</code>
 	 */
 	public function writeAttribute(string! attribute, var value)
@@ -3286,30 +3506,24 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * generated INSERT/UPDATE statement
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->skipAttributes(array('price'));
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->skipAttributes(
+	 *             [
+	 *                 "price",
+	 *             ]
+	 *         );
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function skipAttributes(array! attributes)
 	{
-		var keysAttributes, metaData, attribute;
-
-		let keysAttributes = [];
-		for attribute in attributes {
-			let keysAttributes[attribute] = null;
-		}
-
-		let metaData = this->getModelsMetaData();
-		metaData->setAutomaticCreateAttributes(this, keysAttributes);
-		metaData->setAutomaticUpdateAttributes(this, keysAttributes);
+		this->skipAttributesOnCreate(attributes);
+		this->skipAttributesOnUpdate(attributes);
 	}
 
 	/**
@@ -3317,16 +3531,18 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * generated INSERT statement
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->skipAttributesOnCreate(array('created_at'));
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->skipAttributesOnCreate(
+	 *             [
+	 *                 "created_at",
+	 *             ]
+	 *         );
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function skipAttributesOnCreate(array! attributes) -> void
@@ -3346,16 +3562,18 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * generated UPDATE statement
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->skipAttributesOnUpdate(array('modified_in'));
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->skipAttributesOnUpdate(
+	 *             [
+	 *                 "modified_in",
+	 *             ]
+	 *         );
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function skipAttributesOnUpdate(array! attributes) -> void
@@ -3375,16 +3593,18 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * generated UPDATE statement
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->allowEmptyStringValues(array('name'));
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->allowEmptyStringValues(
+	 *             [
+	 *                 "name",
+	 *             ]
+	 *         );
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function allowEmptyStringValues(array! attributes) -> void
@@ -3403,16 +3623,14 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Setup a 1-1 relation between two models
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->hasOne('id', 'RobotsDescription', 'robots_id');
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->hasOne("id", "RobotsDescription", "robots_id");
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function hasOne(var fields, string! referenceModel, var referencedFields, options = null) -> <Relation>
@@ -3421,70 +3639,75 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
-	 * Setup a relation reverse 1-1  between two models
+	 * Setup a reverse 1-1 or n-1 relation between two models
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class RobotsParts extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->belongsTo('robots_id', 'Robots', 'id');
-	 *   }
-	 *
-	 *}
+	 * class RobotsParts extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->belongsTo("robots_id", "Robots", "id");
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function belongsTo(var fields, string! referenceModel, var referencedFields, options = null) -> <Relation>
 	{
-		return (<ManagerInterface> this->_modelsManager)->addBelongsTo(this, fields, referenceModel, referencedFields, options);
+		return (<ManagerInterface> this->_modelsManager)->addBelongsTo(
+			this,
+			fields,
+			referenceModel,
+			referencedFields,
+			options
+		);
 	}
 
 	/**
-	 * Setup a relation 1-n between two models
+	 * Setup a 1-n relation between two models
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   $this->hasMany('id', 'RobotsParts', 'robots_id');
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->hasMany("id", "RobotsParts", "robots_id");
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function hasMany(var fields, string! referenceModel, var referencedFields, options = null) -> <Relation>
 	{
-		return (<ManagerInterface> this->_modelsManager)->addHasMany(this, fields, referenceModel, referencedFields, options);
+		return (<ManagerInterface> this->_modelsManager)->addHasMany(
+			this,
+			fields,
+			referenceModel,
+			referencedFields,
+			options
+		);
 	}
 
 	/**
-	 * Setup a relation n-n between two models through an intermediate relation
+	 * Setup an n-n relation between two models, through an intermediate relation
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *class Robots extends \Phalcon\Mvc\Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *	   //Setup a many-to-many relation to Parts through RobotsParts
-	 *	   $this->hasManyToMany(
-	 *			'id',
-	 *			'RobotsParts',
-	 *			'robots_id',
-	 *			'parts_id',
-	 *			'Parts',
-	 *			'id'
-	 *		);
-	 *   }
-	 *}
+	 * class Robots extends \Phalcon\Mvc\Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         // Setup a many-to-many relation to Parts through RobotsParts
+	 *         $this->hasManyToMany(
+	 *             "id",
+	 *             "RobotsParts",
+	 *             "robots_id",
+	 *             "parts_id",
+	 *             "Parts",
+	 *             "id",
+	 *         );
+	 *     }
+	 * }
 	 *</code>
 	 *
 	 * @param	string|array fields
@@ -3515,24 +3738,26 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Setups a behavior in a model
 	 *
 	 *<code>
-	 *<?php
 	 *
-	 *use Phalcon\Mvc\Model;
-	 *use Phalcon\Mvc\Model\Behavior\Timestampable;
+	 * use Phalcon\Mvc\Model;
+	 * use Phalcon\Mvc\Model\Behavior\Timestampable;
 	 *
-	 *class Robots extends Model
-	 *{
-	 *
-	 *   public function initialize()
-	 *   {
-	 *		$this->addBehavior(new Timestampable(array(
-	 *			'onCreate' => array(
-	 *				'field' => 'created_at',
-	 *				'format' => 'Y-m-d'
-	 *			)
-	 *		)));
-	 *   }
-	 *}
+	 * class Robots extends Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->addBehavior(
+	 *             new Timestampable(
+	 *                [
+	 *                    "onCreate" => [
+	 *                         "field"  => "created_at",
+	 *                         "format" => "Y-m-d",
+	 * 	                   ],
+	 *                 ]
+	 *             )
+	 *         );
+	 *     }
+	 * }
 	 *</code>
 	 */
 	public function addBehavior(<BehaviorInterface> behavior) -> void
@@ -3544,17 +3769,16 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Sets if the model must keep the original record snapshot in memory
 	 *
 	 *<code>
-	 *<?php
-	 *use Phalcon\Mvc\Model;
 	 *
-	 *class Robots extends Model
-	 *{
+	 * use Phalcon\Mvc\Model;
 	 *
-	 *   public function initialize()
-	 *   {
-	 *		$this->keepSnapshots(true);
-	 *   }
-	 *}
+	 * class Robots extends Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->keepSnapshots(true);
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function keepSnapshots(boolean keepSnapshot) -> void
@@ -3611,12 +3835,12 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 
 				let snapshot[attribute] = value;
 			}
-
-			let this->_snapshot = snapshot;
-			return null;
+		} else {
+			let snapshot = data;
 		}
 
-		let this->_snapshot = data;
+		let this->_oldSnapshot = snapshot;
+		let this->_snapshot = snapshot;
 	}
 
 	/**
@@ -3639,117 +3863,96 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
+	 * Returns the internal old snapshot data
+	 */
+	public function getOldSnapshotData() -> array
+	{
+		return this->_oldSnapshot;
+	}
+
+	/**
 	 * Check if a specific attribute has changed
 	 * This only works if the model is keeping data snapshots
 	 *
+	 *<code>
+	 * $robot = new Robots();
+	 *
+	 * $robot->type = "mechanical";
+	 * $robot->name = "Astro Boy";
+	 * $robot->year = 1952;
+	 *
+	 * $robot->create();
+	 * $robot->type = "hydraulic";
+	 * $hasChanged = $robot->hasChanged("type"); // returns true
+	 * $hasChanged = $robot->hasChanged(["type", "name"]); // returns true
+	 * $hasChanged = $robot->hasChanged(["type", "name", true]); // returns false
+	 *</code>
+	 *
 	 * @param string|array fieldName
+	 * @param boolean allFields
 	 */
-	public function hasChanged(var fieldName = null) -> boolean
+	public function hasChanged(var fieldName = null, boolean allFields = false) -> boolean
 	{
-		var snapshot, metaData, columnMap, allAttributes, value,
-			originalValue, name;
+		var changedFields;
 
-		let snapshot = this->_snapshot;
-		if typeof snapshot != "array" {
-			throw new Exception("The record doesn't have a valid data snapshot");
-		}
-
-		/**
-		 * Dirty state must be DIRTY_PERSISTENT to make the checking
-		 */
-		if this->_dirtyState != self::DIRTY_STATE_PERSISTENT {
-			throw new Exception("Change checking cannot be performed because the object has not been persisted or is deleted");
-		}
-
-		/**
-		 * Return the models meta-data
-		 */
-		let metaData = this->getModelsMetaData();
-
-		/**
-		 * The reversed column map is an array if the model has a column map
-		 */
-		let columnMap = metaData->getReverseColumnMap(this);
-
-		/**
-		 * Data types are field indexed
-		 */
-		if typeof columnMap != "array" {
-			let allAttributes = metaData->getDataTypes(this);
-		} else {
-			let allAttributes = columnMap;
-		}
+		let changedFields = this->getChangedFields();
 
 		/**
 		 * If a field was specified we only check it
 		 */
 		if typeof fieldName == "string" {
+			return in_array(fieldName, changedFields);
+		} elseif typeof fieldName == "array" {
+		    if allFields {
+		        return array_intersect(fieldName, changedFields) == fieldName;
+		    }
 
-			/**
-			 * We only make this validation over valid fields
-			 */
-			if typeof columnMap == "array" {
-				if !isset columnMap[fieldName] {
-					throw new Exception("The field '" . fieldName . "' is not part of the model");
-				}
-			} else {
-				if !isset allAttributes[fieldName] {
-					throw new Exception("The field '" . fieldName . "' is not part of the model");
-				}
-			}
-
-			/**
-			 * The field is not part of the model, throw exception
-			 */
-			if !fetch value, this->{fieldName} {
-				throw new Exception("The field '" . fieldName . "' is not defined on the model");
-			}
-
-			/**
-			 * The field is not part of the data snapshot, throw exception
-			 */
-			if !fetch originalValue, snapshot[fieldName] {
-				throw new Exception("The field '" . fieldName . "' was not found in the snapshot");
-			}
-
-			/**
-			 * Check if the field has changed
-			 */
-			return value != originalValue;
+		    return count(array_intersect(fieldName, changedFields)) > 0;
 		}
 
-		/**
-		 * Check every attribute in the model
-		 */
-		for name, _ in allAttributes {
-
-			/**
-			 * If some attribute is not present in the snapshot, we assume the record as changed
-			 */
-			if !fetch originalValue, snapshot[name] {
-				return true;
-			}
-
-			/**
-			 * If some attribute is not present in the model, we assume the record as changed
-			 */
-			if !fetch value, this->{name} {
-				return true;
-			}
-
-			/**
-			 * Check if the field has changed
-			 */
-			if value != originalValue {
-				return true;
-			}
-		}
-
-		return false;
+		return count(changedFields) > 0;
 	}
 
 	/**
-	 * Returns a list of changed values
+	 * Check if a specific attribute was updated
+	 * This only works if the model is keeping data snapshots
+	 *
+	 * @param string|array fieldName
+	 */
+	public function hasUpdated(var fieldName = null, boolean allFields = false) -> boolean
+	{
+		var updatedFields;
+
+		let updatedFields = this->getUpdatedFields();
+
+		/**
+		 * If a field was specified we only check it
+		 */
+		if typeof fieldName == "string" {
+			return in_array(fieldName, updatedFields);
+		} elseif typeof fieldName == "array" {
+			if allFields {
+				return array_intersect(fieldName, updatedFields) == fieldName;
+			}
+
+			return count(array_intersect(fieldName, updatedFields)) > 0;
+		}
+
+		return count(updatedFields) > 0;
+	}
+
+	/**
+	 * Returns a list of changed values.
+	 *
+	 * <code>
+	 * $robots = Robots::findFirst();
+	 * print_r($robots->getChangedFields()); // []
+	 *
+	 * $robots->deleted = 'Y';
+	 *
+	 * $robots->getChangedFields();
+	 * print_r($robots->getChangedFields()); // ["deleted"]
+	 * </code>
 	 */
 	public function getChangedFields() -> array
 	{
@@ -3759,13 +3962,6 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		let snapshot = this->_snapshot;
 		if typeof snapshot != "array" {
 			throw new Exception("The record doesn't have a valid data snapshot");
-		}
-
-		/**
-		 * Dirty state must be DIRTY_PERSISTENT to make the checking
-		 */
-		if this->_dirtyState != self::DIRTY_STATE_PERSISTENT {
-			throw new Exception("Change checking cannot be performed because the object has not been persisted or is deleted");
 		}
 
 		/**
@@ -3793,7 +3989,6 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		let changed = [];
 
 		for name, _ in allAttributes {
-
 			/**
 			 * If some attribute is not present in the snapshot, we assume the record as changed
 			 */
@@ -3813,7 +4008,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			/**
 			 * Check if the field has changed
 			 */
-			if value != snapshot[name] {
+			if value !== snapshot[name] {
 				let changed[] = name;
 				continue;
 			}
@@ -3823,20 +4018,78 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
+	 * Returns a list of updated values.
+	 *
+	 * <code>
+	 * $robots = Robots::findFirst();
+	 * print_r($robots->getChangedFields()); // []
+	 *
+	 * $robots->deleted = 'Y';
+	 *
+	 * $robots->getChangedFields();
+	 * print_r($robots->getChangedFields()); // ["deleted"]
+	 * $robots->save();
+	 * print_r($robots->getChangedFields()); // []
+	 * print_r($robots->getUpdatedFields()); // ["deleted"]
+	 * </code>
+	 */
+	public function getUpdatedFields()
+	{
+		var updated, name, snapshot,
+			oldSnapshot, value;
+
+		let snapshot = this->_snapshot;
+		let oldSnapshot = this->_oldSnapshot;
+
+		if !globals_get("orm.update_snapshot_on_save") {
+			throw new Exception("Update snapshot on save must be enabled for this method to work properly");
+		}
+
+		if typeof snapshot != "array" {
+			throw new Exception("The record doesn't have a valid data snapshot");
+		}
+
+		/**
+		 * Dirty state must be DIRTY_PERSISTENT to make the checking
+		 */
+		if this->_dirtyState != self::DIRTY_STATE_PERSISTENT {
+			throw new Exception("Change checking cannot be performed because the object has not been persisted or is deleted");
+		}
+
+		let updated = [];
+
+		for name, value in snapshot {
+			/**
+			 * If some attribute is not present in the oldSnapshot, we assume the record as changed
+			 */
+			if !isset oldSnapshot[name] {
+				let updated[] = name;
+				continue;
+			}
+
+			if value !== oldSnapshot[name] {
+				let updated[] = name;
+				continue;
+			}
+		}
+
+		return updated;
+	}
+
+	/**
 	 * Sets if a model must use dynamic update instead of the all-field update
 	 *
 	 *<code>
-	 *<?php
-	 *use Phalcon\Mvc\Model;
 	 *
-	 *class Robots extends Model
-	 *{
+	 * use Phalcon\Mvc\Model;
 	 *
-	 *   public function initialize()
-	 *   {
-	 *		$this->useDynamicUpdate(true);
-	 *   }
-	 *}
+	 * class Robots extends Model
+	 * {
+	 *     public function initialize()
+	 *     {
+	 *         $this->useDynamicUpdate(true);
+	 *     }
+	 * }
 	 *</code>
 	 */
 	protected function useDynamicUpdate(boolean dynamicUpdate) -> void
@@ -3868,10 +4121,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		/**
 		 * Call the 'getRelationRecords' in the models manager
 		 */
-		return call_user_func_array(
-			[manager, "getRelationRecords"],
-			[relation, null, this, arguments]
-		);
+		return manager->getRelationRecords(relation, null, this, arguments);
 	}
 
 	/**
@@ -3901,25 +4151,26 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		/**
 		 * Calling count if the method starts with "count"
 		 */
-		if typeof relation != "object" {
-			if starts_with(method, "count") {
-				let queryMethod = "count",
-					relation = <RelationInterface> manager->getRelationByAlias(modelName, substr(method, 5));
-			}
+		elseif starts_with(method, "count") {
+			let queryMethod = "count",
+				relation = <RelationInterface> manager->getRelationByAlias(modelName, substr(method, 5));
 		}
 
 		/**
 		 * If the relation was found perform the query via the models manager
 		 */
-		if typeof relation == "object" {
-			fetch extraArgs, arguments[0];
-			return call_user_func_array(
-				[manager, "getRelationRecords"],
-				[relation, queryMethod, this, extraArgs]
-			);
+		if typeof relation != "object" {
+			return null;
 		}
 
-		return null;
+		fetch extraArgs, arguments[0];
+
+		return manager->getRelationRecords(
+			relation,
+			queryMethod,
+			this,
+			extraArgs
+		);
 	}
 
 	/**
@@ -3947,21 +4198,17 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		/**
 		 * Check if the method starts with "find"
 		 */
-		if extraMethod === null {
-			if starts_with(method, "findBy") {
-				let type = "find",
-					extraMethod = substr(method, 6);
-			}
+		elseif starts_with(method, "findBy") {
+			let type = "find",
+				extraMethod = substr(method, 6);
 		}
 
 		/**
 		 * Check if the method starts with "count"
 		 */
-		if extraMethod === null {
-			if starts_with(method, "countBy") {
-				let type = "count",
-					extraMethod = substr(method, 7);
-			}
+		elseif starts_with(method, "countBy") {
+			let type = "count",
+				extraMethod = substr(method, 7);
 		}
 
 		/**
@@ -4017,8 +4264,8 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 * Execute the query
 		 */
 		return {modelName}::{type}([
-			"conditions": field . " = ?0",
-			"bind"	    : [value]
+			"conditions": "[" . field . "] = ?0",
+			"bind"		: [value]
 		]);
 	}
 
@@ -4143,12 +4390,41 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			return value;
 		}
 
-		/**
-		 * Fallback assigning the value to the instance
-		 */
+		// Use possible setter.
+		if this->_possibleSetter(property, value) {
+			return value;
+		}
+
+		// Throw an exception if there is an attempt to set a non-public property.
+		if property_exists(this, property) {
+			let manager = this->getModelsManager();
+			if !manager->isVisibleModelProperty(this, property) {
+				throw new Exception("Property '" . property . "' does not have a setter.");
+			}
+		}
+
 		let this->{property} = value;
 
 		return value;
+	}
+
+	/**
+	 * Check for, and attempt to use, possible setter.
+	 *
+	 * @param string property
+	 * @param mixed value
+	 * @return string
+	 */
+	protected final function _possibleSetter(string property, value)
+	{
+		var possibleSetter;
+
+		let possibleSetter = "set" . camelize(property);
+		if method_exists(this, possibleSetter) {
+			this->{possibleSetter}(value);
+			return true;
+		}
+		return false;
 	}
 
 	/**
@@ -4171,13 +4447,16 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		let relation = <RelationInterface> manager->getRelationByAlias(modelName, lowerProperty);
 		if typeof relation == "object" {
 
+			/*
+			 Not fetch a relation if it is on CamelCase
+			 */
+			if isset this->{lowerProperty} && typeof this->{lowerProperty} == "object" {
+				return this->{lowerProperty};
+			}
 			/**
 			 * Get the related records
 			 */
-			let result = call_user_func_array(
-				[manager, "getRelationRecords"],
-				[relation, null, this, null]
-			);
+			let result = manager->getRelationRecords(relation, null, this, null);
 
 			/**
 			 * Assign the result to the object
@@ -4241,7 +4520,22 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		/**
 		 * Use the standard serialize function to serialize the array data
 		 */
-		return serialize(this->toArray());
+		var attributes, snapshot, manager;
+
+		let attributes = this->toArray(),
+		    manager = <ManagerInterface> this->getModelsManager();
+
+		if manager->isKeepingSnapshots(this) {
+			let snapshot = this->_snapshot;
+			/**
+			 * If attributes is not the same as snapshot then save snapshot too
+			 */
+			if snapshot != null && attributes != snapshot {
+				return serialize(["_attributes": attributes, "_snapshot": snapshot]);
+			}
+		}
+
+		return serialize(attributes);
 	}
 
 	/**
@@ -4249,7 +4543,7 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 */
 	public function unserialize(string! data)
 	{
-		var attributes, dependencyInjector, manager, key, value;
+		var attributes, dependencyInjector, manager, key, value, snapshot;
 
 		let attributes = unserialize(data);
 		if typeof attributes == "array" {
@@ -4284,6 +4578,15 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 			 * Try to initialize the model
 			 */
 			manager->initialize(this);
+			if manager->isKeepingSnapshots(this) {
+				if fetch snapshot, attributes["_snapshot"] {
+					let this->_snapshot = snapshot;
+					let attributes = attributes["_attributes"];
+				}
+				else {
+					let this->_snapshot = attributes;
+				}
+			}
 
 			/**
 			 * Update the objects attributes
@@ -4298,7 +4601,9 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Returns a simple representation of the object that can be used with var_dump
 	 *
 	 *<code>
-	 * var_dump($robot->dump());
+	 * var_dump(
+	 *     $robot->dump()
+	 * );
 	 *</code>
 	 */
 	public function dump() -> array
@@ -4310,7 +4615,9 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	 * Returns the instance as an array representation
 	 *
 	 *<code>
-	 * print_r($robot->toArray());
+	 * print_r(
+	 *     $robot->toArray()
+	 * );
 	 *</code>
 	 *
 	 * @param array $columns
@@ -4359,13 +4666,28 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 	}
 
 	/**
+	* Serializes the object for json_encode
+	*
+	*<code>
+	* echo json_encode($robot);
+	*</code>
+	*
+	* @return array
+	*/
+	public function jsonSerialize() -> array
+	{
+		return this->toArray();
+	}
+
+	/**
 	 * Enables/disables options in the ORM
 	 */
 	public static function setup(array! options) -> void
 	{
 		var disableEvents, columnRenaming, notNullValidations,
 			exceptionOnFailedSave, phqlLiterals, virtualForeignKeys,
-			lateStateBinding, castOnHydrate, ignoreUnknownColumns;
+			lateStateBinding, castOnHydrate, ignoreUnknownColumns,
+			updateSnapshotOnSave, disableAssignSetters;
 
 		/**
 		 * Enables/Disables globally the internal events
@@ -4428,6 +4750,14 @@ abstract class Model implements EntityInterface, ModelInterface, ResultInterface
 		 */
 		if fetch ignoreUnknownColumns, options["ignoreUnknownColumns"] {
 			globals_set("orm.ignore_unknown_columns", ignoreUnknownColumns);
+		}
+
+		if fetch updateSnapshotOnSave, options["updateSnapshotOnSave"] {
+			globals_set("orm.update_snapshot_on_save", updateSnapshotOnSave);
+		}
+
+		if fetch disableAssignSetters, options["disableAssignSetters"] {
+		    globals_set("orm.disable_assign_setters", disableAssignSetters);
 		}
 	}
 

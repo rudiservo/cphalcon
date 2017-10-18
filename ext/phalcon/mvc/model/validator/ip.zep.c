@@ -24,45 +24,60 @@
  *
  * Validates that a value is ipv4 address in valid range
  *
+ * This validator is only for use with Phalcon\Mvc\Collection. If you are using
+ * Phalcon\Mvc\Model, please use the validators provided by Phalcon\Validation.
+ *
  *<code>
- *use Phalcon\Mvc\Model\Validator\Ip;
+ * use Phalcon\Mvc\Model\Validator\Ip;
  *
- *class Data extends Phalcon\Mvc\Model
- *{
+ * class Data extends \Phalcon\Mvc\Collection
+ * {
+ *     public function validation()
+ *     {
+ *         // Any pubic IP
+ *         $this->validate(
+ *             new IP(
+ *                 [
+ *                     "field"         => "server_ip",
+ *                     "version"       => IP::VERSION_4 | IP::VERSION_6, // v6 and v4. The same if not specified
+ *                     "allowReserved" => false,   // False if not specified. Ignored for v6
+ *                     "allowPrivate"  => false,   // False if not specified
+ *                     "message"       => "IP address has to be correct",
+ *                 ]
+ *             )
+ *         );
  *
- *  public function validation()
- *  {
- *      // Any pubic IP
- *      $this->validate(new IP(array(
- *          'field'             => 'server_ip',
- *          'version'           => IP::VERSION_4 | IP::VERSION_6, // v6 and v4. The same if not specified
- *          'allowReserved'     => false,   // False if not specified. Ignored for v6
- *          'allowPrivate'      => false,   // False if not specified
- *          'message'           => 'IP address has to be correct'
- *      )));
+ *         // Any public v4 address
+ *         $this->validate(
+ *             new IP(
+ *                 [
+ *                     "field"   => "ip_4",
+ *                     "version" => IP::VERSION_4,
+ *                     "message" => "IP address has to be correct",
+ *                 ]
+ *             )
+ *         );
  *
- *      // Any public v4 address
- *      $this->validate(new IP(array(
- *          'field'             => 'ip_4',
- *          'version'           => IP::VERSION_4,
- *          'message'           => 'IP address has to be correct'
- *      )));
+ *         // Any v6 address
+ *         $this->validate(
+ *             new IP(
+ *                 [
+ *                     "field"        => "ip6",
+ *                     "version"      => IP::VERSION_6,
+ *                     "allowPrivate" => true,
+ *                     "message"      => "IP address has to be correct",
+ *                 ]
+ *             )
+ *         );
  *
- *      // Any v6 address
- *      $this->validate(new IP(array(
- *          'field'             => 'ip6',
- *          'version'           => IP::VERSION_6,
- *          'allowPrivate'      => true,
- *          'message'           => 'IP address has to be correct'
- *      )));
- *
- *      if ($this->validationHasFailed() == true) {
- *          return false;
- *      }
- *  }
- *
- *}
+ *         if ($this->validationHasFailed() === true) {
+ *             return false;
+ *         }
+ *     }
+ * }
  *</code>
+ *
+ * @deprecated 3.1.0
  */
 ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_Validator_Ip) {
 
@@ -72,7 +87,6 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_Validator_Ip) {
 
 	zend_declare_class_constant_long(phalcon_mvc_model_validator_ip_ce, SL("VERSION_6"), 2097152 TSRMLS_CC);
 
-	zend_class_implements(phalcon_mvc_model_validator_ip_ce TSRMLS_CC, 1, phalcon_mvc_model_validatorinterface_ce);
 	return SUCCESS;
 
 }
@@ -84,7 +98,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Ip, validate) {
 
 	zval *_6, *_12$$5;
 	zend_bool _5;
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *record, *field = NULL, *value = NULL, *message = NULL, *version = NULL, *allowPrivate = NULL, *allowReserved = NULL, *options = NULL, *_0 = NULL, *_1 = NULL, *_2 = NULL, *_3 = NULL, *_4 = NULL, _7 = zval_used_for_init, *_8, *_9 = NULL, *_10$$5 = NULL, *_11$$5, *_13$$5 = NULL;
 
 	ZEPHIR_MM_GROW();
@@ -98,7 +112,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Ip, validate) {
 	zephir_check_temp_parameter(_0);
 	zephir_check_call_status();
 	if (Z_TYPE_P(field) != IS_STRING) {
-		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "Field name must be a string", "phalcon/mvc/model/validator/ip.zep", 87);
+		ZEPHIR_THROW_EXCEPTION_DEBUG_STR(phalcon_mvc_model_exception_ce, "Field name must be a string", "phalcon/mvc/model/validator/ip.zep", 101);
 		return;
 	}
 	ZEPHIR_CALL_METHOD(&value, record, "readattribute", NULL, 0, field);
@@ -161,7 +175,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Ip, validate) {
 	zephir_array_update_string(&options, SL("flags"), &_8, PH_COPY | PH_SEPARATE);
 	ZEPHIR_SINIT_NVAR(_7);
 	ZVAL_LONG(&_7, 275);
-	ZEPHIR_CALL_FUNCTION(&_9, "filter_var", NULL, 193, value, &_7, options);
+	ZEPHIR_CALL_FUNCTION(&_9, "filter_var", NULL, 208, value, &_7, options);
 	zephir_check_call_status();
 	if (!(zephir_is_true(_9))) {
 		ZEPHIR_INIT_VAR(_10$$5);
@@ -175,7 +189,7 @@ PHP_METHOD(Phalcon_Mvc_Model_Validator_Ip, validate) {
 		ZEPHIR_INIT_VAR(_12$$5);
 		zephir_create_array(_12$$5, 1, 0 TSRMLS_CC);
 		zephir_array_update_string(&_12$$5, SL(":field"), &field, PH_COPY | PH_SEPARATE);
-		ZEPHIR_CALL_FUNCTION(&_13$$5, "strtr", NULL, 55, message, _12$$5);
+		ZEPHIR_CALL_FUNCTION(&_13$$5, "strtr", NULL, 27, message, _12$$5);
 		zephir_check_call_status();
 		ZEPHIR_INIT_NVAR(_10$$5);
 		ZVAL_STRING(_10$$5, "IP", ZEPHIR_TEMP_PARAM_COPY);

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (http://www.phalconphp.com)       |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -28,16 +28,6 @@ use Phalcon\Validation\Message;
  */
 interface MessageInterface
 {
-
-	/**
-	 * Phalcon\Validation\Message constructor
-	 *
-	 * @param string message
-	 * @param string field
-	 * @param string type
-	 */
-	public function __construct(string! message, field = null, type = null);
-
 	/**
 	 * Sets message type
 	 */
@@ -78,7 +68,7 @@ interface MessageInterface
 	public function __toString() -> string;
 
 	/**
-	 * Magic __set_state helps to recover messsages from serialization
+	 * Magic __set_state helps to recover messages from serialization
 	 */
 	public static function __set_state(array! message) -> <MessageInterface>;
 

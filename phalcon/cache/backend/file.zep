@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,7 +22,6 @@ namespace Phalcon\Cache\Backend;
 use Phalcon\Cache\Exception;
 use Phalcon\Cache\Backend;
 use Phalcon\Cache\FrontendInterface;
-use Phalcon\Cache\BackendInterface;
 
 /**
  * Phalcon\Cache\Backend\File
@@ -30,32 +29,37 @@ use Phalcon\Cache\BackendInterface;
  * Allows to cache output fragments using a file backend
  *
  *<code>
- *	//Cache the file for 2 days
- *	$frontendOptions = array(
- *		'lifetime' => 172800
- *	);
+ * use Phalcon\Cache\Backend\File;
+ * use Phalcon\Cache\Frontend\Output as FrontOutput;
  *
- *  //Create a output cache
- *  $frontCache = \Phalcon\Cache\Frontend\Output($frontOptions);
+ * // Cache the file for 2 days
+ * $frontendOptions = [
+ *     "lifetime" => 172800,
+ * ];
  *
- *	//Set the cache directory
- *	$backendOptions = array(
- *		'cacheDir' => '../app/cache/'
- *	);
+ * // Create an output cache
+ * $frontCache = FrontOutput($frontOptions);
  *
- *  //Create the File backend
- *  $cache = new \Phalcon\Cache\Backend\File($frontCache, $backendOptions);
+ * // Set the cache directory
+ * $backendOptions = [
+ *     "cacheDir" => "../app/cache/",
+ * ];
  *
- *	$content = $cache->start('my-cache');
- *	if ($content === null) {
- *  	echo '<h1>', time(), '</h1>';
- *  	$cache->save();
- *	} else {
- *		echo $content;
- *	}
+ * // Create the File backend
+ * $cache = new File($frontCache, $backendOptions);
+ *
+ * $content = $cache->start("my-cache");
+ *
+ * if ($content === null) {
+ *     echo "<h1>", time(), "</h1>";
+ *
+ *     $cache->save();
+ * } else {
+ *     echo $content;
+ * }
  *</code>
  */
-class File extends Backend implements BackendInterface
+class File extends Backend
 {
 	/**
 	 * Default to false for backwards compatibility
@@ -66,11 +70,8 @@ class File extends Backend implements BackendInterface
 
 	/**
 	 * Phalcon\Cache\Backend\File constructor
-	 *
-	 * @param	Phalcon\Cache\FrontendInterface frontend
-	 * @param	array options
 	 */
-	public function __construct(<FrontendInterface> frontend, options = null)
+	public function __construct(<FrontendInterface> frontend, array options)
 	{
 		var prefix, safekey;
 
@@ -98,15 +99,10 @@ class File extends Backend implements BackendInterface
 
 	/**
 	 * Returns a cached content
-	 *
-	 * @param int|string keyName
-	 * @param   int lifetime
-	 * @return  mixed
 	 */
-	public function get(var keyName, lifetime = null)
+	public function get(string keyName, int lifetime = null) -> var | null
 	{
-		var prefixedKey, cacheDir, cacheFile, frontend, lastLifetime, ttl, cachedContent, ret;
-		int modifiedTime;
+		var prefixedKey, cacheDir, cacheFile, frontend, lastLifetime, ttl, cachedContent, ret, modifiedTime;
 
 		let prefixedKey =  this->_prefix . this->getKey(keyName);
 		let this->_lastKey = prefixedKey;
@@ -117,7 +113,7 @@ class File extends Backend implements BackendInterface
 
 		let cacheFile = cacheDir . prefixedKey;
 
-		if file_exists(cacheFile) == true {
+		if file_exists(cacheFile) === true {
 
 			let frontend = this->_frontend;
 
@@ -135,13 +131,14 @@ class File extends Backend implements BackendInterface
 				let ttl = (int) lifetime;
 			}
 
+			clearstatcache(true, cacheFile);
 			let modifiedTime = (int) filemtime(cacheFile);
 
 			/**
 			 * Check if the file has expired
 			 * The content is only retrieved if the content has not expired
 			 */
-			if !(time() - ttl > modifiedTime) {
+			if modifiedTime + ttl > time() {
 
 				/**
 				 * Use file-get-contents to control that the openbase_dir can't be skipped
@@ -162,6 +159,8 @@ class File extends Backend implements BackendInterface
 				}
 			}
 		}
+
+		return null;
 	}
 
 	/**
@@ -172,14 +171,15 @@ class File extends Backend implements BackendInterface
 	 * @param int lifetime
 	 * @param boolean stopBuffer
 	 */
-	public function save(var keyName = null, var content = null, lifetime = null, boolean stopBuffer = true) -> void
+	public function save(var keyName = null, var content = null, lifetime = null, boolean stopBuffer = true) -> boolean
 	{
 		var lastKey, frontend, cacheDir, isBuffering, cacheFile, cachedContent, preparedContent, status;
 
 		if keyName === null {
 			let lastKey = this->_lastKey;
 		} else {
-			let lastKey = this->_prefix . this->getKey(keyName);
+			let lastKey = this->_prefix . this->getKey(keyName),
+				this->_lastKey = lastKey;
 		}
 
 		if !lastKey {
@@ -200,16 +200,16 @@ class File extends Backend implements BackendInterface
 			let cachedContent = content;
 		}
 
-		let preparedContent = frontend->beforeStore(cachedContent);
+		if !is_numeric(cachedContent) {
+			let preparedContent = frontend->beforeStore(cachedContent);
+		} else {
+			let preparedContent = cachedContent;
+		}
 
 		/**
 		 * We use file_put_contents to respect open-base-dir directive
 		 */
-		if !is_numeric(cachedContent) {
-			let status = file_put_contents(cacheFile, preparedContent);
-		} else {
-			let status = file_put_contents(cacheFile, cachedContent);
-		}
+		let status = file_put_contents(cacheFile, preparedContent);
 
 		if status === false {
 			throw new Exception("Cache file ". cacheFile . " could not be written");
@@ -226,13 +226,14 @@ class File extends Backend implements BackendInterface
 		}
 
 		let this->_started = false;
+
+		return status !== false;
 	}
 
 	/**
 	 * Deletes a value from the cache by its key
 	 *
 	 * @param int|string keyName
-	 * @return boolean
 	 */
 	public function delete(var keyName) -> boolean
 	{
@@ -251,29 +252,36 @@ class File extends Backend implements BackendInterface
 	}
 
 	/**
-	 * Query the existing cached keys
+	 * Query the existing cached keys.
 	 *
-	 * @param string|int prefix
-	 * @return array
+	 * <code>
+	 * $cache->save("users-ids", [1, 2, 3]);
+	 * $cache->save("projects-ids", [4, 5, 6]);
+	 *
+	 * var_dump($cache->queryKeys("users")); // ["users-ids"]
+	 * </code>
 	 */
-	public function queryKeys(var prefix = null) -> array
+	public function queryKeys(string prefix = null) -> array
 	{
-		var item, key, cacheDir;
+		var item, key, cacheDir, prefixedKey;
 		array keys = [];
 
 		if !fetch cacheDir, this->_options["cacheDir"] {
 			throw new Exception("Unexpected inconsistency in options");
 		}
 
+		if !empty prefix {
+			let prefixedKey = this->_prefix . this->getKey(prefix);
+		}
+
 		/**
 		 * We use a directory iterator to traverse the cache dir directory
 		 */
 		for item in iterator(new \DirectoryIterator(cacheDir)) {
-
 			if likely item->isDir() === false {
 				let key = item->getFileName();
-				if prefix !== null {
-					if starts_with(key, prefix) {
+				if !empty prefix {
+					if starts_with(key, prefixedKey) {
 						let keys[] = key;
 					}
 				} else {
@@ -289,13 +297,11 @@ class File extends Backend implements BackendInterface
 	 * Checks if cache exists and it isn't expired
 	 *
 	 * @param string|int keyName
-	 * @param   int lifetime
-	 * @return boolean
+	 * @param int lifetime
 	 */
 	public function exists(var keyName = null, int lifetime = null) -> boolean
 	{
-		var lastKey, prefix, cacheFile;
-		int ttl;
+		var lastKey, prefix, cacheFile, ttl, modifiedTime;
 
 		if !keyName {
 			let lastKey = this->_lastKey;
@@ -319,7 +325,10 @@ class File extends Backend implements BackendInterface
 					let ttl = (int) lifetime;
 				}
 
-				if filemtime(cacheFile) + ttl > time() {
+				clearstatcache(true, cacheFile);
+				let modifiedTime = (int) filemtime(cacheFile);
+
+				if modifiedTime + ttl > time() {
 					return true;
 				}
 			}
@@ -332,13 +341,11 @@ class File extends Backend implements BackendInterface
 	 * Increment of a given key, by number $value
 	 *
 	 * @param  string|int keyName
-	 * @param  int value
-	 * @return mixed
 	 */
-	public function increment(var keyName = null, int value = 1)
+	public function increment(var keyName = null, int value = 1) -> int | null
 	{
-		var prefixedKey, cacheFile, frontend, timestamp, lifetime, ttl,
-			cachedContent, result;
+		var prefixedKey, cacheFile, frontend, lifetime, ttl,
+			cachedContent, result, modifiedTime;
 
 		let prefixedKey = this->_prefix . this->getKey(keyName),
 			this->_lastKey = prefixedKey,
@@ -347,11 +354,6 @@ class File extends Backend implements BackendInterface
 		if file_exists(cacheFile) {
 
 			let frontend = this->_frontend;
-
-			/**
-			 * Check if the file has expired
-			 */
-			let timestamp = time();
 
 			/**
 			 * Take the lifetime from the frontend or read it from the set in start()
@@ -363,10 +365,14 @@ class File extends Backend implements BackendInterface
 				let ttl = lifetime;
 			}
 
+			clearstatcache(true, cacheFile);
+			let modifiedTime = (int) filemtime(cacheFile);
+
 			/**
+			 * Check if the file has expired
 			 * The content is only retrieved if the content has not expired
 			 */
-			if (timestamp - ttl) < filemtime(cacheFile) {
+			if modifiedTime + ttl > time() {
 
 				/**
 				 * Use file-get-contents to control that the openbase_dir can't be skipped
@@ -388,29 +394,24 @@ class File extends Backend implements BackendInterface
 				}
 			}
 		}
+
+		return null;
 	}
 
 	/**
 	 * Decrement of a given key, by number $value
 	 *
-	 * @param  string|int keyName
-	 * @param  int value
-	 * @return mixed
+	 * @param string|int keyName
 	 */
-	public function decrement(var keyName = null, int value = 1)
+	public function decrement(var keyName = null, int value = 1) -> int | null
 	{
-		var prefixedKey, cacheFile, timestamp, lifetime, ttl, cachedContent, result;
+		var prefixedKey, cacheFile, lifetime, ttl, cachedContent, result, modifiedTime;
 
 		let prefixedKey = this->_prefix . this->getKey(keyName),
 			this->_lastKey = prefixedKey,
 			cacheFile = this->_options["cacheDir"] . prefixedKey;
 
 		if file_exists(cacheFile) {
-
-			/**
-			 * Check if the file has expired
-			 */
-			let timestamp = time();
 
 			/**
 			 * Take the lifetime from the frontend or read it from the set in start()
@@ -422,10 +423,14 @@ class File extends Backend implements BackendInterface
 				let ttl = lifetime;
 			}
 
+			clearstatcache(true, cacheFile);
+			let modifiedTime = (int) filemtime(cacheFile);
+
 			/**
+			 * Check if the file has expired
 			 * The content is only retrieved if the content has not expired
 			 */
-			if (timestamp - ttl) < filemtime(cacheFile) {
+			if modifiedTime + ttl > time() {
 
 				/**
 				 * Use file-get-contents to control that the openbase_dir can't be skipped
@@ -447,6 +452,8 @@ class File extends Backend implements BackendInterface
 				}
 			}
 		}
+
+		return null;
 	}
 
 	/**
@@ -493,10 +500,8 @@ class File extends Backend implements BackendInterface
 
 	/**
 	 * Set whether to use the safekey or not
-	 *
-	 * @return this
 	 */
-	public function useSafeKey(bool useSafeKey)
+	public function useSafeKey(bool useSafeKey) -> <File>
 	{
 		let this->_useSafeKey = useSafeKey;
 

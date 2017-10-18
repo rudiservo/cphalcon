@@ -21,16 +21,13 @@ ZEPHIR_INIT_CLASS(Phalcon_Mvc_Model_Query_BuilderInterface) {
 
 	ZEPHIR_REGISTER_INTERFACE(Phalcon\\Mvc\\Model\\Query, BuilderInterface, phalcon, mvc_model_query_builderinterface, phalcon_mvc_model_query_builderinterface_method_entry);
 
+	zend_declare_class_constant_string(phalcon_mvc_model_query_builderinterface_ce, SL("OPERATOR_OR"), "or" TSRMLS_CC);
+
+	zend_declare_class_constant_string(phalcon_mvc_model_query_builderinterface_ce, SL("OPERATOR_AND"), "and" TSRMLS_CC);
+
 	return SUCCESS;
 
 }
-
-/**
- * Phalcon\Mvc\Model\Query\Builder
- *
- * @param array params
- */
-ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, __construct);
 
 /**
  * Sets the columns to be queried
@@ -72,17 +69,18 @@ ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, addFrom);
 ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, getFrom);
 
 /**
- * Adds a INNER join to the query
+ * Adds an :type: join (by default type - INNER) to the query
  *
  * @param string model
  * @param string conditions
  * @param string alias
+ * @param string type
  * @return \Phalcon\Mvc\Model\Query\BuilderInterface
  */
 ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, join);
 
 /**
- * Adds a INNER join to the query
+ * Adds an INNER join to the query
  *
  * @param string model
  * @param string conditions
@@ -113,6 +111,13 @@ ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, leftJoin);
 ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, rightJoin);
 
 /**
+ * Return join parts of the query
+ *
+ * @return array
+ */
+ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, getJoins);
+
+/**
  * Sets conditions for the query
  *
  * @param string conditions
@@ -133,7 +138,7 @@ ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, where);
 ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, andWhere);
 
 /**
- * Appends a condition to the current conditions using a OR operator
+ * Appends a condition to the current conditions using an OR operator
  *
  * @param string conditions
  * @param array bindParams
@@ -180,7 +185,7 @@ ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, notInWhere);
 ZEPHIR_DOC_METHOD(Phalcon_Mvc_Model_Query_BuilderInterface, getWhere);
 
 /**
- * Sets a ORDER BY condition clause
+ * Sets an ORDER BY condition clause
  *
  * @param string orderBy
  * @return \Phalcon\Mvc\Model\Query\BuilderInterface

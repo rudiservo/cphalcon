@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -29,9 +29,11 @@ use Phalcon\Mvc\Model\ResultsetInterface;
 use Phalcon\Mvc\Model\ManagerInterface;
 use Phalcon\Di\InjectionAwareInterface;
 use Phalcon\Events\EventsAwareInterface;
+use Phalcon\Mvc\Model\Query;
 use Phalcon\Mvc\Model\QueryInterface;
 use Phalcon\Mvc\Model\Query\Builder;
 use Phalcon\Mvc\Model\Query\BuilderInterface;
+use Phalcon\Mvc\Model\BehaviorInterface;
 use Phalcon\Events\ManagerInterface as EventsManagerInterface;
 
 /**
@@ -48,9 +50,12 @@ use Phalcon\Events\ManagerInterface as EventsManagerInterface;
  *
  * $di = new Di();
  *
- * $di->set('modelsManager', function() {
- *      return new ModelsManager();
- * });
+ * $di->set(
+ *     "modelsManager",
+ *     function() {
+ *         return new ModelsManager();
+ *     }
+ * );
  *
  * $robot = new Robots($di);
  * </code>
@@ -69,6 +74,8 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	protected _writeConnectionServices;
 
 	protected _aliases;
+
+	protected _modelVisibility = [];
 
 	/**
 	 * Has many relations
@@ -114,6 +121,8 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 * Mark initialized models
 	 */
 	protected _initialized;
+
+	protected _prefix = "";
 
 	protected _sources;
 
@@ -194,14 +203,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getCustomEventsManager(<ModelInterface> model) -> <EventsManagerInterface> | boolean
 	{
-		var customEventsManager, eventsManager;
-		let customEventsManager = this->_customEventsManager;
-		if typeof customEventsManager == "array" {
-			if fetch eventsManager, customEventsManager[get_class_lower(model)] {
-				return eventsManager;
-			}
+		var eventsManager;
+
+		if !fetch eventsManager, this->_customEventsManager[get_class_lower(model)] {
+			return false;
 		}
-		return false;
+
+		return eventsManager;
 	}
 
 	/**
@@ -269,30 +277,85 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function load(string! modelName, boolean newInstance = false) -> <ModelInterface>
 	{
-		var model;
+		var model, colonPos, namespaceName, namespaceAlias, className;
 
 		/**
-		 * Check if a model with the same is already loaded
+		 * Check if a modelName is an alias
 		 */
-		if fetch model, this->_initialized[strtolower(modelName)] {
-			if newInstance {
-				return new {modelName}(this->_dependencyInjector, this);
-			}
-			model->reset();
-			return model;
-		}
+		let colonPos = strpos(modelName, ":");
 
-		/**
-		 * Load it using an autoloader
-		 */
-		if class_exists(modelName) {
-			return new {modelName}(this->_dependencyInjector, this);
+		if colonPos !== false {
+			let className = substr(modelName, colonPos + 1);
+			let namespaceAlias = substr(modelName, 0, colonPos);
+			let namespaceName = this->getNamespaceAlias(namespaceAlias);
+			let modelName = namespaceName . "\\" . className;
 		}
 
 		/**
 		 * The model doesn't exist throw an exception
 		 */
-		throw new Exception("Model '" . modelName . "' could not be loaded");
+		if !class_exists(modelName) {
+			throw new Exception("Model '" . modelName . "' could not be loaded");
+		}
+
+		/**
+		 * Check if a model with the same is already loaded
+		 */
+		if !newInstance {
+			if fetch model, this->_initialized[strtolower(modelName)] {
+				model->reset();
+				return model;
+			}
+		}
+
+		/**
+		 * Load it using an autoloader
+		 */
+		return new {modelName}(null, this->_dependencyInjector, this);
+	}
+
+	/**
+	 * Sets the prefix for all model sources.
+	 *
+	 * <code>
+	 * use Phalcon\Mvc\Model\Manager;
+	 *
+	 * $di->set("modelsManager", function () {
+	 *     $modelsManager = new Manager();
+	 *     $modelsManager->setModelPrefix("wp_");
+	 *
+	 *     return $modelsManager;
+	 * });
+	 *
+	 * $robots = new Robots();
+	 * echo $robots->getSource(); // wp_robots
+	 * </code>
+	 */
+	public function setModelPrefix(string! prefix) -> void
+	{
+		let this->_prefix = prefix;
+	}
+
+	/**
+	 * Returns the prefix for all model sources.
+	 *
+	 * <code>
+	 * use Phalcon\Mvc\Model\Manager;
+	 *
+	 * $di->set("modelsManager", function () {
+	 *     $modelsManager = new Manager();
+	 *     $modelsManager->setModelPrefix("wp_");
+	 *
+	 *     return $modelsManager;
+	 * });
+	 *
+	 * $robots = new Robots();
+	 * echo $robots->getSource(); // wp_robots
+	 * </code>
+	 */
+	public function getModelPrefix() -> string
+	{
+		return this->_prefix;
 	}
 
 	/**
@@ -304,24 +367,44 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	}
 
 	/**
+	 * Check whether a model property is declared as public.
+	 *
+	 * <code>
+	 * $isPublic = $manager->isVisibleModelProperty(
+	 *     new Robots(),
+	 *     "name"
+	 * );
+	 * </code>
+	 */
+	public final function isVisibleModelProperty(<ModelInterface> model, string property) -> boolean
+	{
+		var properties, className;
+
+		let className = get_class(model);
+
+		if !isset this->_modelVisibility[className] {
+			let this->_modelVisibility[className] = get_object_vars(model);
+		}
+
+		let properties = this->_modelVisibility[className];
+
+		return array_key_exists(property, properties);
+	}
+
+	/**
 	 * Returns the mapped source for a model
 	 */
 	public function getModelSource(<ModelInterface> model) -> string
 	{
-		var sources, entityName, source;
+		var entityName;
 
 		let entityName = get_class_lower(model);
 
-		let sources = this->_sources;
-		if typeof sources == "array" {
-			if fetch source, sources[entityName] {
-				return source;
-			}
+		if !isset this->_sources[entityName] {
+			let this->_sources[entityName] = uncamelize(get_class_ns(model));
 		}
 
-		let source = uncamelize(get_class_ns(model)),
-			this->_sources[entityName] = source;
-		return source;
+		return this->_prefix . this->_sources[entityName];
 	}
 
 	/**
@@ -337,14 +420,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getModelSchema(<ModelInterface> model) -> string
 	{
-		var schemas, schema;
-		let schemas = this->_schemas;
-		if typeof schemas == "array" {
-			if fetch schema, schemas[get_class_lower(model)] {
-				return schema;
-			}
+		var schema;
+
+		if !fetch schema, this->_schemas[get_class_lower(model)] {
+			return "";
 		}
-		return "";
+
+		return schema;
 	}
 
 	/**
@@ -352,10 +434,8 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function setConnectionService(<ModelInterface> model, string! connectionService) -> void
 	{
-		var entityName;
-		let entityName = get_class_lower(model),
-			this->_readConnectionServices[entityName] = connectionService,
-			this->_writeConnectionServices[entityName] = connectionService;
+		this->setReadConnectionService(model, connectionService);
+		this->setWriteConnectionService(model, connectionService);
 	}
 
 	/**
@@ -395,14 +475,9 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	protected function _getConnection(<ModelInterface> model, connectionServices) -> <AdapterInterface>
 	{
-		var dependencyInjector, service = null, connection;
+		var dependencyInjector, service, connection;
 
-		/**
-		 * Check if the model has a custom connection service
-		 */
-		if typeof connectionServices == "array" {
-			fetch service, connectionServices[get_class_lower(model)];
-		}
+		let service = this->_getConnectionService(model, connectionServices);
 
 		let dependencyInjector = <DiInterface> this->_dependencyInjector;
 		if typeof dependencyInjector != "object" {
@@ -412,11 +487,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 		/**
 		 * Request the connection service from the DI
 		 */
-		if service {
-			let connection = <AdapterInterface> dependencyInjector->getShared(service);
-		} else {
-			let connection = <AdapterInterface> dependencyInjector->getShared("db");
-		}
+		let connection = <AdapterInterface> dependencyInjector->getShared(service);
 
 		if typeof connection != "object" {
 			throw new Exception("Invalid injected connection service");
@@ -442,47 +513,42 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	}
 
 	/**
-	 * Returns the connection service name used to read or write data related to a model depending on the connection services
+	 * Returns the connection service name used to read or write data related to
+	 * a model depending on the connection services
 	 */
 	public function _getConnectionService(<ModelInterface> model, connectionServices) -> string
 	{
 		var connection;
 
-		if typeof connectionServices == "array" {
-			if fetch connection, connectionServices[get_class_lower(model)] {
-				return connection;
-			}
+		if !fetch connection, connectionServices[get_class_lower(model)] {
+			return "db";
 		}
 
-		return "db";
+		return connection;
 	}
 
 	/**
-	 * Receives events generated in the models and dispatches them to a events-manager if available
+	 * Receives events generated in the models and dispatches them to an events-manager if available
 	 * Notify the behaviors that are listening in the model
 	 */
 	public function notifyEvent(string! eventName, <ModelInterface> model)
 	{
-		var status, behavior, modelsBehaviors, eventsManager,
-			customEventsManager, behaviors;
+		var status, behavior, modelsBehaviors, eventsManager, customEventsManager;
 
 		let status = null;
 
 		/**
 		 * Dispatch events to the global events manager
 		 */
-		let behaviors = this->_behaviors;
-		if typeof behaviors == "array" {
-			if fetch modelsBehaviors, behaviors[get_class_lower(model)] {
+		if fetch modelsBehaviors, this->_behaviors[get_class_lower(model)] {
 
-				/**
-				 * Notify all the events on the behavior
-				 */
-				for behavior in modelsBehaviors {
-					let status = behavior->notify(eventName, model);
-					if status === false {
-						return false;
-					}
+			/**
+			 * Notify all the events on the behavior
+			 */
+			for behavior in modelsBehaviors {
+				let status = behavior->notify(eventName, model);
+				if status === false {
+					return false;
 				}
 			}
 		}
@@ -501,13 +567,10 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 		/**
 		 * A model can has a specific events manager for it
 		 */
-		let customEventsManager = this->_customEventsManager;
-		if typeof customEventsManager == "array" {
-			if fetch customEventsManager, customEventsManager[get_class_lower(model)] {
-				let status = customEventsManager->fire("model:" . eventName, model);
-				if status === false {
-					return false;
-				}
+		if fetch customEventsManager, this->_customEventsManager[get_class_lower(model)] {
+			let status = customEventsManager->fire("model:" . eventName, model);
+			if status === false {
+				return false;
 			}
 		}
 
@@ -515,30 +578,26 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	}
 
 	/**
-	 * Dispatch a event to the listeners and behaviors
+	 * Dispatch an event to the listeners and behaviors
 	 * This method expects that the endpoint listeners/behaviors returns true
 	 * meaning that a least one was implemented
 	 */
 	public function missingMethod(<ModelInterface> model, string! eventName, var data)
 	{
-		var behaviors, modelsBehaviors, result, eventsManager, behavior;
+		var modelsBehaviors, result, eventsManager, behavior;
 
 		/**
 		 * Dispatch events to the global events manager
 		 */
-		let behaviors = this->_behaviors;
-		if typeof behaviors == "array" {
+		if fetch modelsBehaviors, this->_behaviors[get_class_lower(model)] {
 
-			if fetch modelsBehaviors, behaviors[get_class_lower(model)] {
-
-				/**
-				 * Notify all the events on the behavior
-				 */
-				for behavior in modelsBehaviors {
-					let result = behavior->missingMethod(model, eventName, data);
-					if result !== null {
-						return result;
-					}
+			/**
+			 * Notify all the events on the behavior
+			 */
+			for behavior in modelsBehaviors {
+				let result = behavior->missingMethod(model, eventName, data);
+				if result !== null {
+					return result;
 				}
 			}
 		}
@@ -557,7 +616,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	/**
 	 * Binds a behavior to a model
 	 */
-	public function addBehavior(<ModelInterface> model, <\Phalcon\Mvc\Model\BehaviorInterface> behavior)
+	public function addBehavior(<ModelInterface> model, <BehaviorInterface> behavior)
 	{
 		var entityName, modelsBehaviors;
 
@@ -684,7 +743,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 			}
 			let lowerAlias = strtolower(alias);
 		} else {
-			let lowerAlias = referencedEntity;			
+			let lowerAlias = referencedEntity;
 		}
 
 		/**
@@ -1097,14 +1156,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getRelationByAlias(string! modelName, string! alias) -> <Relation> | boolean
 	{
-		var aliases, relation;
-		let aliases = this->_aliases;
-		if typeof aliases == "array" {
-			if fetch relation, aliases[strtolower(modelName . "$" . alias)] {
-				return relation;
-			}
+		var relation;
+
+		if !fetch relation, this->_aliases[strtolower(modelName . "$" . alias)] {
+			return false;
 		}
-		return false;
+
+		return relation;
 	}
 
 	/**
@@ -1115,7 +1173,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 		var key, value, findParams;
 
 		if typeof findParamsOne == "string" && typeof findParamsTwo == "string" {
-			return ["(" . findParamsOne . ") AND " . findParamsTwo];
+			return ["(" . findParamsOne . ") AND (" . findParamsTwo . ")"];
 		}
 
 		let findParams = [];
@@ -1127,7 +1185,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 					if !isset findParams[0] {
 						let findParams[0] = value;
 					} else {
-						let findParams[0] = "(" . findParams[0] . ") AND " . value;
+						let findParams[0] = "(" . findParams[0] . ") AND (" . value . ")";
 					}
 					continue;
 				}
@@ -1148,7 +1206,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 					if !isset findParams[0] {
 						let findParams[0] = value;
 					} else {
-						let findParams[0] = "(" . findParams[0] . ") AND " . value;
+						let findParams[0] = "(" . findParams[0] . ") AND (" . value . ")";
 					}
 					continue;
 				}
@@ -1173,7 +1231,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 				if !isset findParams[0] {
 					let findParams[0] = findParamsTwo;
 				} else {
-					let findParams[0] = "(" . findParams[0] . ") AND " . findParamsTwo;
+					let findParams[0] = "(" . findParams[0] . ") AND (" . findParamsTwo . ")";
 				}
 			}
 		}
@@ -1184,14 +1242,14 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	/**
 	 * Helper method to query records based on a relation definition
 	 *
-	 * @return \Phalcon\Mvc\Model\Resultset\Simple|Phalcon\Mvc\Model\Resultset\Simple|false
+	 * @return \Phalcon\Mvc\Model\Resultset\Simple|Phalcon\Mvc\Model\Resultset\Simple|int|false
 	 */
 	public function getRelationRecords(<RelationInterface> relation, string! method, <ModelInterface> record, var parameters = null)
 	{
 		var placeholders, referencedModel, intermediateModel,
 			intermediateFields, joinConditions, fields, builder, extraParameters,
 			conditions, refPosition, field, referencedFields, findParams,
-			findArguments, retrieveMethod, uniqueKey, records, arguments;
+			findArguments, retrieveMethod, uniqueKey, records, arguments, rows, firstRow;
 		boolean reusable;
 
 		/**
@@ -1252,6 +1310,16 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 			builder->innerJoin(intermediateModel, join(" AND ", joinConditions));
 			builder->andWhere(join(" AND ", conditions), placeholders);
 
+			if method == "count" {
+				builder->columns("COUNT(*) AS rowcount");
+
+				let rows = builder->getQuery()->execute();
+
+				let firstRow = rows->getFirst();
+
+				return (int) firstRow->readAttribute("rowcount");
+			}
+
 			/**
 			 * Get the query
 			 * Execute the query
@@ -1274,7 +1342,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 			 * Compound relation
 			 */
 			let referencedFields = relation->getReferencedFields();
-			for refPosition, field in relation->getReferencedFields() {
+			for refPosition, field in relation->getFields() {
 				let conditions[] = "[". referencedFields[refPosition] . "] = :APR" . refPosition . ":",
 					placeholders["APR" . refPosition] = record->readAttribute(field);
 			}
@@ -1293,7 +1361,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 		let findArguments = this->_mergeFindParameters(findParams, parameters);
 
 		if typeof extraParameters == "array" {
-			let findParams = this->_mergeFindParameters(findArguments, extraParameters);
+			let findParams = this->_mergeFindParameters(extraParameters, findArguments);
 		} else {
 			let findParams = findArguments;
 		}
@@ -1384,28 +1452,21 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	public function getBelongsToRecords(string! method, string! modelName, var modelRelation, <ModelInterface> record, parameters = null)
 		-> <ResultsetInterface> | boolean
 	{
-		var belongsTo, keyRelation, relations;
+		var keyRelation, relations;
 
-		let belongsTo = this->_hasMany;
-		if typeof belongsTo == "array" {
-
-			/**
-			 * Check if there is a relation between them
-			 */
-			let keyRelation = strtolower(modelName) . "$" . strtolower(modelRelation);
-			if !isset belongsTo[keyRelation] {
-				return false;
-			}
-
-			/**
-			 * "relations" is an array with all the belongsTo relationships to that model
-			 * Perform the query
-			 */
-			let relations = belongsTo[keyRelation];
-			return this->getRelationRecords(relations[0], method, record, parameters);
+		/**
+		 * Check if there is a relation between them
+		 */
+		let keyRelation = strtolower(modelName) . "$" . strtolower(modelRelation);
+		if !fetch relations, this->_hasMany[keyRelation] {
+			return false;
 		}
 
-		return false;
+		/**
+		 * "relations" is an array with all the belongsTo relationships to that model
+		 * Perform the query
+		 */
+		return this->getRelationRecords(relations[0], method, record, parameters);
 	}
 
 	/**
@@ -1414,28 +1475,21 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	public function getHasManyRecords(string! method, string! modelName, var modelRelation, <ModelInterface> record, parameters = null)
 		-> <ResultsetInterface> | boolean
 	{
-		var hasMany, keyRelation, relations;
+		var keyRelation, relations;
 
-		let hasMany = this->_hasMany;
-		if typeof hasMany == "array" {
-
-			/**
-			 * Check if there is a relation between them
-			 */
-			let keyRelation = strtolower(modelName) . "$" . strtolower(modelRelation);
-			if !isset hasMany[keyRelation] {
-				return false;
-			}
-
-			/**
-			 * "relations" is an array with all the hasMany relationships to that model
-			 * Perform the query
-			 */
-			let relations = hasMany[keyRelation];
-			return this->getRelationRecords(relations[0], method, record, parameters);
+		/**
+		 * Check if there is a relation between them
+		 */
+		let keyRelation = strtolower(modelName) . "$" . strtolower(modelRelation);
+		if !fetch relations, this->_hasMany[keyRelation] {
+			return false;
 		}
 
-		return false;
+		/**
+		 * "relations" is an array with all the hasMany relationships to that model
+		 * Perform the query
+		 */
+		return this->getRelationRecords(relations[0], method, record, parameters);
 	}
 
 	/**
@@ -1444,47 +1498,41 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	public function getHasOneRecords(string! method, string! modelName, var modelRelation, <ModelInterface> record, parameters = null)
 		-> <ModelInterface> | boolean
 	{
-		var hasOne, keyRelation, relations;
+		var keyRelation, relations;
 
-		let hasOne = this->_hasOne;
-		if typeof hasOne == "array" {
-
-			/**
-			 * Check if there is a relation between them
-			 */
-			let keyRelation = strtolower(modelName) . "$" . strtolower(modelRelation);
-			if !isset hasOne[keyRelation] {
-				return false;
-			}
-
-			/**
-			 * "relations" is an array with all the belongsTo relationships to that model
-			 * Perform the query
-			 */
-			let relations = hasOne[keyRelation];
-			return this->getRelationRecords(relations[0], method, record, parameters);
+		/**
+		 * Check if there is a relation between them
+		 */
+		let keyRelation = strtolower(modelName) . "$" . strtolower(modelRelation);
+		if !fetch relations, this->_hasOne[keyRelation] {
+			return false;
 		}
 
-		return false;
+		/**
+		 * "relations" is an array with all the belongsTo relationships to that model
+		 * Perform the query
+		 */
+		return this->getRelationRecords(relations[0], method, record, parameters);
 	}
 
 	/**
 	 * Gets all the belongsTo relations defined in a model
 	 *
 	 *<code>
-	 *	$relations = $modelsManager->getBelongsTo(new Robots());
+	 * $relations = $modelsManager->getBelongsTo(
+	 *     new Robots()
+	 * );
 	 *</code>
 	 */
 	public function getBelongsTo(<ModelInterface> model) -> <RelationInterface[]> | array
 	{
-		var belongsToSingle, relations;
-		let belongsToSingle = this->_belongsToSingle;
-		if typeof belongsToSingle == "array" {
-			if fetch relations, belongsToSingle[get_class_lower(model)] {
-				return relations;
-			}
+		var relations;
+
+		if !fetch relations, this->_belongsToSingle[get_class_lower(model)] {
+			return [];
 		}
-		return [];
+
+		return relations;
 	}
 
 	/**
@@ -1492,15 +1540,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getHasMany(<ModelInterface> model) -> <RelationInterface[]> | array
 	{
-		var hasManySingle, relations;
-		let hasManySingle = this->_hasManySingle;
-		if typeof hasManySingle == "array" {
-			if fetch relations, hasManySingle[get_class_lower(model)] {
-				return relations;
-			}
+		var relations;
 
+		if !fetch relations, this->_hasManySingle[get_class_lower(model)] {
+			return [];
 		}
-		return [];
+
+		return relations;
 	}
 
 	/**
@@ -1508,14 +1554,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getHasOne(<ModelInterface> model) -> array
 	{
-		var hasOneSingle, relations;
-		let hasOneSingle = this->_hasOneSingle;
-		if typeof hasOneSingle == "array" {
-			if fetch relations, hasOneSingle[get_class_lower(model)] {
-				return relations;
-			}
+		var relations;
+
+		if !fetch relations, this->_hasOneSingle[get_class_lower(model)] {
+			return [];
 		}
-		return [];
+
+		return relations;
 	}
 
 	/**
@@ -1523,14 +1568,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getHasManyToMany(<ModelInterface> model) -> <RelationInterface[]> | array
 	{
-		var hasManyToManySingle, relations;
-		let hasManyToManySingle = this->_hasManyToManySingle;
-		if typeof hasManyToManySingle == "array" {
-			if fetch relations, hasManyToManySingle[get_class_lower(model)] {
-				return relations;
-			}
+		var relations;
+
+		if !fetch relations, this->_hasManyToManySingle[get_class_lower(model)] {
+			return [];
 		}
-		return [];
+
+		return relations;
 	}
 
 	/**
@@ -1546,8 +1590,7 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getRelations(string! modelName) -> <RelationInterface[]>
 	{
-		var entityName, allRelations, relations,
-			belongsTo, relation, hasOne, hasMany;
+		var entityName, allRelations, relations, relation;
 
 		let entityName = strtolower(modelName),
 			allRelations = [];
@@ -1555,36 +1598,27 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 		/**
 		 * Get belongs-to relations
 		 */
-		let belongsTo = this->_belongsToSingle;
-		if typeof belongsTo == "array" {
-			if fetch relations, belongsTo[entityName] {
-				for relation in relations {
-					let allRelations[] = relation;
-				}
+		if fetch relations, this->_belongsToSingle[entityName] {
+			for relation in relations {
+				let allRelations[] = relation;
 			}
 		}
 
 		/**
 		 * Get has-many relations
 		 */
-		let hasMany = this->_hasManySingle;
-		if typeof hasMany == "array" {
-			if fetch relations, hasMany[entityName] {
-				for relation in relations {
-					let allRelations[] = relation;
-				}
+		if fetch relations, this->_hasManySingle[entityName] {
+			for relation in relations {
+				let allRelations[] = relation;
 			}
 		}
 
 		/**
 		 * Get has-one relations
 		 */
-		let hasOne = this->_hasOneSingle;
-		if typeof hasOne == "array" {
-			if fetch relations, hasOne[entityName] {
-				for relation in relations {
-					let allRelations[] = relation;
-				}
+		if fetch relations, this->_hasOneSingle[entityName] {
+			for relation in relations {
+				let allRelations[] = relation;
 			}
 		}
 
@@ -1596,38 +1630,29 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function getRelationsBetween(string! first, string! second) -> <RelationInterface[]> | boolean
 	{
-		var keyRelation, belongsTo, hasMany, hasOne, relations;
+		var keyRelation, relations;
 
 		let keyRelation = strtolower(first) . "$" . strtolower(second);
 
 		/**
 		 * Check if it's a belongs-to relationship
 		 */
-		let belongsTo = this->_belongsTo;
-		if typeof belongsTo == "array" {
-			if fetch relations, belongsTo[keyRelation] {
-				return relations;
-			}
+		if fetch relations, this->_belongsTo[keyRelation] {
+			return relations;
 		}
 
 		/**
 		 * Check if it's a has-many relationship
 		 */
-		let hasMany = this->_hasMany;
-		if typeof hasMany == "array" {
-			if fetch relations, hasMany[keyRelation] {
-				return relations;
-			}
+		if fetch relations, this->_hasMany[keyRelation] {
+			return relations;
 		}
 
 		/**
 		 * Check whether it's a has-one relationship
 		 */
-		let hasOne = this->_hasOne;
-		if typeof hasOne == "array" {
-			if fetch relations, hasOne[keyRelation] {
-				return relations;
-			}
+		if fetch relations, this->_hasOne[keyRelation] {
+			return relations;
 		}
 
 		return false;
@@ -1658,18 +1683,9 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	 */
 	public function executeQuery(string! phql, var placeholders = null, var types = null) -> <QueryInterface>
 	{
-		var dependencyInjector, query;
+		var query;
 
-		let dependencyInjector = <DiInterface> this->_dependencyInjector;
-		if typeof dependencyInjector != "object" {
-			throw new Exception("A dependency injection object is required to access ORM services");
-		}
-
-		/**
-		 * Gets Query instance from DI container
-		 */
-		let query = <QueryInterface> dependencyInjector->get("Phalcon\\Mvc\\Model\\Query", [phql, dependencyInjector]);
-		let this->_lastQuery = query;
+		let query = this->createQuery(phql);
 
 		if typeof placeholders == "array" {
 			query->setBindParams(placeholders);
@@ -1700,7 +1716,13 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 		/**
 		 * Gets Builder instance from DI container
 		 */
-		return <BuilderInterface> dependencyInjector->get("Phalcon\\Mvc\\Model\\Query\\Builder", [params, dependencyInjector]);
+		return <BuilderInterface> dependencyInjector->get(
+			"Phalcon\\Mvc\\Model\\Query\\Builder",
+			[
+				params,
+				dependencyInjector
+			]
+		);
 	}
 
 	/**
@@ -1738,5 +1760,14 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
 	public function getNamespaceAliases() -> array
 	{
 		return this->_namespaceAliases;
+	}
+
+	/**
+ 	 * Destroys the current PHQL cache
+ 	 */
+	public function __destruct()
+	{
+		phalcon_orm_destroy_cache();
+		Query::clean();
 	}
 }

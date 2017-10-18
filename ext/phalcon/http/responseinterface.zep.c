@@ -37,10 +37,6 @@ ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, getHeaders);
 
 /**
  * Overwrites a header in the response
- *
- * @param string name
- * @param string value
- * @return \Phalcon\Http\ResponseInterface
  */
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setHeader);
 
@@ -50,7 +46,7 @@ ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setHeader);
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setRawHeader);
 
 /**
- * Resets all the stablished headers
+ * Resets all the established headers
  */
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, resetHeaders);
 
@@ -74,12 +70,12 @@ ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setNotModified);
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setContentType);
 
 /**
+ * Sets the response content-length
+ */
+ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setContentLength);
+
+/**
  * Redirect by HTTP to another action or URL
- *
- * @param string location
- * @param boolean externalRedirect
- * @param int statusCode
- * @return \Phalcon\Http\ResponseInterface
  */
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, redirect);
 
@@ -92,19 +88,17 @@ ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setContent);
  * Sets HTTP response body. The parameter is automatically converted to JSON
  *
  *<code>
- *	response->setJsonContent(array("status" => "OK"));
+ * $response->setJsonContent(
+ *     [
+ *         "status" => "OK",
+ *     ]
+ * );
  *</code>
- *
- * @param string content
- * @return \Phalcon\Http\ResponseInterface
  */
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setJsonContent);
 
 /**
  * Appends a string to the HTTP response body
- *
- * @param string content
- * @return \Phalcon\Http\ResponseInterface
  */
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, appendContent);
 
@@ -130,9 +124,6 @@ ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, send);
 
 /**
  * Sets an attached file to be sent at the end of the request
- *
- * @param string filePath
- * @param string attachmentName
  */
 ZEPHIR_DOC_METHOD(Phalcon_Http_ResponseInterface, setFileToSend);
 

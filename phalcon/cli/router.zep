@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -33,15 +33,18 @@ use Phalcon\Cli\Router\Exception;
  * action of that task should receive the request</p>
  *
  *<code>
- *	$router = new \Phalcon\Cli\Router();
- *	$router->handle(array(
- *		'module' => 'main',
- *		'task' => 'videos',
- *		'action' => 'process'
- *	));
- *	echo $router->getTaskName();
- *</code>
+ * $router = new \Phalcon\Cli\Router();
  *
+ * $router->handle(
+ *     [
+ *         "module" => "main",
+ *         "task"   => "videos",
+ *         "action" => "process",
+ *     ]
+ * );
+ *
+ * echo $router->getTaskName();
+ *</code>
  */
 class Router implements \Phalcon\Di\InjectionAwareInterface
 {
@@ -54,7 +57,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 
 	protected _action;
 
-	protected _params;
+	protected _params = [];
 
 	protected _defaultModule = null;
 
@@ -62,7 +65,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 
 	protected _defaultAction = null;
 
-	protected _defaultParams;
+	protected _defaultParams = [];
 
 	protected _routes;
 
@@ -96,9 +99,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 			]);
 		}
 
-		let this->_params = [],
-			this->_defaultParams = [],
-			this->_routes = routes;
+		let this->_routes = routes;
 	}
 
 	/**
@@ -146,10 +147,12 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	 * This method must not be used to set a 404 route
 	 *
 	 *<code>
-	 * $router->setDefaults(array(
-	 *		'module' => 'common',
-	 *		'action' => 'index'
-	 * ));
+	 * $router->setDefaults(
+	 *     [
+	 *         "module" => "common",
+	 *         "action" => "index",
+	 *     ]
+	 * );
 	 *</code>
 	 */
 	public function setDefaults(array! defaults) -> <Router>
@@ -353,23 +356,19 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 		/**
 		 * Check for an parameters
 		 */
-		if routeFound {
-			if fetch params, parts["params"] {
-				if typeof params != "array" {
-					let strParams = substr((string)params, 1);
-					if strParams {
-						let params = explode(Route::getDelimiter(), strParams);
-					} else {
-						let params = [];
-					}
+		if fetch params, parts["params"] {
+			if typeof params != "array" {
+				let strParams = substr((string)params, 1);
+				if strParams {
+					let params = explode(Route::getDelimiter(), strParams);
+				} else {
+					let params = [];
 				}
-				unset parts["params"];
 			}
-			if count(params) {
-				let params = array_merge(params, parts);
-			} else {
-				let params = parts;
-			}
+			unset parts["params"];
+		}
+		if count(params) {
+			let params = array_merge(params, parts);
 		} else {
 			let params = parts;
 		}
@@ -384,14 +383,14 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	 * Adds a route to the router
 	 *
 	 *<code>
-	 * $router->add('/about', 'About::main');
+	 * $router->add("/about", "About::main");
 	 *</code>
 	 *
 	 * @param string pattern
 	 * @param string/array paths
 	 * @return \Phalcon\Cli\Router\Route
 	 */
-	public function add(string! pattern, paths = null) -> <Route>
+	public function add(string! pattern, paths = null) -> <RouteInterface>
 	{
 		var route;
 
@@ -401,7 +400,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	}
 
 	/**
-	 * Returns proccesed module name
+	 * Returns processed module name
 	 */
 	public function getModuleName() -> string
 	{
@@ -409,7 +408,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	}
 
 	/**
-	 * Returns proccesed task name
+	 * Returns processed task name
 	 */
 	public function getTaskName() -> string
 	{
@@ -417,7 +416,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	}
 
 	/**
-	 * Returns proccesed action name
+	 * Returns processed action name
 	 */
 	public function getActionName() -> string
 	{
@@ -425,7 +424,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	}
 
 	/**
-	 * Returns proccesed extra params
+	 * Returns processed extra params
 	 *
 	 * @return array
 	 */
@@ -435,9 +434,9 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	}
 
 	/**
-	 * Returns the route that matchs the handled URI
+	 * Returns the route that matches the handled URI
 	 */
-	public function getMatchedRoute() -> <Route>
+	public function getMatchedRoute() -> <RouteInterface>
 	{
 		return this->_matchedRoute;
 	}
@@ -453,7 +452,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	}
 
 	/**
-	 * Checks if the router macthes any of the defined routes
+	 * Checks if the router matches any of the defined routes
 	 */
 	public function wasMatched() -> boolean
 	{
@@ -474,7 +473,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	 * @param int id
 	 * @return \Phalcon\Cli\Router\Route
 	 */
-	public function getRouteById(var id) -> <Route> | boolean
+	public function getRouteById(var id) -> <RouteInterface> | boolean
 	{
 		var route;
 
@@ -489,7 +488,7 @@ class Router implements \Phalcon\Di\InjectionAwareInterface
 	/**
 	 * Returns a route object by its name
 	 */
-	public function getRouteByName(string! name) -> <Route> | boolean
+	public function getRouteByName(string! name) -> <RouteInterface> | boolean
 	{
 		var route;
 

@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,34 +22,42 @@ namespace Phalcon\Mvc\Model\Validator;
 use Phalcon\Mvc\EntityInterface;
 use Phalcon\Mvc\Model\Exception;
 use Phalcon\Mvc\Model\Validator;
-use Phalcon\Mvc\Model\ValidatorInterface;
 
 /**
  * Phalcon\Mvc\Model\Validator\PresenceOf
  *
  * Allows to validate if a filed have a value different of null and empty string ("")
  *
+ * This validator is only for use with Phalcon\Mvc\Collection. If you are using
+ * Phalcon\Mvc\Model, please use the validators provided by Phalcon\Validation.
+ *
  *<code>
- *use Phalcon\Mvc\Model\Validator\PresenceOf;
+ * use Phalcon\Mvc\Model\Validator\PresenceOf;
  *
- *class Subscriptors extends \Phalcon\Mvc\Model
- *{
+ * class Subscriptors extends \Phalcon\Mvc\Collection
+ * {
+ *     public function validation()
+ *     {
+ *         $this->validate(
+ *             new PresenceOf(
+ *                 [
+ *                     "field"   => "name",
+ *                     "message" => "The name is required",
+ *                 ]
+ *             )
+ *         );
  *
- *  public function validation()
- *  {
- *      $this->validate(new PresenceOf(array(
- *          "field" => 'name',
- *          "message" => 'The name is required'
- *      )));
- *      if ($this->validationHasFailed() == true) {
- *          return false;
- *      }
- *  }
- *
- *}
+ *         if ($this->validationHasFailed() === true) {
+ *             return false;
+ *         }
+ *     }
+ * }
  *</code>
+ *
+ * @deprecated 3.1.0
+ * @see Phalcon\Validation\Validator\PresenceOf
  */
-class PresenceOf extends Validator implements ValidatorInterface
+class PresenceOf extends Validator
 {
 	/**
 	 * Executes the validator
@@ -64,7 +72,7 @@ class PresenceOf extends Validator implements ValidatorInterface
 		}
 
 		/**
-		 * A value is null when it is identical to null or a empty string
+		 * A value is null when it is identical to null or an empty string
 		 */
 		let value = record->readAttribute(field);
 		if is_null(value) || (is_string(value) && !strlen(value)) {

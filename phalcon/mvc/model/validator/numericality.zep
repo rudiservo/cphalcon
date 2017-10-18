@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -22,33 +22,41 @@ namespace Phalcon\Mvc\Model\Validator;
 use Phalcon\Mvc\EntityInterface;
 use Phalcon\Mvc\Model\Exception;
 use Phalcon\Mvc\Model\Validator;
-use Phalcon\Mvc\Model\ValidatorInterface;
 
 /**
  * Phalcon\Mvc\Model\Validator\Numericality
  *
  * Allows to validate if a field has a valid numeric format
  *
+ * This validator is only for use with Phalcon\Mvc\Collection. If you are using
+ * Phalcon\Mvc\Model, please use the validators provided by Phalcon\Validation.
+ *
  *<code>
- *use Phalcon\Mvc\Model\Validator\Numericality as NumericalityValidator;
+ * use Phalcon\Mvc\Model\Validator\Numericality as NumericalityValidator;
  *
- *class Products extends \Phalcon\Mvc\Model
- *{
+ * class Products extends \Phalcon\Mvc\Collection
+ * {
+ *     public function validation()
+ *     {
+ *         $this->validate(
+ *             new NumericalityValidator(
+ *                 [
+ *                     "field" => "price",
+ *                 ]
+ *             )
+ *         );
  *
- *  public function validation()
- *  {
- *      $this->validate(new NumericalityValidator(array(
- *          "field" => 'price'
- *      )));
- *      if ($this->validationHasFailed() == true) {
- *          return false;
- *      }
- *  }
- *
- *}
+ *         if ($this->validationHasFailed() === true) {
+ *             return false;
+ *         }
+ *     }
+ * }
  *</code>
+ *
+ * @deprecated 3.1.0
+ * @see Phalcon\Validation\Validator\Numericality
  */
-class Numericality extends Validator implements ValidatorInterface
+class Numericality extends Validator
 {
 	/**
 	 * Executes the validator

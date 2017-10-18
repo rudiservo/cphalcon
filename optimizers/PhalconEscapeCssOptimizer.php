@@ -4,10 +4,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://www.phalconphp.com)      |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -26,45 +26,53 @@ use Zephir\CompilerException;
 use Zephir\CompiledExpression;
 use Zephir\Optimizers\OptimizerAbstract;
 
+/**
+ * Zephir\Optimizers\FunctionCall\PhalconEscapeCssOptimizer
+ *
+ * @package Zephir\Optimizers\FunctionCall
+ */
 class PhalconEscapeCssOptimizer extends OptimizerAbstract
 {
+    /**
+     * @param array $expression
+     * @param Call $call
+     * @param CompilationContext $context
+     * @return bool|CompiledExpression
+     *
+     * @throws CompilerException
+     */
+    public function optimize(array $expression, Call $call, CompilationContext $context)
+    {
+        if (!isset($expression['parameters'])) {
+            return false;
+        }
 
-	/**
-	 *
-	 * @param array $expression
-	 * @param Call $call
-	 * @param CompilationContext $context
-	 */
-	public function optimize(array $expression, Call $call, CompilationContext $context)
-	{
+        if (count($expression['parameters']) != 1) {
+            throw new CompilerException("phalcon_escape_css only accepts one parameter", $expression);
+        }
 
-		if (!isset($expression['parameters'])) {
-			return false;
-		}
+        /**
+         * Process the expected symbol to be returned
+         */
+        $call->processExpectedReturn($context);
 
-		if (count($expression['parameters']) != 1) {
-			throw new CompilerException("phalcon_escape_css only accepts one parameter", $expression);
-		}
+        $symbolVariable = $call->getSymbolVariable();
+        if ($symbolVariable->getType() != 'variable') {
+            throw new CompilerException(
+                "Returned values by functions can only be assigned to variant variables",
+                $expression
+            );
+        }
 
-		/**
-		 * Process the expected symbol to be returned
-		 */
-		$call->processExpectedReturn($context);
+        if ($call->mustInitSymbolVariable()) {
+            $symbolVariable->initVariant($context);
+        }
 
-		$symbolVariable = $call->getSymbolVariable();
-		if ($symbolVariable->getType() != 'variable') {
-			throw new CompilerException("Returned values by functions can only be assigned to variant variables", $expression);
-		}
+        $context->headersManager->add('kernel/filter');
 
-		if ($call->mustInitSymbolVariable()) {
-			$symbolVariable->initVariant($context);
-		}
-
-		$context->headersManager->add('kernel/filter');
-
-		$resolvedParams = $call->getResolvedParams($expression['parameters'], $context, $expression);
-		$context->codePrinter->output('zephir_escape_css(' . $symbolVariable->getName() . ', ' . $resolvedParams[0] . ');');
-		return new CompiledExpression('variable', $symbolVariable->getRealName(), $expression);
-	}
+        $resolvedParams = $call->getResolvedParams($expression['parameters'], $context, $expression);
+        $context->codePrinter->output('zephir_escape_css(' . $symbolVariable->getName() . ', ' . $resolvedParams[0] . ');');
+        return new CompiledExpression('variable', $symbolVariable->getRealName(), $expression);
+    }
 
 }

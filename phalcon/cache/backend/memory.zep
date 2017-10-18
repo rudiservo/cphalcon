@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,7 +20,6 @@
 namespace Phalcon\Cache\Backend;
 
 use Phalcon\Cache\Backend;
-use Phalcon\Cache\BackendInterface;
 use Phalcon\Cache\Exception;
 
 /**
@@ -29,32 +28,30 @@ use Phalcon\Cache\Exception;
  * Stores content in memory. Data is lost when the request is finished
  *
  *<code>
- *	//Cache data
- *	$frontCache = new \Phalcon\Cache\Frontend\Data();
+ * use Phalcon\Cache\Backend\Memory;
+ * use Phalcon\Cache\Frontend\Data as FrontData;
  *
- *  $cache = new \Phalcon\Cache\Backend\Memory($frontCache);
+ * // Cache data
+ * $frontCache = new FrontData();
  *
- *	//Cache arbitrary data
- *	$cache->save('my-data', array(1, 2, 3, 4, 5));
+ * $cache = new Memory($frontCache);
  *
- *	//Get data
- *	$data = $cache->get('my-data');
+ * // Cache arbitrary data
+ * $cache->save("my-data", [1, 2, 3, 4, 5]);
  *
+ * // Get data
+ * $data = $cache->get("my-data");
  *</code>
  */
-class Memory extends Backend implements BackendInterface, \Serializable
+class Memory extends Backend implements \Serializable
 {
 
 	protected _data;
 
 	/**
 	 * Returns a cached content
-	 *
-	 * @param 	string keyName
-	 * @param   long lifetime
-	 * @return  mixed
 	 */
-	public function get(var keyName, lifetime = null)
+	public function get(string keyName, int lifetime = null) -> var | null
 	{
 		var lastKey, cachedContent;
 
@@ -80,17 +77,18 @@ class Memory extends Backend implements BackendInterface, \Serializable
 	 *
 	 * @param string keyName
 	 * @param string content
-	 * @param long lifetime
+	 * @param int lifetime
 	 * @param boolean stopBuffer
 	 */
-	public function save(var keyName = null, var content = null, lifetime = null, boolean stopBuffer = true) -> void
+	public function save(var keyName = null, var content = null, lifetime = null, boolean stopBuffer = true) -> boolean
 	{
 		var lastKey, frontend, cachedContent, preparedContent, isBuffering;
 
 		if keyName === null {
 			let lastKey = this->_lastKey;
 		} else {
-			let lastKey = this->_prefix . keyName;
+			let lastKey = this->_prefix . keyName,
+				this->_lastKey = lastKey;
 		}
 
 		if !lastKey {
@@ -105,10 +103,14 @@ class Memory extends Backend implements BackendInterface, \Serializable
 			let cachedContent = content;
 		}
 
-		let preparedContent = frontend->beforeStore(cachedContent),
-			this->_data[lastKey] = preparedContent;
+		if !is_numeric(cachedContent) {
+			let preparedContent = frontend->beforeStore(cachedContent);
+		} else {
+			let preparedContent = cachedContent;
+		}
 
-		let isBuffering = frontend->isBuffering();
+		let this->_data[lastKey] = preparedContent,
+			isBuffering = frontend->isBuffering();
 
 		if stopBuffer === true {
 			frontend->stop();
@@ -119,6 +121,8 @@ class Memory extends Backend implements BackendInterface, \Serializable
 		}
 
 		let this->_started = false;
+
+		return true;
 	}
 
 	/**
@@ -129,11 +133,15 @@ class Memory extends Backend implements BackendInterface, \Serializable
 	 */
 	public function delete(var keyName) -> boolean
 	{
-		var key;
+		var key, data;
 
-		let key = this->_prefix . keyName;
-		if isset this->_data[key] {
-			unset this->_data[key];
+		let key = this->_prefix . keyName,
+			data = this->_data;
+
+		if isset data[key] {
+			unset data[key];
+			let this->_data = data;
+
 			return true;
 		}
 
@@ -141,35 +149,39 @@ class Memory extends Backend implements BackendInterface, \Serializable
 	}
 
 	/**
-	 * Query the existing cached keys
+	 * Query the existing cached keys.
 	 *
-	 * @param string|int prefix
-	 * @return array
+	 * <code>
+	 * $cache->save("users-ids", [1, 2, 3]);
+	 * $cache->save("projects-ids", [4, 5, 6]);
+	 *
+	 * var_dump($cache->queryKeys("users")); // ["users-ids"]
+	 * </code>
 	 */
-	public function queryKeys(var prefix = null) -> array
+	public function queryKeys(string prefix = null) -> array
 	{
-		var data, index, keys;
+		var data, keys, key, idx;
 
 		let data = this->_data;
-		if typeof data == "array" {
-			if !prefix {
-				let keys = (array) array_keys(data);
-			} else {
-			    	let keys = [];
-				for index, _ in data {
-					let keys[] = index;
-				}
+		if typeof data != "array" {
+			return [];
+		}
+
+		let keys = array_keys(data);
+		for idx, key in keys {
+			if !empty prefix && !starts_with(key, prefix) {
+				unset keys[idx];
 			}
 		}
+
 		return keys;
 	}
 
 	/**
 	 * Checks if cache exists and it hasn't expired
 	 *
-	 * @param  string|int keyName
-	 * @param  long lifetime
-	 * @return boolean
+	 * @param string|int keyName
+	 * @param int lifetime
 	 */
 	public function exists(var keyName = null, lifetime = null) -> boolean
 	{
@@ -193,11 +205,9 @@ class Memory extends Backend implements BackendInterface, \Serializable
 	/**
 	 * Increment of given $keyName by $value
 	 *
-	 * @param  string keyName
-	 * @param  long lifetime
-	 * @return long
+	 * @param string keyName
 	 */
-	public function increment(keyName = null, value = null)
+	public function increment(keyName = null, int value = 1) -> int | null
 	{
 		var lastKey, prefix, cachedContent, result;
 
@@ -215,10 +225,6 @@ class Memory extends Backend implements BackendInterface, \Serializable
 
 		if !cachedContent {
 			return null;
-		}
-
-		if !value {
-			let value = 1;
 		}
 
 		let result = cachedContent + value;
@@ -230,11 +236,9 @@ class Memory extends Backend implements BackendInterface, \Serializable
 	/**
 	 * Decrement of $keyName by given $value
 	 *
-	 * @param  string keyName
-	 * @param  long value
-	 * @return long
+	 * @param string keyName
 	 */
-	public function decrement(keyName = null, value = null)
+	public function decrement(keyName = null, int value = 1) -> int | null
 	{
 		var lastKey, prefix, cachedContent, result;
 
@@ -252,10 +256,6 @@ class Memory extends Backend implements BackendInterface, \Serializable
 
 		if !cachedContent {
 			return null;
-		}
-
-		if !value {
-			let value = 1;
 		}
 
 		let result = cachedContent - value;

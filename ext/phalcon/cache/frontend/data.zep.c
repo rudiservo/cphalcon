@@ -16,6 +16,7 @@
 #include "kernel/memory.h"
 #include "kernel/array.h"
 #include "kernel/fcall.h"
+#include "kernel/operators.h"
 
 
 /**
@@ -24,37 +25,48 @@
  * Allows to cache native PHP data in a serialized form
  *
  *<code>
- *<?php
+ * use Phalcon\Cache\Backend\File;
+ * use Phalcon\Cache\Frontend\Data;
  *
- *	// Cache the files for 2 days using a Data frontend
- *	$frontCache = new \Phalcon\Cache\Frontend\Data(array(
- *		"lifetime" => 172800
- *	));
+ * // Cache the files for 2 days using a Data frontend
+ * $frontCache = new Data(
+ *     [
+ *         "lifetime" => 172800,
+ *     ]
+ * );
  *
- *	// Create the component that will cache "Data" to a "File" backend
- *	// Set the cache file directory - important to keep the "/" at the end of
- *	// of the value for the folder
- *	$cache = new \Phalcon\Cache\Backend\File($frontCache, array(
- *		"cacheDir" => "../app/cache/"
- *	));
+ * // Create the component that will cache "Data" to a 'File' backend
+ * // Set the cache file directory - important to keep the '/' at the end of
+ * // of the value for the folder
+ * $cache = new File(
+ *     $frontCache,
+ *     [
+ *         "cacheDir" => "../app/cache/",
+ *     ]
+ * );
  *
- *	// Try to get cached records
- *	$cacheKey = 'robots_order_id.cache';
- *	$robots    = $cache->get($cacheKey);
- *	if ($robots === null) {
+ * $cacheKey = "robots_order_id.cache";
  *
- *		// $robots is null due to cache expiration or data does not exist
- *		// Make the database call and populate the variable
- *		$robots = Robots::find(array("order" => "id"));
+ * // Try to get cached records
+ * $robots = $cache->get($cacheKey);
  *
- *		// Store it in the cache
- *		$cache->save($cacheKey, $robots);
- *	}
+ * if ($robots === null) {
+ *     // $robots is null due to cache expiration or data does not exist
+ *     // Make the database call and populate the variable
+ *     $robots = Robots::find(
+ *         [
+ *             "order" => "id",
+ *         ]
+ *     );
  *
- *	// Use $robots :)
- *	foreach ($robots as $robot) {
- *		echo $robot->name, "\n";
- *	}
+ *     // Store it in the cache
+ *     $cache->save($cacheKey, $robots);
+ * }
+ *
+ * // Use $robots :)
+ * foreach ($robots as $robot) {
+ *     echo $robot->name, "\n";
+ * }
  *</code>
  */
 ZEPHIR_INIT_CLASS(Phalcon_Cache_Frontend_Data) {
@@ -84,7 +96,7 @@ PHP_METHOD(Phalcon_Cache_Frontend_Data, __construct) {
 	}
 
 
-	zephir_update_property_this(this_ptr, SL("_frontendOptions"), frontendOptions TSRMLS_CC);
+	zephir_update_property_this(getThis(), SL("_frontendOptions"), frontendOptions TSRMLS_CC);
 
 }
 
@@ -155,7 +167,7 @@ PHP_METHOD(Phalcon_Cache_Frontend_Data, stop) {
  */
 PHP_METHOD(Phalcon_Cache_Frontend_Data, beforeStore) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *data;
 
 	ZEPHIR_MM_GROW();
@@ -163,7 +175,7 @@ PHP_METHOD(Phalcon_Cache_Frontend_Data, beforeStore) {
 
 
 
-	ZEPHIR_RETURN_CALL_FUNCTION("serialize", NULL, 75, data);
+	ZEPHIR_RETURN_CALL_FUNCTION("serialize", NULL, 66, data);
 	zephir_check_call_status();
 	RETURN_MM();
 
@@ -174,7 +186,7 @@ PHP_METHOD(Phalcon_Cache_Frontend_Data, beforeStore) {
  */
 PHP_METHOD(Phalcon_Cache_Frontend_Data, afterRetrieve) {
 
-	int ZEPHIR_LAST_CALL_STATUS;
+	zend_long ZEPHIR_LAST_CALL_STATUS;
 	zval *data;
 
 	ZEPHIR_MM_GROW();
@@ -182,7 +194,15 @@ PHP_METHOD(Phalcon_Cache_Frontend_Data, afterRetrieve) {
 
 
 
-	ZEPHIR_RETURN_CALL_FUNCTION("unserialize", NULL, 76, data);
+	if (zephir_is_numeric(data)) {
+		RETVAL_ZVAL(data, 1, 0);
+		RETURN_MM();
+	}
+	if (ZEPHIR_IS_EMPTY(data)) {
+		RETVAL_ZVAL(data, 1, 0);
+		RETURN_MM();
+	}
+	ZEPHIR_RETURN_CALL_FUNCTION("unserialize", NULL, 67, data);
 	zephir_check_call_status();
 	RETURN_MM();
 

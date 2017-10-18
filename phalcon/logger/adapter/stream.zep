@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -21,7 +21,6 @@ namespace Phalcon\Logger\Adapter;
 
 use Phalcon\Logger\Exception;
 use Phalcon\Logger\Adapter;
-use Phalcon\Logger\AdapterInterface;
 use Phalcon\Logger\FormatterInterface;
 use Phalcon\Logger\Formatter\Line as LineFormatter;
 
@@ -30,14 +29,18 @@ use Phalcon\Logger\Formatter\Line as LineFormatter;
  *
  * Sends logs to a valid PHP stream
  *
- *<code>
- *	$logger = new \Phalcon\Logger\Adapter\Stream("php://stderr");
- *	$logger->log("This is a message");
- *	$logger->log(\Phalcon\Logger::ERROR, "This is an error");
- *	$logger->error("This is another error");
- *</code>
+ * <code>
+ * use Phalcon\Logger;
+ * use Phalcon\Logger\Adapter\Stream;
+ *
+ * $logger = new Stream("php://stderr");
+ *
+ * $logger->log("This is a message");
+ * $logger->log(Logger::ERROR, "This is an error");
+ * $logger->error("This is another error");
+ * </code>
  */
-class Stream extends Adapter implements AdapterInterface
+class Stream extends Adapter
 {
 
 	/**

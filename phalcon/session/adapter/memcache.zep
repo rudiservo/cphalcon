@@ -3,10 +3,10 @@
  +------------------------------------------------------------------------+
  | Phalcon Framework                                                      |
  +------------------------------------------------------------------------+
- | Copyright (c) 2011-2015 Phalcon Team (http://www.phalconphp.com)       |
+ | Copyright (c) 2011-2017 Phalcon Team (https://phalconphp.com)          |
  +------------------------------------------------------------------------+
  | This source file is subject to the New BSD License that is bundled     |
- | with this package in the file docs/LICENSE.txt.                        |
+ | with this package in the file LICENSE.txt.                             |
  |                                                                        |
  | If you did not receive a copy of the license and are unable to         |
  | obtain it through the world-wide-web, please send an email             |
@@ -20,7 +20,6 @@
 namespace Phalcon\Session\Adapter;
 
 use Phalcon\Session\Adapter;
-use Phalcon\Session\AdapterInterface;
 use Phalcon\Cache\Backend\Memcache;
 use Phalcon\Cache\Frontend\Data as FrontendData;
 
@@ -29,26 +28,28 @@ use Phalcon\Cache\Frontend\Data as FrontendData;
  *
  * This adapter store sessions in memcache
  *
- *<code>
+ * <code>
  * use Phalcon\Session\Adapter\Memcache;
  *
- * $session = new Memcache([
- *    'uniqueId'   => 'my-private-app',
- *    'host'       => '127.0.0.1',
- *    'port'       => 11211,
- *    'persistent' => true,
- *    'lifetime'   => 3600,
- *    'prefix'     => 'my_'
- * ]);
+ * $session = new Memcache(
+ *     [
+ *         "uniqueId"   => "my-private-app",
+ *         "host"       => "127.0.0.1",
+ *         "port"       => 11211,
+ *         "persistent" => true,
+ *         "lifetime"   => 3600,
+ *         "prefix"     => "my_",
+ *     ]
+ * );
  *
  * $session->start();
  *
- * $session->set('var', 'some-value');
+ * $session->set("var", "some-value");
  *
- * echo $session->get('var');
- *</code>
+ * echo $session->get("var");
+ * </code>
  */
-class Memcache extends Adapter implements AdapterInterface
+class Memcache extends Adapter
 {
 	protected _memcache = null { get };
 
@@ -107,17 +108,17 @@ class Memcache extends Adapter implements AdapterInterface
 	/**
 	 * {@inheritdoc}
 	 */
-	public function read(string sessionId) -> var
+	public function read(string sessionId) -> string
 	{
-		return this->_memcache->get(sessionId, this->_lifetime);
+		return (string) this->_memcache->get(sessionId, this->_lifetime);
 	}
 
 	/**
 	 * {@inheritdoc}
 	 */
-	public function write(string sessionId, string data)
+	public function write(string sessionId, string data) -> boolean
 	{
-		this->_memcache->save(sessionId, data, this->_lifetime);
+		return this->_memcache->save(sessionId, data, this->_lifetime);
 	}
 
 	/**
@@ -133,7 +134,13 @@ class Memcache extends Adapter implements AdapterInterface
 			let id = sessionId;
 		}
 
-		return this->_memcache->delete(id);
+		this->removeSessionData();
+
+		if !empty id && this->_memcache->exists(id) {
+			return (bool) this->_memcache->delete(id);
+		}
+
+		return true;
 	}
 
 	/**
