@@ -18,6 +18,9 @@ use Phalcon\Mvc\Model\Resultset;
 use Phalcon\Mvc\Model\Row;
 use Phalcon\Mvc\ModelInterface;
 use Phalcon\Storage\Serializer\SerializerInterface;
+use Phalcon\Messages\Message;
+use Phalcon\Messages\MessageInterface;
+use Phalcon\Storage\Adapter\FirstLevelCache;
 
 /**
  * Phalcon\Mvc\Model\Resultset\Simple
@@ -36,6 +39,38 @@ class Simple extends Resultset
      * @var ModelInterface|Row
      */
     protected model;
+
+    /**
+     * @var string
+     */
+
+    protected modelName;
+
+    protected firstLevelCache = null;
+
+    protected metaData;
+
+    protected appended_uuid;
+
+    /**
+    * @var array;
+    */
+    protected appended;
+
+    /**
+    * @var array;
+    */
+    protected removed;
+
+    /**
+    * @var array;
+    */
+    protected errorMessages;
+
+    /**
+    * @var int
+    */
+    protected dirtyState = 1;
 
     /**
      * @var bool
@@ -65,7 +100,19 @@ class Simple extends Resultset
          * Set if the returned resultset must keep the record snapshots
          */
         let this->keepSnapshots = keepSnapshots;
+        let this->modelName = "Phalcon\\Mvc\\Model";
 
+        let this->appended_uuid = [];
+        let this->appended = [];
+        let this->removed = [];
+        let this->errorMessages = [];
+        if this->model instanceof Model {
+            if globals_get("orm.late_state_binding") {
+               let this->modelName = get_class(model);
+            }
+            let this->metaData = model->getModelsMetaData();
+            let this->firstLevelCache = model->getModelsManager()->getFirstLevelCache();
+        }
         parent::__construct(result, cache);
     }
 
@@ -74,7 +121,7 @@ class Simple extends Resultset
      */
     final public function current() -> <ModelInterface> | null
     {
-        var row, hydrateMode, columnMap, activeRow, modelName;
+        var row, hydrateMode, columnMap, activeRow, modelName, uuid;
 
         let activeRow = this->activeRow;
 
@@ -115,13 +162,12 @@ class Simple extends Resultset
                  * Set records as dirty state PERSISTENT by default
                  * Performs the standard hydration based on objects
                  */
-                if globals_get("orm.late_state_binding") {
-                    if this->model instanceof Model {
-                        let modelName = get_class(this->model);
-                    } else {
-                        let modelName = "Phalcon\\Mvc\\Model";
-                    }
-
+                if this->hasFirstLevelCache() {
+                    let uuid = this->metaData->getUUID(this->model, row);
+                    let activeRow = this->firstLevelCache->get(uuid);
+                }
+                if null === activeRow {
+                    let modelName = this->modelName;
                     let activeRow = {modelName}::cloneResultMap(
                         this->model,
                         row,
@@ -129,18 +175,13 @@ class Simple extends Resultset
                         Model::DIRTY_STATE_PERSISTENT,
                         this->keepSnapshots
                     );
-                } else {
-                    let activeRow = Model::cloneResultMap(
-                        this->model,
-                        row,
-                        columnMap,
-                        Model::DIRTY_STATE_PERSISTENT,
-                        this->keepSnapshots
-                    );
                 }
-
+                if this->hasFirstLevelCache() {
+                    let uuid = this->metaData->getUUID(this->model, row);
+                    activeRow->setModelUUID(uuid);
+                    this->firstLevelCache->set(uuid, activeRow);
+                }
                 break;
-
             default:
                 /**
                  * Other kinds of hydrations
@@ -157,6 +198,120 @@ class Simple extends Resultset
         let this->activeRow = activeRow;
 
         return activeRow;
+    }
+
+
+    public function getAppended() -> array
+    {
+        return array_merge(this->appended, this->appended_uuid);
+    }
+
+    public function getRemoved() -> array
+    {
+        return this->removed;
+    }
+
+    public function hasChanged() -> bool
+    {
+        return false === empty(this->appended) || false === this->appended_uuid || false === this->removed;
+    }
+
+    public function getModel() -> <ModelInterface> | null
+    {
+        return this->model;
+    }
+
+    public function getModelName() -> string | null
+    {
+        return this->modelName;
+    }
+
+    public function appendMessage(<MessageInterface> message) -> <Resultset>
+    {
+        let this->errorMessages[] = message;
+        return this;
+    }
+
+    public function append(<ModelInterface> model) -> bool
+    {
+        /**
+        * to add a list of appended witha model UUID if it's not a new model
+        *
+        */
+        var model_uuid;
+        if model instanceof this->model {
+            let model_uuid = model->getModelUUID();
+            if null !== model_uuid {
+                if false === array_key_exists(model_uuid, this->appended_uuid) {
+                    let this->appended_uuid[model_uuid] = model;
+                }
+            } else {
+                if false === array_search(model, this->appended) {
+                    let this->appended[] = model;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public function remove(<ModelInterface> model) -> bool
+    {
+        /**
+        * add a removed list with the model uuid, if it's new remove only from appended
+        */
+        var model_uuid;
+        var key;
+        if  model instanceof this->model {
+            let model_uuid = model->getModelUUID();
+            if null !== model_uuid {
+                if true === array_key_exists(model_uuid, this->appended_uuid) {
+                    unset(this->appended_uuid[model_uuid]);
+                }
+            } else {
+                let key = array_search(model, this->appended);
+                if false !== key {
+                    unset(this->appended[key]);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public function persist() -> bool
+    {
+        array removed, appended_uuid, appended;
+        var record;
+
+        if Model::DIRTY_STATE_TRANSIENT !== this->dirtyState {
+            return true;
+        }
+        let removed = this->removed;
+        let appended_uuid = this->appended_uuid;
+        let appended = this->appended;
+
+        for record in removed {
+            if false === record->delete() {
+                let this->errorMessages = record->getMessages();
+                return false;
+            }
+        }
+        for record in appended {
+            if false === record->persist() {
+                let this->errorMessages = record->getMessages();
+                return false;
+            } else {
+                // TODO: Add logic for objects still in memory.
+            }
+        }
+        for record in appended_uuid {
+            if false === record->persist() {
+                let this->errorMessages = record->getMessages();
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -320,6 +475,18 @@ class Simple extends Resultset
         if fetch keepSnapshots, resultset["keepSnapshots"] {
             let this->keepSnapshots = keepSnapshots;
         }
+        let this->modelName = "Phalcon\\Mvc\\Model";
+        let this->appended_uuid = [];
+        let this->appended = [];
+        let this->removed = [];
+        let this->errorMessages = [];
+        if this->model instanceof Model {
+            if globals_get("orm.late_state_binding") {
+               let this->modelName = get_class(this->model);
+            }
+            let this->metaData = this->model->getModelsMetaData();
+            let this->firstLevelCache = this->model->getModelsManager()->getFirstLevelCache();
+        }
     }
 
     public function __serialize() -> array
@@ -348,5 +515,27 @@ class Simple extends Resultset
         if fetch keepSnapshots, data["keepSnapshots"] {
             let this->keepSnapshots = keepSnapshots;
         }
+        let this->modelName = "Phalcon\\Mvc\\Model";
+        let this->appended_uuid = [];
+        let this->appended = [];
+        let this->removed = [];
+        let this->errorMessages = [];
+        if this->model instanceof Model {
+            if globals_get("orm.late_state_binding") {
+               let this->modelName = get_class(this->model);
+            }
+            let this->metaData = this->model->getModelsMetaData();
+            let this->firstLevelCache = this->model->getModelsManager()->getFirstLevelCache();
+        }
+    }
+
+    public function hasFirstLevelCache() -> bool
+    {
+        return null !== this->firstLevelCache && this->firstLevelCache instanceof FirstLevelCache;
+    }
+
+    public function getFirstLevelCache() -> <FirstLevelCache> | null
+    {
+        return this->firstLevelCache;
     }
 }

@@ -10,6 +10,7 @@
 
 namespace Phalcon\Mvc\Model;
 
+use Phalcon\Cache\Adapter\AdapterInterface as CacheAdapterInterface;
 use Phalcon\Db\Adapter\AdapterInterface;
 use Phalcon\Di\DiInterface;
 use Phalcon\Di\InjectionAwareInterface;
@@ -19,6 +20,7 @@ use Phalcon\Mvc\ModelInterface;
 use Phalcon\Mvc\Model\Query\Builder;
 use Phalcon\Mvc\Model\Query\BuilderInterface;
 use Phalcon\Mvc\Model\Query\StatusInterface;
+use Phalcon\Storage\Adapter\FirstLevelCache;
 use ReflectionClass;
 use ReflectionProperty;
 
@@ -220,6 +222,40 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
      * @var array
      */
     protected reusable = [];
+
+    /**
+     * @var array
+     */
+    protected transactionConnections = [];
+
+    /**
+     * FirstLevelCache that stores at a session/thread level instances of objects fetched from the database.
+     *
+     * @var CacheAdapterInterface
+     */
+    protected firstLevelCache = null;
+
+    /**
+     * Holds a list of dirty models
+     *
+     * @var array
+     */
+    protected dirty_list = [];
+
+
+    /**
+     * Holds a list of dirty models
+     *
+     * @var array
+     */
+    protected delete_list = [];
+
+    /**
+     * state of connection transaction
+     *
+     * @var bool
+     */
+     protected transaction = false;
 
     /**
      * Destroys the current PHQL cache
@@ -2368,5 +2404,151 @@ class Manager implements ManagerInterface, InjectionAwareInterface, EventsAwareI
         }
 
         return isset this->{collection}[keyRelation];
+    }
+
+
+    /**
+     * Sets a cache for model working in memory
+     */
+     public function setFirstLevelCache(<FirstLevelCache> cache) -> void
+     {
+         let this->firstLevelCache = cache;
+     }
+
+    /**
+     * Returns a cache instance or null if not configured
+     */
+    public function getFirstLevelCache() -> <FirstLevelCache> | null
+    {
+        return this->firstLevelCache;
+    }
+
+    /**
+     * Returns the model primary key
+     */
+
+     //  public function getModelPrimaryKey(<ModelInterface> model) -> string | null
+     //  {
+     //      var metaData;
+     //      var pks;
+     //      var column_map;
+     //      var pk;
+
+     //      let metaData = model->getModelsMetaData();
+     //      let pks = metaData->getPrimaryKeyAttributes(model);
+
+     //      if 0 < count(pks) {
+     //          let column_map = metaData->getColumnMap(model);
+     //          if column_map {
+     //              let pk = column_map[pks[0]];
+     //          } else {
+     //              let pk = pks[0];
+     //          }
+     //          return pk;
+     //      }
+     //      return null;
+     //  }
+
+    public function getModelUUID(<ModelInterface> model) -> string | null
+    {
+        var metaData;
+        let metaData = model->getModelsMetaData();
+        return metaData->getUUID(model);
+    }
+
+    /**
+     * TODO: Why do I need this???
+     */
+    public function modelEquals(<ModelInterface> first, <ModelInterface> other) -> bool
+    {
+        return this->getModelUUID(first) === this->getModelUUID(other);
+    }
+
+    public function startConnections() -> bool
+    {
+        array transactionConnections;
+        var container, key, connection;
+
+        let container = <DiInterface> this->container;
+        if unlikely typeof container != "object" {
+            throw new Exception(
+                "A dependency injection container is required to access the services related to the ORM"
+            );
+        }
+        let transactionConnections = this->transactionConnections;
+        if true === empty(transactionConnections) {
+            return false;
+        }
+        for key, connection in transactionConnections {
+            if null === connection {
+                let connection = <AdapterInterface> container->getShared(key);
+                if unlikely typeof connection != "object" {
+                    throw new Exception("Invalid injected connection service");
+                }
+                let this->transactionConnections[key] = connection;
+            }
+        }
+        return true;
+    }
+
+    public function begin() -> bool
+    {
+        array transactionConnections;
+        var connection;
+
+        if true === this->transaction {
+            return true;
+        }
+        if false === this->startConnections() {
+            return false;
+        }
+        let transactionConnections = this->transactionConnections;
+        for connection in transactionConnections {
+            if !connection->isUnderTransaction() {
+                connection->begin(false);
+            }
+        }
+        let this->transaction = true;
+        return true;
+    }
+
+    public function rollback() -> bool
+    {
+        array transactionConnections;
+        var connection;
+        if false === this->transaction {
+            return false;
+        }
+        let transactionConnections = this->transactionConnections;
+        for connection in transactionConnections {
+            connection->rollback(false);
+        }
+        return true;
+    }
+
+    public function commit() -> bool
+    {
+        array transactionConnections;
+        var connection;
+        if false === this->transaction {
+            return false;
+        }
+        let transactionConnections = this->transactionConnections;
+        for connection in transactionConnections {
+            connection->commit(false);
+        }
+        return true;
+    }
+
+    public function getTransactionConnections() -> array
+    {
+        return this->transactionConnections;
+    }
+
+    public function addTransactionConnection(string! key) -> void
+    {
+        if false === array_key_exists(key, this->transactionConnections) {
+            let this->transactionConnections[key] = null;
+        }
     }
 }

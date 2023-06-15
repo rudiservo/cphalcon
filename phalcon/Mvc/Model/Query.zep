@@ -319,6 +319,9 @@ class Query implements QueryInterface, InjectionAwareInterface
                  */
                 if uniqueRow {
                     let preparedResult = result->getFirst();
+                    /**
+                     * TODO: ADD to FLC
+                     */
                 } else {
                     let preparedResult = result;
                 }
@@ -1297,6 +1300,9 @@ class Query implements QueryInterface, InjectionAwareInterface
                 let isKeepingSnapshots = (bool) manager->isKeepingSnapshots(resultObject);
             }
 
+            /**
+             * Use Custom Resultsets by declaring function getResultsetClass in Model.
+             */
             if resultObject instanceof ModelInterface && method_exists(resultObject, "getResultsetClass") {
                 let resultsetClassName = (<ModelInterface> resultObject)->getResultsetClass();
 

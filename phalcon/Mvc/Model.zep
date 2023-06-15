@@ -92,9 +92,33 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
     const TRANSACTION_INDEX = "transaction";
 
     /**
+     * Persist was trigger but not finished
+     */
+     const DIRTY_STATE_EXECUTED  = 3;
+
+    /**
      * @var int
      */
     protected dirtyState = 1;
+
+    /**
+     * @var string | null
+     * TODO: Make it always array in code (dont remember why I came to this conclusion)
+     */
+    protected model_uuid = null;
+
+    protected hasFirstLevelCache;
+
+    /**
+     * TODO: DELETE dirtyRelated
+     * @var array
+     */
+    protected dirtyPreRelated = [];
+
+     /**
+      * @var array
+      */
+    protected dirtyPostRelated = [];
 
     /**
      * @var array
@@ -194,6 +218,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
                     "The injected service 'modelsManager' is not valid"
                 );
             }
+            let this->hasFirstLevelCache = (null !== modelsManager->getFirstLevelCache());
         }
 
         /**
@@ -429,7 +454,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
             if typeof relation === "object" {
                 let dirtyState = this->dirtyState;
 
-                if (value->getDirtyState() != dirtyState) {
+                if (value->getDirtyState() != dirtyState && this->dirtyState != self::DIRTY_STATE_EXECUTED) {
                     let dirtyState = self::DIRTY_STATE_TRANSIENT;
                 }
 
@@ -470,8 +495,10 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
 
                             unset this->related[lowerProperty];
 
-                            let this->dirtyRelated[lowerProperty] = referencedModel,
-                                this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+                            let this->dirtyRelated[lowerProperty] = referencedModel;
+                            if this->dirtyState !== self::DIRTY_STATE_EXECUTED {
+                                let this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+                            }
 
                             return value;
                         }
@@ -493,8 +520,10 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
                         unset this->related[lowerProperty];
 
                         if count(related) > 0 {
-                            let this->dirtyRelated[lowerProperty] = related,
-                                this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+                            let this->dirtyRelated[lowerProperty] = related;
+                            if this->dirtyState !== self::DIRTY_STATE_EXECUTED {
+                                let this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+                            }
                         } else {
                             unset this->dirtyRelated[lowerProperty];
                         }
@@ -1146,9 +1175,28 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
             if typeof record !== "object" || !(record instanceof ModelInterface) {
                 continue;
             }
+            // if typeof record !== "object"
+            //     || !(record instanceof ModelInterface
+            //         && ( record instanceof \Phalcon\Mvc\Model\Resultset
+            //             && record->isDirty() )) {
+            //     continue;
+            // }
+            if record->getDirtyState() !== self::DIRTY_STATE_EXECUTED {
+                record->setDirtyState(self::DIRTY_STATE_TRANSIENT);
+            }
 
-            record->setDirtyState(self::DIRTY_STATE_TRANSIENT);
             let dirtyRelated[name] = record;
+
+            // if !isset dirtyRelated[name] {
+            //     if typeof record  === "object"
+            //         && ( record instanceof ModelInterface
+            //             || ( record instanceof \Phalcon\Mvc\Model\Resultset
+            //                 && record->isDirty() )
+            //             ) {
+            //         record->setDirtyState(self::DIRTY_STATE_TRANSIENT);
+            //         let dirtyRelated[name] = record;
+            //     }
+            // }
         }
 
         return dirtyRelated;
@@ -1267,6 +1315,11 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
             success;
         array values, bindTypes, conditions;
 
+        if self::DIRTY_STATE_EXECUTED === this->dirtyState || self::DIRTY_STATE_DETACHED === this->dirtyState {
+            return true;
+        }
+
+        let this->dirtyState = self::DIRTY_STATE_EXECUTED;
         let metaData = this->getModelsMetaData(),
             writeConnection = this->getWriteConnection();
 
@@ -2563,161 +2616,26 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
      */
     public function save() -> bool
     {
-        var metaData, schema, writeConnection, readConnection, source, table,
-            identityField, exists, success, relatedToSave;
-        bool hasRelatedToSave;
-
-        let metaData = this->getModelsMetaData();
+        var transaction, success, ex;
 
         /**
-         * Create/Get the current database connection
+         * Create/Get the current database connection and start a transaction;
          */
-        let writeConnection = this->getWriteConnection();
+        if true === this->hasFirstLevelCache {
+            let transaction = this->modelsManager->begin();
+        }
 
         /**
-         * Fire the start event
+         * persist the model
          */
-        this->fireEvent("prepareSave");
-
-        /**
-         * Load unsaved related records and collect
-         * previously queried related records that
-         * may have been modified
-         */
-        let relatedToSave = this->collectRelatedToSave();
-
-        /**
-         * Does it have unsaved related records
-         */
-        let hasRelatedToSave = count(relatedToSave) > 0;
-
-        if hasRelatedToSave {
-            if this->preSaveRelatedRecords(writeConnection, relatedToSave) === false {
-                return false;
+        try {
+            let success = this->persist();
+        } catch \Exception, ex {
+            if transaction {
+                this->modelsManager->rollback();
             }
+            throw new Exception(ex->getMessage());
         }
-
-        let schema = this->getSchema(),
-            source = this->getSource();
-
-        if schema {
-            let table = [schema, source];
-        } else {
-            let table = source;
-        }
-
-        /**
-         * Create/Get the current database connection
-         */
-        let readConnection = this->getReadConnection();
-
-        /**
-         * We need to check if the record exists
-         */
-        let exists = this->has(metaData, readConnection);
-
-        if exists {
-            let this->operationMade = self::OP_UPDATE;
-        } else {
-            let this->operationMade = self::OP_CREATE;
-        }
-
-        /**
-         * Clean the messages
-         */
-        let this->errorMessages = [];
-
-        /**
-         * Query the identity field
-         */
-        let identityField = metaData->getIdentityField(this);
-
-        /**
-         * preSave() makes all the validations
-         */
-        if this->preSave(metaData, exists, identityField) === false {
-            /**
-             * Rollback the current transaction if there was validation errors
-             */
-            if hasRelatedToSave {
-                writeConnection->rollback(false);
-            }
-
-            /**
-             * Throw exceptions on failed saves?
-             */
-            if unlikely globals_get("orm.exception_on_failed_save") {
-                /**
-                 * Launch a Phalcon\Mvc\Model\ValidationFailed to notify that
-                 * the save failed
-                 */
-                throw new ValidationFailed(
-                    this,
-                    this->getMessages()
-                );
-            }
-
-            return false;
-        }
-
-        /**
-         * Depending if the record exists we do an update or an insert operation
-         */
-        if exists {
-            let success = this->doLowUpdate(metaData, writeConnection, table);
-        } else {
-            let success = this->doLowInsert(
-                metaData,
-                writeConnection,
-                table,
-                identityField
-            );
-        }
-
-        /**
-         * Change the dirty state to persistent
-         */
-        if success {
-            let this->dirtyState = self::DIRTY_STATE_PERSISTENT;
-        }
-
-        if hasRelatedToSave {
-            /**
-             * Rollbacks the implicit transaction if the master save has failed
-             */
-            if success === false {
-                writeConnection->rollback(false);
-            } else {
-                /**
-                 * Save the post-related records
-                 */
-                let success = this->postSaveRelatedRecords(
-                    writeConnection,
-                    relatedToSave
-                );
-            }
-        }
-
-        /**
-         * postSave() invokes after* events if the operation was successful
-         */
-        if globals_get("orm.events") {
-            let success = this->postSave(success, exists);
-        }
-
-        if success === false {
-            this->cancelOperation();
-        } else {
-            if hasRelatedToSave {
-                /**
-                 * Clear unsaved related records storage
-                 */
-                let this->dirtyRelated = [];
-            }
-
-            this->fireEvent("afterSave");
-        }
-
         return success;
     }
 
@@ -4317,15 +4235,16 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
             uniqueParams,
             uniqueTypes
         );
-
         if num["rowcount"] {
-            let this->dirtyState = self::DIRTY_STATE_PERSISTENT;
-
+            if this->dirtyState !== self::DIRTY_STATE_EXECUTED && this->dirtyState !== self::DIRTY_STATE_TRANSIENT {
+                let this->dirtyState = self::DIRTY_STATE_PERSISTENT;
+            }
             return true;
         } else {
-            let this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+            if this->dirtyState !== self::DIRTY_STATE_EXECUTED {
+                let this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+            }
         }
-
         return false;
     }
 
@@ -4904,17 +4823,17 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
      * @param ModelInterface[] related
      * @return bool
      */
-    protected function preSaveRelatedRecords(<AdapterInterface> connection, related) -> bool
+    protected function preSaveRelatedRecords(<AdapterInterface> connection, var related) -> bool
     {
-        var className, manager, type, relation, columns, referencedFields,
-            message, nesting, name, record;
+        var className, manager, type, relation, columns, column_count, referencedFields, nesting, name, record, i;
 
         let nesting = false;
-
-        /**
-         * Start an implicit transaction
-         */
-        connection->begin(nesting);
+        if false === this->hasFirstLevelCache {
+            /**
+            * Start an implicit transaction
+            */
+            connection->begin(nesting);
+        }
 
         let className = get_class(this),
             manager = <ManagerInterface> this->getModelsManager();
@@ -4939,65 +4858,54 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
                  */
                 if type == Relation::BELONGS_TO {
                     if unlikely typeof record !== "object" {
-                        connection->rollback(nesting);
-
+                        if true === this->hasFirstLevelCache {
+                            manager->rollback();
+                        } else {
+                            connection->rollback(nesting);
+                        }
                         throw new Exception(
                             "Only objects can be stored as part of belongs-to relations"
                         );
                     }
-
-                    let columns = relation->getFields(),
-                        referencedFields = relation->getReferencedFields();
-//                    let columns = relation->getFields(),
-//                        referencedModel = relation->getReferencedModel(),
-//                        referencedFields = relation->getReferencedFields();
-
-                    if unlikely typeof columns === "array" {
-                        connection->rollback(nesting);
-
-                        throw new Exception("Not implemented");
-                    }
-
                     /**
                      * If dynamic update is enabled, saving the record must not take any action
                      * Only save if the model is dirty to prevent circular relations causing an infinite loop
                      */
-                    if record->dirtyState !== Model::DIRTY_STATE_PERSISTENT && !record->save() {
+                    if record->dirtyState !== Model::DIRTY_STATE_PERSISTENT && !record->persist() {
                         /**
                          * Get the validation messages generated by the
                          * referenced model
                          */
-                        for message in record->getMessages() {
-                            /**
-                             * Set the related model
-                             */
-                            if typeof message == "object" {
-                                message->setMetaData(
-                                    [
-                                        "model": record
-                                    ]
-                                );
-                            }
-
-                            /**
-                             * Appends the messages to the current model
-                             */
-                            this->appendMessage(message);
+                        this->appendMessagesFrom(record);
+                        if false === this->hasFirstLevelCache {
+                            connection->rollback(nesting);
                         }
-
-                        /**
-                         * Rollback the implicit transaction
-                         */
-                        connection->rollback(nesting);
-
                         return false;
                     }
-
-                    /**
-                     * Read the attribute from the referenced model and assign
-                     * it to the current model
-                     */
-                    let this->{columns} = record->readAttribute(referencedFields);
+                    let columns = relation->getFields(),
+                        referencedFields = relation->getReferencedFields();
+                    if this->getOperationMade() !== self::OP_DELETE {
+                        if is_array(columns) || is_array(referencedFields) {
+                            let column_count = count(columns);
+                            if is_array(columns) && is_array(referencedFields) && column_count == count(referencedFields) {
+                                let column_count = (column_count - 1);
+                                for i in range(0, column_count) {
+                                    this->writeAttribute(columns[i], record->readAttribute(referencedFields[i]));
+                                }
+                            } else {
+                                if true === this->hasFirstLevelCache {
+                                    manager->rollback();
+                                } else {
+                                    connection->rollback(nesting);
+                                }
+                                throw new Exception(
+                                    "The column array in the model '" . className . "' with relation'" . relation . "' is inconsistent"
+                                );
+                            }
+                        } else {
+                            this->writeAttribute(columns, record->readAttribute(referencedFields));
+                        }
+                    }
                 }
             }
         }
@@ -5031,12 +4939,12 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
      */
     protected function postSaveRelatedRecords(<AdapterInterface> connection, related) -> bool
     {
-        var nesting, className, manager, relation, name, record, message,
-            columns, referencedModel, referencedFields, relatedRecords, value,
-            recordAfter, intermediateModel, intermediateFields,
-            intermediateValue, intermediateModelName,
-            intermediateReferencedFields, existingIntermediateModel;
+        var className, referenceName, manager, relation, name, record,
+            columns, referencedModel, referencedFields, relatedRecords, value, values,
+            recordAfter, intermediateModel, intermediateField, intermidiateQuery, intermediateFields, intermediateModelName,
+            intermediateReferencedFields, existingIntermediateModel, column, referencedField,referenceValue, referenceValues, nesting;
         bool isThrough;
+        int column_count, reference_count, i;
 
         let nesting = false,
             className = get_class(this),
@@ -5044,215 +4952,223 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
 
         for name, record in related {
             /**
-             * Try to get a relation with the same name
-             */
+            * Try to get a relation with the same name
+            */
             let relation = <RelationInterface> manager->getRelationByAlias(
                 className,
                 name
             );
 
-            if typeof relation === "object" {
-                /**
-                 * Discard belongsTo relations
-                 */
-                if relation->getType() == Relation::BELONGS_TO {
-                    continue;
-                }
+            if typeof relation == "object" {
 
-                if unlikely (typeof record !== "object" && typeof record !== "array") {
-                    connection->rollback(nesting);
+                if relation->getType() != Relation::BELONGS_TO {
 
-                    throw new Exception(
-                        "Only objects/arrays can be stored as part of has-many/has-one/has-one-through/has-many-to-many relations"
-                    );
-                }
+                    if unlikely (typeof record !== "object" && typeof record !== "array") {
 
-                let columns = relation->getFields(),
-                    referencedModel = relation->getReferencedModel(),
-                    referencedFields = relation->getReferencedFields();
-
-                if unlikely typeof columns === "array" {
-                    connection->rollback(nesting);
-
-                    throw new Exception("Not implemented");
-                }
-
-                /**
-                 * Create an implicit array for has-many/has-one records
-                 */
-                if typeof record === "object" {
-                    let relatedRecords = [record];
-                } else {
-                    let relatedRecords = record;
-                }
-
-                if unlikely !fetch value, this->{columns} {
-                    connection->rollback(nesting);
-
-                    throw new Exception(
-                        "The column '" . columns . "' needs to be present in the model"
-                    );
-                }
-
-                /**
-                 * Get the value of the field from the current model
-                 * Check if the relation is a has-many-to-many
-                 */
-                let isThrough = (bool) relation->isThrough();
-
-                /**
-                 * Get the rest of intermediate model info
-                 */
-                if isThrough {
-                    let intermediateModelName = relation->getIntermediateModel(),
-                        intermediateFields = relation->getIntermediateFields(),
-                        intermediateReferencedFields = relation->getIntermediateReferencedFields();
-                }
-
-                for recordAfter in relatedRecords {
-                    /**
-                     * For non has-many-to-many relations just assign the local
-                     * value in the referenced model
-                     */
-                    if !isThrough {
-                        /**
-                         * Assign the value to the
-                         */
-                        recordAfter->writeAttribute(referencedFields, value);
-                    }
-
-                    /**
-                     * Save the record and get messages
-                     */
-                    if !recordAfter->save() {
-                        /**
-                         * Get the validation messages generated by the
-                         * referenced model
-                         */
-                        for message in recordAfter->getMessages() {
-                            /**
-                             * Set the related model
-                             */
-                            if typeof message === "object" {
-                                message->setMetaData(
-                                    [
-                                        "model": recordAfter
-                                    ]
-                                );
-                            }
-
-                            /**
-                             * Appends the messages to the current model
-                             */
-                            this->appendMessage(message);
+                        if this->hasFirstLevelCache {
+                            manager->rollback();
+                        } else {
+                            connection->rollback(nesting);
                         }
+                        throw new Exception(
+                            "Only objects/arrays can be stored as part of has-many/has-one/has-one-through/has-many-to-many relations on model " . className . " on Relation " . name
+                        );
 
-                        /**
-                         * Rollback the implicit transaction
-                         */
-                        connection->rollback(nesting);
-
-                        return false;
                     }
 
+                    let columns = relation->getFields(),
+                        referencedModel = relation->getReferencedModel(),
+                        referencedFields = relation->getReferencedFields();
+
+                    /**
+                     * Array columns in reference fields
+                     */
+
+                    if unlikely is_array(columns) || is_array(referencedFields) {
+                        let column_count = count(columns) - 1;
+                    } else {
+                        let columns = [columns];
+                        let column_count = 0;
+                    }
+                    if unlikely is_array(referencedFields) {
+                        let reference_count = count(reference_count) - 1;
+                    } else {
+                        let referencedFields = [referencedFields];
+                        let reference_count = 0;
+                    }
+                    let values = [];
+                    for i in range (0, column_count) {
+                        let column = columns[i];
+                        if unlikely !fetch value, this->{column} {
+                            if this->hasFirstLevelCache {
+                                manager->rollback();
+                            } else {
+                                connection->rollback(nesting);
+                            }
+                            throw new Exception(
+                                "The column '" . column . "' needs to be present in the model " . className
+                            );
+                        }
+                        let values[i] = value;
+                    }
+                    /**
+                     * Create an implicit array for has-many/has-one records
+                     * TODO: this should not matter since all persist is going to be called
+                     */
+                    if typeof record === "object" && record instanceof \Phalcon\Mvc\ModelInterface {
+                        let relatedRecords = [record];
+                    } else {
+                        let relatedRecords = record;
+                    }
+
+                    /**
+                     * Get the value of the field from the current model
+                     * Check if the relation is a has-many-to-many
+                     */
+                    let isThrough = (bool) relation->isThrough();
+
+                    /**
+                     * Get the rest of intermediate model info
+                     * not saving records after if not many to many
+                     * not saving array on persistrecordsafter
+                     */
                     if isThrough {
                         /**
-                         * Create a new instance of the intermediate model
+                         * Array columns in reference fields
                          */
+                        let intermediateModelName = relation->getIntermediateModel(),
+                            intermediateFields = relation->getIntermediateFields(),
+                            intermediateReferencedFields = relation->getIntermediateReferencedFields();
+
+                        if unlikely is_array(intermediateFields) || is_array(intermediateReferencedFields) {
+                            if !(is_array(intermediateFields) && is_array(intermediateReferencedFields) && count(intermediateFields) === column_count && count(intermediateReferencedFields) === reference_count) {
+                                if this->hasFirstLevelCache {
+                                    manager->rollback();
+                                } else {
+                                    connection->rollback(nesting);
+                                }
+                                throw new Exception(
+                                    "The column array in the model '" . className . "' on Relation'" . relation . "' is inconsistent"
+                                );
+                            }
+                        } else {
+                            let intermediateFields = [intermediateFields];
+                            let intermediateReferencedFields = [intermediateReferencedFields];
+                        }
                         let intermediateModel = <ModelInterface> manager->load(
                             intermediateModelName
                         );
-
-                        /**
-                         * Has-one-through relations can only use one intermediate model.
-                         * If it already exist, it can be updated with the new referenced key.
-                         */
-                        if relation->getType() == Relation::HAS_ONE_THROUGH {
+                        for recordAfter in relatedRecords {
+                            if !this->persistRecordAfter(recordAfter) {
+                                if false === this->hasFirstLevelCache {
+                                    connection->rollback(nesting);
+                                }
+                                return false;
+                            }
+                            /**
+                             *  Has-one-through relations can only use one intermediate model.
+                             *  If it already exist, it can be updated with the new referenced key.
+                             *
+                             *  TODO:intermediateFields are an array, a query build must be made.
+                             *
+                             */
+                            let referenceValues = [];
+                            let intermediateField = intermediateFields[0];
+                            let intermidiateQuery = "[" . intermediateField . "] = ?0";
+                            for i in range(1, column_count) {
+                                let intermediateField = intermediateFields[i];
+                                let intermidiateQuery = "and [" . intermediateField . "] = ?0";
+                            }
+                            for i in range(0, reference_count) {
+                                let intermediateField = intermediateReferencedFields[i];
+                                let intermidiateQuery = "and [" . intermediateField . "] = ?0";
+                                let referencedField = referencedFields[i];
+                                if unlikely !fetch referenceValue, recordAfter->{referencedField} {
+                                    let referenceName = (string) get_class(referencedModel);
+                                    if true === this->hasFirstLevelCache {
+                                        manager->rollback();
+                                    } else {
+                                        connection->rollback(nesting);
+                                    }
+                                    return false;
+                                }
+                                let referenceValues[i] = referenceValue;
+                            }
                             let existingIntermediateModel = intermediateModel->findFirst(
                                 [
-                                    "[" . intermediateFields . "] = ?0",
-                                    "bind": [value]
+                                    "[" . intermidiateQuery . "] = ?0",
+                                    "bind": array_merge(values, referenceValues)
                                 ]
                             );
 
                             if existingIntermediateModel {
                                 let intermediateModel = existingIntermediateModel;
                             }
-                        }
 
-                        /**
-                         * Write value in the intermediate model
-                         */
-                        intermediateModel->writeAttribute(
-                            intermediateFields,
-                            value
-                        );
-
-                        /**
-                         * Get the value from the referenced model
-                         */
-                        let intermediateValue = recordAfter->readAttribute(
-                            referencedFields
-                        );
-
-                        /**
-                         * Write the intermediate value in the intermediate model
-                         */
-                        intermediateModel->writeAttribute(
-                            intermediateReferencedFields,
-                            intermediateValue
-                        );
-
-                        /**
-                         * Save the record and get messages
-                         */
-                        if !intermediateModel->save() {
                             /**
-                             * Get the validation messages generated by the referenced model
+                             * Write value in the intermediate model
                              */
-                            for message in intermediateModel->getMessages() {
-                                /**
-                                 * Set the related model
-                                 */
-                                if typeof message === "object" {
-                                    message->setMetaData(
-                                        [
-                                            "model": intermediateModel
-                                        ]
-                                    );
-                                }
-
-                                /**
-                                 * Appends the messages to the current model
-                                 */
-                                this->appendMessage(message);
+                            for i in range(0, column_count) {
+                                let column = columns[i];
+                                intermediateModel->writeAttribute(intermediateFields[i], this->{column});
+                            }
+                            for i in range(0, reference_count) {
+                                let referencedField = referencedFields[i];
+                                intermediateModel->writeAttribute(intermediateReferencedFields[i], recordAfter->{referencedField});
                             }
 
                             /**
-                             * Rollback the implicit transaction
+                             * Save the record and get messages
                              */
-                            connection->rollback(nesting);
-
-                            return false;
+                            if !this->persistRecordAfter(intermediateModel) {
+                                if false === this->hasFirstLevelCache {
+                                    connection->rollback(nesting);
+                                }
+                                return false;
+                            }
+                        }
+                    } else {
+                        if unlikely !(is_array(columns) && is_array(referencedFields) && column_count == reference_count) {
+                            if this->hasFirstLevelCache {
+                                manager->rollback();
+                            } else {
+                                connection->rollback(nesting);
+                            }
+                            throw new Exception(
+                                "The column array in the model '" . className . "' on Relation'" . relation . "' is inconsistent"
+                            );
+                        }
+                        for recordAfter in relatedRecords {
+                            for i in range(0, column_count) {
+                                let referencedField = referencedFields[i];
+                                let value = values[i];
+                                recordAfter->writeAttribute(referencedField, value);
+                            }
+                            if !this->persistRecordAfter(recordAfter) {
+                                if false === this->hasFirstLevelCache {
+                                    connection->rollback(nesting);
+                                }
+                                return false;
+                            }
                         }
                     }
                 }
             } else {
                 if unlikely typeof record !== "array" {
-                    connection->rollback(nesting);
-
+                    if true === this->hasFirstLevelCache {
+                        manager->rollback();
+                    } else {
+                        connection->rollback(nesting);
+                    }
                     throw new Exception(
-                        "There are no defined relations for the model '" . className . "' using alias '" . name . "'"
+                        "There are no defined relations for the model '" . className . "' on Relation '" . name . "'"
                     );
                 }
             }
         }
-
-        /**
-         * Commit the implicit transaction
-         */
-        connection->commit(nesting);
-
+        if false === this->hasFirstLevelCache {
+            connection->commit(nesting);
+        }
         return true;
     }
 
@@ -5900,6 +5816,228 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
     {
         return count(this->errorMessages) > 0;
     }
+
+    /**
+     * Set Model Unique ID to be used for First Level Cache
+     */
+    public function setModelUUID(string model_uuid) -> void
+    {
+        let this->model_uuid = model_uuid;
+    }
+
+    /**
+     * Set Model Unique ID to be used for First Level Cache
+     */
+    public function getModelUUID() -> string | null
+    {
+        return this->model_uuid;
+    }
+
+    /**
+     * Used to destroy reference in WeakCache
+     *
+     * @return void
+     */
+    public function __destruct()
+    {
+        if true === this->hasFirstLevelCache {
+            var flc;
+            let flc = this->modelsManager->FirstLevelCache;
+            flc->delete(this->model_uuid);
+        }
+    }
+
+    public function appendMessagesFrom(var record) -> void
+    {
+        var messages, message;
+        var model;
+        let messages = record->getMessages();
+        if false === empty(messages) {
+            for message in messages {
+                if typeof message == "object" {
+                    if record instanceof \Phalcon\Mvc\Model\Resultset {
+                        let model = record->getModel();
+                    } else {
+                        let model = record;
+                    }
+                    message->setMetaData(
+                        [
+                            "model": model
+                        ]
+                    );
+                }
+                /**
+                 * Appends the messages to the current model
+                 */
+                this->appendMessage(message);
+            }
+        }
+    }
+
+    public function persistRecordAfter(record) -> bool
+    {
+        if !record->persist() {
+            this->appendMessagesFrom(record);
+            return false;
+        }
+        return true;
+    }
+
+    public function hasRelatedToSave() -> bool
+    {
+        return count(this->dirtyRelated) > 0;
+    }
+
+    public function persist() -> bool
+    {
+        var metaData, schema, readConnection, source, table, writeConnection, identityField, exists, relatedToSave;
+        var hasRelatedToSave;
+        var success;
+
+        /**
+         * only run if the state is transient
+         */
+        if self::DIRTY_STATE_EXECUTED === this->dirtyState {
+            return true;
+        }
+        /**
+         * Change State to Executed so it wont go into an endless loop
+         */
+        let this->dirtyState = self::DIRTY_STATE_EXECUTED;
+
+        let metaData = this->getModelsMetaData();
+
+        let writeConnection = this->getWriteConnection();
+        /**
+         * Fire the start event
+         */
+        this->fireEvent("prepareSave");
+
+        /**
+         * Load unsaved related records and collect
+         * previously queried related records that
+         * may have been modified
+         */
+        let relatedToSave = this->collectRelatedToSave();
+        /**
+         * Does it have unsaved related records
+         */
+
+        let hasRelatedToSave = count(relatedToSave) > 0;
+
+        if hasRelatedToSave {
+            if false === this->preSaveRelatedRecords(writeConnection, relatedToSave) {
+                return false;
+            }
+        }
+
+        let schema = this->getSchema(),
+            source = this->getSource();
+
+        if schema {
+            let table = [schema, source];
+        } else {
+            let table = source;
+        }
+
+        /**
+         * Create/Get the current database connection
+         */
+        let readConnection = this->getReadConnection();
+
+        /**
+         * We need to check if the record exists
+         */
+        let exists = this->has(metaData, readConnection);
+
+        if exists {
+            let this->operationMade = self::OP_UPDATE;
+        } else {
+            let this->operationMade = self::OP_CREATE;
+        }
+
+        /**
+         * Clean the messages
+         */
+        let this->errorMessages = [];
+
+        /**
+         * Query the identity field
+         */
+        let identityField = metaData->getIdentityField(this);
+
+        /**
+         * preSave() makes all the validations
+         */
+        if this->preSave(metaData, exists, identityField) === false {
+            /**
+            * Throw exceptions on failed saves?
+            */
+            if hasRelatedToSave && false === this->hasFirstLevelCache {
+                writeConnection->rollback(false);
+            }
+            if unlikely globals_get("orm.exception_on_failed_save") {
+                /**
+                * Launch a Phalcon\Mvc\Model\ValidationFailed to notify that
+                * the save failed
+                */
+                throw new ValidationFailed(
+                    this,
+                    this->getMessages()
+                );
+            }
+            return false;
+        }
+
+        /**
+         * Depending if the record exists we do an update or an insert operation
+         */
+        if exists {
+            let success = this->doLowUpdate(metaData, writeConnection, table);
+        } else {
+            let success = this->doLowInsert(
+                metaData,
+                writeConnection,
+                table,
+                identityField
+            );
+        }
+
+        /**
+         * Change the dirty state to persistent
+         */
+        if success {
+            if hasRelatedToSave {
+                /**
+                * Save the post-related records
+                */
+                let success = this->postSaveRelatedRecords(
+                    writeConnection,
+                    relatedToSave
+                );
+                if true === success {
+                    let this->dirtyRelated = [];
+                }
+            }
+            /**
+             * postSave() invokes after* events if the operation was successful
+             */
+            if globals_get("orm.events") {
+                let success = this->postSave(success, exists);
+            }
+            let this->dirtyState = self::DIRTY_STATE_PERSISTENT;
+        }
+        if false === success {
+            if false === this->hasFirstLevelCache {
+                writeConnection->rollback(false);
+            }
+            let this->dirtyState = self::DIRTY_STATE_TRANSIENT;
+            this->cancelOperation();
+        } else {
+            this->fireEvent("afterSave");
+        }
+        return success;
+     }
 
     /**
      * Attempts to find key case-insensitively

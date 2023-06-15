@@ -36,9 +36,14 @@ use Phalcon\Mvc\ModelInterface;
  *
  * print_r($attributes);
  * ```
+ *
+ * @todo each model should have it's metadata object with all the functions regarding that only that model MetaData, currenty this MetaData is more of a MetaDataManager, this class get's called extenssivly and performs the same getting models Unique ID and fetch whatever metadata an operation needs, we could increase performance by a few cycles if we figure this out.
  */
 abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
 {
+    /**
+     * Current at 13
+     */
     const MODELS_ATTRIBUTES = 0;
     const MODELS_AUTOMATIC_DEFAULT_INSERT = 10;
     const MODELS_AUTOMATIC_DEFAULT_UPDATE = 11;
@@ -55,6 +60,7 @@ abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
     const MODELS_NOT_NULL = 3;
     const MODELS_PRIMARY_KEY = 1;
     const MODELS_REVERSE_COLUMN_MAP = 1;
+
 
     /**
      * @var CacheAdapterInterface|null
@@ -580,21 +586,8 @@ abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
      */
     final public function readMetaData(<ModelInterface> model) -> array
     {
-        var source, schema;
-        string key;
-
-        let source = model->getSource(),
-            schema = model->getSchema();
-
-        /*
-         * Unique key for meta-data is created using class-name-schema-source
-         */
-        let key = get_class_lower(model) . "-" . schema . source;
-
-        if !isset this->metaData[key] {
-            this->initialize(model, key, source, schema);
-        }
-
+        var key;
+        let key = this->getModelUniqueKey(model, true);
         return this->metaData[key];
     }
 
@@ -612,21 +605,8 @@ abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
      */
     final public function readMetaDataIndex(<ModelInterface> model, int index)
     {
-        var source, schema;
-        string key;
-
-        let source = model->getSource(),
-            schema = model->getSchema();
-
-        /*
-         * Unique key for meta-data is created using class-name-schema-source
-         */
-        let key = get_class_lower(model) . "-" . schema . source;
-
-        if !isset this->metaData[key][index] {
-            this->initialize(model, key, source, schema);
-        }
-
+        var key;
+        let key = this->getModelUniqueKey(model, true, index);
         return this->metaData[key][index];
     }
 
@@ -758,25 +738,12 @@ abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
      */
     final public function writeMetaDataIndex(<ModelInterface> model, int index, var data) -> void
     {
-        var source, schema;
-        string key;
+        var key;
 
         if unlikely (typeof data != "array" && typeof data != "string" && typeof data != "boolean") {
             throw new Exception("Invalid data for index");
         }
-
-        let source = model->getSource(),
-            schema = model->getSchema();
-
-        /*
-         * Unique key for meta-data is created using class-name-schema-table
-         */
-        let key = get_class_lower(model) . "-" . schema . source;
-
-        if !isset this->metaData[key] {
-            this->initialize(model, key, source, schema);
-        }
-
+        let key = this->getModelUniqueKey(model, true);
         let this->metaData[key][index] = data;
     }
 
@@ -871,6 +838,7 @@ abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
          * Get the meta-data extraction strategy
          */
         if typeof strategy != "object" {
+        // if null === strategy {
             let container = this->getDI(),
                 strategy = this->getStrategy();
         }
@@ -919,5 +887,43 @@ abstract class MetaData implements InjectionAwareInterface, MetaDataInterface
         }
 
         return value;
+    }
+
+    /**
+     * @todo IMO the classname including namespace is already unique, unless you have two different models with the same namespace or something is changing schema and source halfway during a save of after fetching something it's not only a bad idea, it's living dangerously with Murphy's Law. This is a waste of cycles IMO.
+     */
+    public function getModelUniqueKey(<ModelInterface> model, boolean initialize = false, int index = null) -> string
+    {
+        var source, schema;
+        string key;
+        let source = model->getSource(),
+            schema = model->getSchema();
+        /*
+         * Unique key for meta-data is created using class-name-schema-source
+         * TODO - why are we wasting cycles on getting the Class to lowercase?
+         */
+        let key = get_class_lower(model) . "-" . schema . source;
+        if (initialize && !isset this->metaData[key]) || (null !== index && !isset this->metaData[key][index]) {
+            this->initialize(model, key, source, schema);
+        }
+        return key;
+    }
+
+    /**
+     * Returns the model UniqueID based on model and array row primary key(s) value(s)
+     */
+    public function getUUID(<ModelInterface> model, array row) -> string | null
+    {
+        var pk, pks, uuid;
+        let pks = this->readMetaDataIndex(model, self::MODELS_PRIMARY_KEY);
+        if null === pks {
+            return null;
+        }
+        let uuid = this->getModelUniqueKey(model);
+        for pk in pks {
+            // let uuid = uuid . model->{pk};
+            let uuid = uuid . "::" . row[pk];
+        }
+        return uuid;
     }
 }
