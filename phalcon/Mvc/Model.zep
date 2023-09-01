@@ -1130,33 +1130,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
      */
     protected function collectRelatedToSave() -> array
     {
-        var name, record;
-        array related, dirtyRelated;
-
-        /**
-         * Load previously queried related records
-         */
-        let related = this->related;
-
-        /**
-         * Load unsaved related records
-         */
-        let dirtyRelated = this->dirtyRelated;
-
-        for name, record in related {
-            if isset dirtyRelated[name] {
-                continue;
-            }
-
-            if typeof record !== "object" || !(record instanceof ModelInterface) {
-                continue;
-            }
-
-            record->setDirtyState(self::DIRTY_STATE_TRANSIENT);
-            let dirtyRelated[name] = record;
-        }
-
-        return dirtyRelated;
+        return this->dirtyRelated;
     }
 
     /**
@@ -1388,7 +1362,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
         } else {
             let table = source;
         }
-
+        writeConnection->begin(false);
         /**
          * Join the conditions in the array using an AND operator
          * Do the deletion
@@ -1422,6 +1396,20 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
         if (success) {
             let this->related = [];
             this->modelsManager->clearReusableObjects();
+            writeConnection->commit(false);
+        } else {
+            let this->errorMessages = [
+                new Message(
+                    "Could not delete",
+                    null,
+                    "InvalidDeleteAttempt",
+                    0,
+                    [
+                        "model": get_class(this)
+                    ]
+                )
+            ];
+            writeConnection->rollback();
         }
 
         /**
@@ -5154,7 +5142,22 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
                  * Create an implicit array for has-many/has-one records
                  */
                 if typeof record === "object" {
-                    let relatedRecords = [record];
+                    if record instanceof Resultset {
+                        let relatedRecords = record->getDetached();
+                        for recordAfter in relatedRecords {
+                            if false === recordAfter->delete() {
+                                this->appendMessagesFrom(recordAfter);
+                                /**
+                                * Rollback the implicit transaction
+                                */
+                                connection->rollback(nesting);
+                                return false;
+                            }
+                        }
+                        let relatedRecords = record->getToSave();
+                    } else {
+                        let relatedRecords = [record];
+                    }
                 } else {
                     let relatedRecords = record;
                 }
@@ -5972,7 +5975,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
     /***
      * Append messages to this model from another Model.
      */
-    public inline function appendMessagesFrom(var model) -> void
+    public function appendMessagesFrom(var model) -> void
     {
         var messages, message;
         let messages = model->getMessages();
@@ -5981,7 +5984,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
                 if typeof message == "object" {
                     message->setMetaData(
                         [
-                            "model": model
+                            "model": get_class(model)
                         ]
                     );
                 }

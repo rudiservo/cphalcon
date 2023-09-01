@@ -349,4 +349,11 @@ class Simple extends Resultset
             let this->keepSnapshots = keepSnapshots;
         }
     }
+
+
+    public function getModel() -> <ModelInterface> | null
+    {
+        return this->model;
+    }
+
 }

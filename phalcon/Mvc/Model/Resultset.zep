@@ -23,6 +23,8 @@ use Phalcon\Mvc\ModelInterface;
 use Phalcon\Storage\Serializer\SerializerInterface;
 use SeekableIterator;
 use Serializable;
+use Phalcon\Support\Collection;
+use Phalcon\Support\Collection\CollectionInterface;
 
 /**
  * Phalcon\Mvc\Model\Resultset
@@ -127,6 +129,32 @@ abstract class Resultset
     protected result;
 
     /**
+     * @var array|null
+     */
+    protected attachedNew = null;
+
+    /**
+     * @var array|null
+     */
+    protected attachedRelated = null;
+
+    /**
+     * @var array|null
+     */
+    protected detachedRelated = null;
+
+    /**
+     * @var int
+     */
+    protected attachedCount = 0;
+
+    /**
+     * @var int
+     */
+    protected rowCount = 0;
+
+
+    /**
      * Phalcon\Mvc\Model\Resultset constructor
      *
      * @param ResultInterface|false $result
@@ -141,6 +169,7 @@ abstract class Resultset
          */
         if typeof result !== "object" {
             let this->count = 0;
+            let this->rowCount = 0;
             let this->rows = [];
 
             return;
@@ -168,7 +197,9 @@ abstract class Resultset
 
             let this->cache = cache;
         }
-
+        let this->attachedNew = [];
+        let this->attachedRelated = [];
+        let this->detachedRelated = [];
         /**
          * Do the fetch using only associative indexes
          */
@@ -177,8 +208,9 @@ abstract class Resultset
         /**
          * Update the row-count
          */
-        let rowCount    = result->numRows(),
-            this->count = rowCount;
+        let rowCount    = result->numRows();
+        let this->count = rowCount;
+        let this->rowCount = rowCount;
 
         /**
          * Empty result-set
@@ -213,6 +245,22 @@ abstract class Resultset
     final public function count() -> int
     {
         return this->count;
+    }
+
+    /**
+     * Counts how many rows are in the result
+     */
+     final public function rowCount() -> int
+    {
+        return this->rowCount;
+    }
+
+    /**
+     * Counts how many rows are in the result
+     */
+     final public function attachedCount() -> int
+    {
+        return this->attachedCount;
     }
 
     /**
@@ -285,7 +333,7 @@ abstract class Resultset
         if transaction === true {
             connection->commit();
         }
-
+        // this->refresh();
         return result;
     }
 
@@ -547,61 +595,69 @@ abstract class Resultset
      */
     final public function seek(var position) -> void
     {
-        var result, row;
-
+        var result, row, index, keys, key;
         if this->pointer != position || this->row === null {
-            if typeof this->rows == "array" {
-                /**
-                 * All rows are in memory
-                 */
-                if fetch row, this->rows[position] {
-                    let this->row = row;
+            if position < this->rowCount {
+                if typeof this->rows == "array" {
+                    /**
+                        * All rows are in memory
+                        */
+                    if fetch row, this->rows[position] {
+                        let this->row = row;
+                    }
+    
+                    let this->pointer = position;
+                    let this->activeRow = null;
+    
+                    return;
                 }
-
-                let this->pointer = position;
+    
+                /**
+                    * Fetch from PDO one-by-one.
+                    */
+                let result = this->result;
+    
+                if this->row === null && this->pointer === 0 {
+                    /**
+                        * Fresh result-set: Query was already executed in
+                        * `Model\Query::executeSelect()`
+                        * The first row is available with fetch
+                        */
+                    let this->row = result->$fetch();
+                }
+    
+                if this->pointer > position {
+                    /**
+                        * Current pointer is ahead requested position: e.g. request a
+                        * previous row. It is not possible to rewind. Re-execute query
+                        * with dataSeek.
+                        */
+                    result->dataSeek(position);
+    
+                    let this->row = result->$fetch();
+                    let this->pointer = position;
+                }
+    
+                while this->pointer < position {
+                    /**
+                        * Requested position is greater than current pointer, seek
+                        * forward until the requested position is reached. We do not
+                        * need to re-execute the query!
+                        */
+                    let this->row = result->$fetch();
+                    let this->pointer++;
+                }
                 let this->activeRow = null;
-
-                return;
+            } else {
+                if position < this->count {
+                    let keys = array_keys(this->attachedNew);
+                    let index = position - this->rowCount;
+                    let key = keys[index];
+                    let this->activeRow = this->attachedNew[key];
+                    let this->row = [];
+                }
             }
-
-            /**
-             * Fetch from PDO one-by-one.
-             */
-            let result = this->result;
-
-            if this->row === null && this->pointer === 0 {
-                /**
-                 * Fresh result-set: Query was already executed in
-                 * `Model\Query::executeSelect()`
-                 * The first row is available with fetch
-                 */
-                let this->row = result->$fetch();
-            }
-
-            if this->pointer > position {
-                /**
-                 * Current pointer is ahead requested position: e.g. request a
-                 * previous row. It is not possible to rewind. Re-execute query
-                 * with dataSeek.
-                 */
-                result->dataSeek(position);
-
-                let this->row = result->$fetch();
-                let this->pointer = position;
-            }
-
-            while this->pointer < position {
-                /**
-                 * Requested position is greater than current pointer, seek
-                 * forward until the requested position is reached. We do not
-                 * need to re-execute the query!
-                 */
-                let this->row = result->$fetch();
-                let this->pointer++;
-            }
-
             let this->pointer = position;
-            let this->activeRow = null;
         }
     }
 
@@ -676,7 +732,7 @@ abstract class Resultset
                 /**
                  * Get the messages from the record that produce the error
                  */
-                let this->errorMessages = record->getMessages();
+                this->appendMessagesFrom(record);
 
                 /**
                  * Rollback the transaction
@@ -697,7 +753,7 @@ abstract class Resultset
         if transaction === true {
             connection->commit();
         }
-
+        // this->refresh();
         return transaction;
     }
 
@@ -707,5 +763,106 @@ abstract class Resultset
     public function valid() -> bool
     {
         return this->pointer < this->count;
+    }
+
+    public function hasChanged() -> bool
+    {
+        return false === empty(this->attachedNew) || false === empty(this->attachedRelated) || false === empty(this->detachedRelated);
+    }
+
+    public function getToSave() -> array
+    {
+        return array_merge(this->attachedNew, this->attachedRelated);
+    }
+
+    public function getDirty()
+    {
+        return this->getToSave();
+    }
+
+    public function getDetached() -> array
+    {
+        return this->detachedRelated;
+    }
+
+    /**
+     *
+     */
+    public function attachNew(<ModelInterface> model) -> void
+    {
+        var object_id;
+        let object_id = spl_object_id(model);
+        let this->attachedNew[object_id] = model;
+        let this->count++;
+        let this->attachedCount++;
+    }
+
+    public function detachNew(<ModelInterface> model) -> void
+    {
+        var object_id;
+        let object_id = spl_object_id(model);
+        if true === isset(this->attachedNew[object_id]) {
+            unset(this->attachedNew[object_id]);
+            let this->count--;
+            let this->attachedCount--;
+        }
+    }
+
+    public function attachRelated(<ModelInterface> model) -> void
+    {
+        var object_id;
+        let object_id = spl_object_id(model);
+        let this->attachedRelated[object_id] = model;
+    }
+
+    public function detachRelated(<ModelInterface> model) -> void
+    {
+        var object_id;
+        let object_id = spl_object_id(model);
+        unset(this->attachedRelated[object_id]);
+        let this->detachedRelated[object_id] = model;
+    }
+
+    /***
+     * Append messages to this model from another Model.
+     */
+    public inline function appendMessagesFrom(var model) -> void
+    {
+        var messages, message;
+        let messages = model->getMessages();
+        if false === empty(messages) {
+            for message in messages {
+                if typeof message == "object" {
+                    message->setMetaData(
+                        [
+                            "model": get_class(model)
+                        ]
+                    );
+                }
+                /**
+                * Appends the messages to the current model
+                */
+                this->appendMessage(message);
+            }
+        }
+    }
+
+    public function appendMessage(<MessageInterface> message) -> <ModelInterface>
+    {
+        let this->errorMessages[] = message;
+        return this;
+    }
+
+    public function reset()
+    {
+        // this->refresh();
+        let this->attachedNew = [];
+        let this->attachedRelated = [];
+        let this->detachedRelated = [];
+    }
+
+    public function getIterator() -> <Traversable>
+    {
+        return clone this;
     }
 }
