@@ -1434,6 +1434,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
          */
         if (success) {
             let this->related = [];
+            let this->dirtyRelated = [];
             this->modelsManager->clearReusableObjects();
         }
 
@@ -2112,6 +2113,13 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
 //                 */
 //                let this->related[lowerAlias] = result;
 //            }
+            if isset(this->dirtyRelated[lowerAlias]) {
+                return this->dirtyRelated[lowerAlias];
+            }
+            if isset(this->related[lowerAlias]) {
+                return this->related[lowerAlias];
+            }
+
             /**
              * We do not need conditionals here. The models manager stores
              * reusable related records so we utilize that and remove complexity
@@ -2779,7 +2787,7 @@ abstract class Model extends AbstractInjectionAware implements EntityInterface, 
                  */
                 let this->dirtyRelated = [];
             }
-
+            let this->related = [];
             this->fireEvent("afterSave");
         }
 
